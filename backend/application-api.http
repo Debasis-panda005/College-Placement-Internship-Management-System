@@ -1,0 +1,65 @@
+### Create Application
+POST http://localhost:8080/api/applications
+Content-Type: application/json
+
+{
+  "studentId": 1,
+  "jobId": 1,
+  "applicationDate": "2026-09-22",
+  "status": "APPLIED"
+}
+### Get All Applications
+GET http://localhost:8080/api/applications
+
+### Get Application By ID
+GET http://localhost:8080/api/applications/1
+### Update Application
+PUT http://localhost:8080/api/applications/1
+Content-Type: application/json
+
+{
+  "studentId": 1,
+  "jobId": 1,
+  "applicationDate": "2026-09-22",
+  "status": "SHORTLISTED"
+}
+### Delete Application
+DELETE http://localhost:8080/api/applications/2
+### Create Interview
+POST http://localhost:8080/api/interviews
+Content-Type: application/json
+
+{
+  "applicationId": 1,
+  "interviewDate": "2026-09-25",
+  "interviewTime": "10:30:00",
+  "mode": "ONLINE",
+  "status": "SCHEDULED"
+}
+
+
+### Get All Interviews
+GET http://localhost:8080/api/interviews
+
+
+### Get Interview By ID
+GET http://localhost:8080/api/interviews/1
+
+
+### Update Interview
+PUT http://localhost:8080/api/interviews/1
+Content-Type: application/json
+
+{
+  "applicationId": 1,
+  "interviewDate": "2026-09-26",
+  "interviewTime": "11:00:00",
+  "mode": "OFFLINE",
+  "status": "COMPLETED"
+}
+
+
+### Delete Interview
+DELETE http://localhost:8080/api/interviews/1
+### Verify Deleted Interview
+GET http://localhost:8080/api/interviews/1
