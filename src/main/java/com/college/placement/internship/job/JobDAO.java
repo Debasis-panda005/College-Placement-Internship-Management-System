@@ -66,7 +66,40 @@ public class JobDAO {
 
         return jobs;
     }
+    // GET JOB BY ID
+    public Job getJobById(int id) {
 
+        Job job = null;
+
+        String sql = "SELECT * FROM jobs WHERE id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setInt(1, id);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+
+                if (resultSet.next()) {
+
+                    job = new Job();
+
+                    job.setId(resultSet.getInt("id"));
+                    job.setTitle(resultSet.getString("title"));
+                    job.setCompany(resultSet.getString("company"));
+                    job.setLocation(resultSet.getString("location"));
+                    job.setDescription(resultSet.getString("description"));
+                    job.setSalary(resultSet.getString("salary"));
+                    job.setJobType(resultSet.getString("job_type"));
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return job;
+    }
     // DELETE JOB
     public void deleteJob(int id) {
 

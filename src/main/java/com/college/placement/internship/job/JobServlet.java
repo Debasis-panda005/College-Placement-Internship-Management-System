@@ -23,7 +23,8 @@ public class JobServlet extends HttpServlet {
                           HttpServletResponse response)
             throws ServletException, IOException {
 
-        // Get data from JSP form
+        String idParameter = request.getParameter("id");
+
         String title = request.getParameter("title");
         String company = request.getParameter("company");
         String location = request.getParameter("location");
@@ -31,7 +32,6 @@ public class JobServlet extends HttpServlet {
         String salary = request.getParameter("salary");
         String jobType = request.getParameter("jobType");
 
-        // Create Job object
         Job job = new Job();
 
         job.setTitle(title);
@@ -41,10 +41,21 @@ public class JobServlet extends HttpServlet {
         job.setSalary(salary);
         job.setJobType(jobType);
 
-        // Save to database
-        jobDAO.addJob(job);
+        // If ID exists, update existing job
+        if (idParameter != null && !idParameter.isEmpty()) {
 
-        // Redirect to job list
+            int id = Integer.parseInt(idParameter);
+
+            job.setId(id);
+
+            jobDAO.updateJob(job);
+
+        } else {
+
+            // Otherwise, add a new job
+            jobDAO.addJob(job);
+        }
+
         response.sendRedirect("JobServlet");
     }
 
@@ -53,14 +64,46 @@ public class JobServlet extends HttpServlet {
                          HttpServletResponse response)
             throws ServletException, IOException {
 
-        try {
-            request.setAttribute("jobs", jobDAO.getAllJobs());
+        String action = request.getParameter("action");
+        // DELETE JOB
+        if ("delete".equals(action)) {
 
-            request.getRequestDispatcher("jobs.jsp")
-                    .forward(request, response);
+            String idParameter = request.getParameter("id");
 
-        } catch (Exception e) {
-            throw new ServletException(e);
+            if (idParameter != null && !idParameter.isEmpty()) {
+
+                int id = Integer.parseInt(idParameter);
+
+                jobDAO.deleteJob(id);
+            }
+
+            response.sendRedirect("JobServlet");
+            return;
         }
+        // EDIT JOB
+        if ("edit".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.isEmpty()) {
+
+                int id = Integer.parseInt(idParameter);
+
+                Job job = jobDAO.getJobById(id);
+
+                request.setAttribute("job", job);
+
+                request.getRequestDispatcher("edit-job.jsp")
+                        .forward(request, response);
+
+                return;
+            }
+        }
+
+        // VIEW ALL JOBS
+        request.setAttribute("jobs", jobDAO.getAllJobs());
+
+        request.getRequestDispatcher("jobs.jsp")
+                .forward(request, response);
     }
 }

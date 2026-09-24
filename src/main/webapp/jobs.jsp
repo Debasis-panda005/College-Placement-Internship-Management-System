@@ -77,6 +77,7 @@
             <th>Description</th>
             <th>Salary</th>
             <th>Job Type</th>
+            <th>Action</th>
         </tr>
 
         <%
@@ -95,6 +96,18 @@
             <td><%= job.getDescription() %></td>
             <td><%= job.getSalary() %></td>
             <td><%= job.getJobType() %></td>
+            <td>
+                <a href="JobServlet?action=edit&id=<%= job.getId() %>">
+                    Edit
+                </a>
+
+                &nbsp; | &nbsp;
+
+                <a href="JobServlet?action=delete&id=<%= job.getId() %>"
+                   onclick="return confirm('Are you sure you want to delete this job?');">
+                    Delete
+                </a>
+            </td>
         </tr>
 
         <%
@@ -104,7 +117,7 @@
         %>
 
         <tr>
-            <td colspan="7" style="text-align:center;">
+            <td colspan="8" style="text-align:center;">
                 No jobs available.
             </td>
         </tr>
