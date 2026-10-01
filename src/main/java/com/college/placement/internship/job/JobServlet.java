@@ -5,7 +5,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import java.io.IOException;
 
 @WebServlet("/JobServlet")
@@ -65,6 +64,7 @@ public class JobServlet extends HttpServlet {
             throws ServletException, IOException {
 
         String action = request.getParameter("action");
+        String search = request.getParameter("search");
         // DELETE JOB
         if ("delete".equals(action)) {
 
@@ -100,8 +100,15 @@ public class JobServlet extends HttpServlet {
             }
         }
 
-        // VIEW ALL JOBS
-        request.setAttribute("jobs", jobDAO.getAllJobs());
+        // SEARCH OR VIEW ALL JOBS
+        if (search != null && !search.trim().isEmpty()) {
+
+            request.setAttribute("jobs", jobDAO.searchJobs(search.trim()));
+
+        } else {
+
+            request.setAttribute("jobs", jobDAO.getAllJobs());
+        }
 
         request.getRequestDispatcher("jobs.jsp")
                 .forward(request, response);

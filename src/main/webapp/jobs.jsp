@@ -66,6 +66,22 @@
     <a href="add-job.jsp" class="add-button">
         + Add Job / Internship
     </a>
+    <form action="JobServlet" method="get" style="margin-bottom: 20px;">
+        <input type="text"
+               name="search"
+               placeholder="Search by title, company or location"
+               style="width: 300px; padding: 10px;">
+
+        <button type="submit"
+                style="padding: 10px 18px;">
+            Search
+        </button>
+
+        <a href="JobServlet"
+           style="margin-left: 10px;">
+            Clear
+        </a>
+    </form>
 
     <table>
 
