@@ -82,7 +82,29 @@
             Clear
         </a>
     </form>
+    <form action="JobServlet" method="get" style="margin-bottom: 20px;">
 
+        <select name="jobType"
+                style="padding: 10px; width: 200px;">
+
+            <option value="">All Job Types</option>
+            <option value="Full Time">Full Time</option>
+            <option value="Part Time">Part Time</option>
+            <option value="Internship">Internship</option>
+
+        </select>
+
+        <button type="submit"
+                style="padding: 10px 18px;">
+            Filter
+        </button>
+
+        <a href="JobServlet"
+           style="margin-left: 10px;">
+            Clear
+        </a>
+
+    </form>
     <table>
 
         <tr>

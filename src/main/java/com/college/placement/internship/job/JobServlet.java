@@ -5,6 +5,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 
 @WebServlet("/JobServlet")
@@ -17,6 +18,7 @@ public class JobServlet extends HttpServlet {
         jobDAO = new JobDAO();
     }
 
+    // ADD OR UPDATE JOB
     @Override
     protected void doPost(HttpServletRequest request,
                           HttpServletResponse response)
@@ -58,6 +60,7 @@ public class JobServlet extends HttpServlet {
         response.sendRedirect("JobServlet");
     }
 
+    // VIEW, SEARCH, FILTER, EDIT OR DELETE JOB
     @Override
     protected void doGet(HttpServletRequest request,
                          HttpServletResponse response)
@@ -65,6 +68,8 @@ public class JobServlet extends HttpServlet {
 
         String action = request.getParameter("action");
         String search = request.getParameter("search");
+        String jobType = request.getParameter("jobType");
+
         // DELETE JOB
         if ("delete".equals(action)) {
 
@@ -80,6 +85,7 @@ public class JobServlet extends HttpServlet {
             response.sendRedirect("JobServlet");
             return;
         }
+
         // EDIT JOB
         if ("edit".equals(action)) {
 
@@ -100,16 +106,30 @@ public class JobServlet extends HttpServlet {
             }
         }
 
-        // SEARCH OR VIEW ALL JOBS
+        // SEARCH, FILTER OR VIEW ALL JOBS
         if (search != null && !search.trim().isEmpty()) {
 
-            request.setAttribute("jobs", jobDAO.searchJobs(search.trim()));
+            request.setAttribute(
+                    "jobs",
+                    jobDAO.searchJobs(search.trim())
+            );
+
+        } else if (jobType != null && !jobType.trim().isEmpty()) {
+
+            request.setAttribute(
+                    "jobs",
+                    jobDAO.getJobsByType(jobType)
+            );
 
         } else {
 
-            request.setAttribute("jobs", jobDAO.getAllJobs());
+            request.setAttribute(
+                    "jobs",
+                    jobDAO.getAllJobs()
+            );
         }
 
+        // SHOW JOBS PAGE
         request.getRequestDispatcher("jobs.jsp")
                 .forward(request, response);
     }
