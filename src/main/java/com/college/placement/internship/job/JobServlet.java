@@ -74,8 +74,10 @@ public class JobServlet extends HttpServlet {
         String action = request.getParameter("action");
         String search = request.getParameter("search");
         String jobType = request.getParameter("jobType");
+        String status = request.getParameter("status");
         String sortBy = request.getParameter("sortBy");
         String message = request.getParameter("message");
+
 
         // DELETE JOB
         if ("delete".equals(action)) {
@@ -152,6 +154,14 @@ public class JobServlet extends HttpServlet {
                     jobDAO.getJobsByType(jobType)
             );
 
+            // FILTER JOBS BY STATUS
+        } else if (status != null && !status.trim().isEmpty()) {
+
+            request.setAttribute(
+                    "jobs",
+                    jobDAO.getJobsByStatus(status)
+            );
+
             // SORT JOBS
         } else if (sortBy != null && !sortBy.trim().isEmpty()) {
 
@@ -169,8 +179,10 @@ public class JobServlet extends HttpServlet {
             );
         }
 
+
         // Send message to JSP
         request.setAttribute("message", message);
+
 
         // SHOW JOBS PAGE
         request.getRequestDispatcher("jobs.jsp")

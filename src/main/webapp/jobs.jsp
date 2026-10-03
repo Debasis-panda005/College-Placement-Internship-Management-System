@@ -187,7 +187,40 @@
 
     </form>
 
+    <!-- STATUS FILTER -->
 
+    <form action="JobServlet"
+          method="get"
+          style="margin-bottom: 20px;">
+
+        <select name="status"
+                style="padding: 10px; width: 200px;">
+
+            <option value="">
+                All Statuses
+            </option>
+
+            <option value="Active">
+                Active
+            </option>
+
+            <option value="Closed">
+                Closed
+            </option>
+
+        </select>
+
+        <button type="submit"
+                style="padding: 10px 18px;">
+            Filter Status
+        </button>
+
+        <a href="JobServlet"
+           style="margin-left: 10px;">
+            Clear
+        </a>
+
+    </form>
     <!-- SORT -->
 
     <form action="JobServlet"
