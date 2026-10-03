@@ -12,8 +12,8 @@ public class JobDAO {
     public void addJob(Job job) {
 
         String sql = "INSERT INTO jobs " +
-                "(title, company, location, description, salary, job_type) " +
-                "VALUES (?, ?, ?, ?, ?, ?)";
+                "(title, company, location, description, salary, job_type, status) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -24,6 +24,7 @@ public class JobDAO {
             statement.setString(4, job.getDescription());
             statement.setString(5, job.getSalary());
             statement.setString(6, job.getJobType());
+            statement.setString(7, job.getStatus());
 
             statement.executeUpdate();
 
@@ -57,6 +58,7 @@ public class JobDAO {
                 job.setDescription(resultSet.getString("description"));
                 job.setSalary(resultSet.getString("salary"));
                 job.setJobType(resultSet.getString("job_type"));
+                job.setStatus(resultSet.getString("status"));
 
                 jobs.add(job);
             }
@@ -94,6 +96,7 @@ public class JobDAO {
                     job.setDescription(resultSet.getString("description"));
                     job.setSalary(resultSet.getString("salary"));
                     job.setJobType(resultSet.getString("job_type"));
+                    job.setStatus(resultSet.getString("status"));
                 }
             }
 
@@ -129,7 +132,7 @@ public class JobDAO {
     public void updateJob(Job job) {
 
         String sql = "UPDATE jobs SET title = ?, company = ?, location = ?, " +
-                "description = ?, salary = ?, job_type = ? WHERE id = ?";
+                "description = ?, salary = ?, job_type = ?, status = ? WHERE id = ?";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -140,7 +143,8 @@ public class JobDAO {
             statement.setString(4, job.getDescription());
             statement.setString(5, job.getSalary());
             statement.setString(6, job.getJobType());
-            statement.setInt(7, job.getId());
+            statement.setString(7, job.getStatus());
+            statement.setInt(8, job.getId());
 
             statement.executeUpdate();
 
@@ -184,6 +188,7 @@ public class JobDAO {
                     job.setDescription(resultSet.getString("description"));
                     job.setSalary(resultSet.getString("salary"));
                     job.setJobType(resultSet.getString("job_type"));
+                    job.setStatus(resultSet.getString("status"));
 
                     jobs.add(job);
                 }
@@ -222,6 +227,7 @@ public class JobDAO {
                     job.setDescription(resultSet.getString("description"));
                     job.setSalary(resultSet.getString("salary"));
                     job.setJobType(resultSet.getString("job_type"));
+                    job.setStatus(resultSet.getString("status"));
 
                     jobs.add(job);
                 }
@@ -269,6 +275,7 @@ public class JobDAO {
                 job.setDescription(resultSet.getString("description"));
                 job.setSalary(resultSet.getString("salary"));
                 job.setJobType(resultSet.getString("job_type"));
+                job.setStatus(resultSet.getString("status"));
 
                 jobs.add(job);
             }

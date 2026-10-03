@@ -32,6 +32,7 @@ public class JobServlet extends HttpServlet {
         String description = request.getParameter("description");
         String salary = request.getParameter("salary");
         String jobType = request.getParameter("jobType");
+        String status = request.getParameter("status");
 
         Job job = new Job();
 
@@ -41,6 +42,7 @@ public class JobServlet extends HttpServlet {
         job.setDescription(description);
         job.setSalary(salary);
         job.setJobType(jobType);
+        job.setStatus(status);
 
         // If ID exists, update existing job
         if (idParameter != null && !idParameter.isEmpty()) {
@@ -51,7 +53,6 @@ public class JobServlet extends HttpServlet {
 
             jobDAO.updateJob(job);
 
-            // Send update success message
             response.sendRedirect("JobServlet?message=updated");
 
         } else {
@@ -59,10 +60,10 @@ public class JobServlet extends HttpServlet {
             // Otherwise, add a new job
             jobDAO.addJob(job);
 
-            // Send add success message
             response.sendRedirect("JobServlet?message=added");
         }
     }
+
 
     // VIEW, SEARCH, FILTER, SORT, EDIT OR DELETE JOB
     @Override
@@ -88,10 +89,10 @@ public class JobServlet extends HttpServlet {
                 jobDAO.deleteJob(id);
             }
 
-            // Send delete success message
             response.sendRedirect("JobServlet?message=deleted");
             return;
         }
+
 
         // EDIT JOB
         if ("edit".equals(action)) {
@@ -113,6 +114,7 @@ public class JobServlet extends HttpServlet {
             }
         }
 
+
         // VIEW JOB DETAILS
         if ("view".equals(action)) {
 
@@ -132,6 +134,7 @@ public class JobServlet extends HttpServlet {
                 return;
             }
         }
+
 
         // SEARCH JOBS
         if (search != null && !search.trim().isEmpty()) {

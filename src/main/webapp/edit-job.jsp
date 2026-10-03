@@ -89,6 +89,7 @@
            name="id"
            value="<%= job.getId() %>">
 
+
     <label>Job Title</label>
 
     <input type="text"
@@ -156,6 +157,25 @@
     </select>
 
 
+    <label>Status</label>
+
+    <select id="status"
+            name="status"
+            required>
+
+      <option value="Active"
+              <%= "Active".equals(job.getStatus()) ? "selected" : "" %>>
+        Active
+      </option>
+
+      <option value="Closed"
+              <%= "Closed".equals(job.getStatus()) ? "selected" : "" %>>
+        Closed
+      </option>
+
+    </select>
+
+
     <button type="submit">
       Update Job
     </button>
@@ -174,11 +194,23 @@
 
   function validateForm() {
 
-    let title = document.getElementById("title").value.trim();
-    let company = document.getElementById("company").value.trim();
-    let location = document.getElementById("location").value.trim();
-    let salary = document.getElementById("salary").value.trim();
-    let jobType = document.getElementById("jobType").value;
+    let title =
+            document.getElementById("title").value.trim();
+
+    let company =
+            document.getElementById("company").value.trim();
+
+    let location =
+            document.getElementById("location").value.trim();
+
+    let salary =
+            document.getElementById("salary").value.trim();
+
+    let jobType =
+            document.getElementById("jobType").value;
+
+    let status =
+            document.getElementById("status").value;
 
 
     if (title === "") {
@@ -207,6 +239,12 @@
 
     if (jobType === "") {
       alert("Please select a job type.");
+      return false;
+    }
+
+
+    if (status === "") {
+      alert("Please select a status.");
       return false;
     }
 

@@ -8,11 +8,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-
     <title>Job Details</title>
 
     <style>
-
         body {
             font-family: Arial, sans-serif;
             background: #f4f6f8;
@@ -29,99 +27,102 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
-        h1 {
+        h2 {
             text-align: center;
-            color: #1976d2;
             margin-bottom: 30px;
         }
 
         .detail {
-            margin-bottom: 18px;
+            margin-bottom: 15px;
         }
 
         .label {
             font-weight: bold;
-            display: block;
-            margin-bottom: 5px;
         }
 
-        .value {
-            padding: 10px;
-            background: #f4f6f8;
-            border-radius: 5px;
+        .active-status {
+            color: green;
+            font-weight: bold;
+        }
+
+        .closed-status {
+            color: red;
+            font-weight: bold;
         }
 
         .back-button {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 18px;
-            background: #1976d2;
-            color: white;
+            display: block;
+            text-align: center;
+            margin-top: 25px;
             text-decoration: none;
-            border-radius: 5px;
         }
-
-        .back-button:hover {
-            background: #125aa0;
-        }
-
     </style>
-
 </head>
 
 <body>
 
 <div class="container">
 
-    <h1>Job / Internship Details</h1>
+    <h2>Job / Internship Details</h2>
 
     <div class="detail">
-        <span class="label">Job ID</span>
-        <div class="value">
-            <%= job.getId() %>
-        </div>
+        <span class="label">Job ID:</span>
+        <%= job.getId() %>
     </div>
 
     <div class="detail">
-        <span class="label">Job Title</span>
-        <div class="value">
-            <%= job.getTitle() %>
-        </div>
+        <span class="label">Job Title:</span>
+        <%= job.getTitle() %>
     </div>
 
     <div class="detail">
-        <span class="label">Company</span>
-        <div class="value">
-            <%= job.getCompany() %>
-        </div>
+        <span class="label">Company:</span>
+        <%= job.getCompany() %>
     </div>
 
     <div class="detail">
-        <span class="label">Location</span>
-        <div class="value">
-            <%= job.getLocation() %>
-        </div>
+        <span class="label">Location:</span>
+        <%= job.getLocation() %>
     </div>
 
     <div class="detail">
-        <span class="label">Description</span>
-        <div class="value">
-            <%= job.getDescription() %>
-        </div>
+        <span class="label">Description:</span>
+        <%= job.getDescription() %>
     </div>
 
     <div class="detail">
-        <span class="label">Salary</span>
-        <div class="value">
-            <%= job.getSalary() %>
-        </div>
+        <span class="label">Salary:</span>
+        <%= job.getSalary() %>
     </div>
 
     <div class="detail">
-        <span class="label">Job Type</span>
-        <div class="value">
-            <%= job.getJobType() %>
-        </div>
+        <span class="label">Job Type:</span>
+        <%= job.getJobType() %>
+    </div>
+
+    <div class="detail">
+        <span class="label">Status:</span>
+
+        <%
+            if ("Active".equals(job.getStatus())) {
+        %>
+
+        <span class="active-status">
+                Active
+            </span>
+
+        <%
+        } else {
+        %>
+
+        <span class="closed-status">
+                Closed
+            </span>
+
+        <%
+            }
+        %>
+
     </div>
 
     <a href="JobServlet" class="back-button">

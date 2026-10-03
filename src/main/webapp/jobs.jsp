@@ -69,6 +69,16 @@
         .action-link {
             text-decoration: none;
         }
+
+        .active-status {
+            color: green;
+            font-weight: bold;
+        }
+
+        .closed-status {
+            color: red;
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -118,7 +128,9 @@
 
     <!-- SEARCH -->
 
-    <form action="JobServlet" method="get" style="margin-bottom: 20px;">
+    <form action="JobServlet"
+          method="get"
+          style="margin-bottom: 20px;">
 
         <input type="text"
                name="search"
@@ -140,15 +152,26 @@
 
     <!-- FILTER -->
 
-    <form action="JobServlet" method="get" style="margin-bottom: 20px;">
+    <form action="JobServlet"
+          method="get"
+          style="margin-bottom: 20px;">
 
         <select name="jobType"
                 style="padding: 10px; width: 200px;">
 
             <option value="">All Job Types</option>
-            <option value="Full Time">Full Time</option>
-            <option value="Part Time">Part Time</option>
-            <option value="Internship">Internship</option>
+
+            <option value="Full Time">
+                Full Time
+            </option>
+
+            <option value="Part Time">
+                Part Time
+            </option>
+
+            <option value="Internship">
+                Internship
+            </option>
 
         </select>
 
@@ -167,15 +190,28 @@
 
     <!-- SORT -->
 
-    <form action="JobServlet" method="get" style="margin-bottom: 20px;">
+    <form action="JobServlet"
+          method="get"
+          style="margin-bottom: 20px;">
 
         <select name="sortBy"
                 style="padding: 10px; width: 200px;">
 
-            <option value="">Sort Jobs By</option>
-            <option value="title">Job Title</option>
-            <option value="company">Company</option>
-            <option value="jobType">Job Type</option>
+            <option value="">
+                Sort Jobs By
+            </option>
+
+            <option value="title">
+                Job Title
+            </option>
+
+            <option value="company">
+                Company
+            </option>
+
+            <option value="jobType">
+                Job Type
+            </option>
 
         </select>
 
@@ -204,8 +240,10 @@
             <th>Description</th>
             <th>Salary</th>
             <th>Job Type</th>
+            <th>Status</th>
             <th>Action</th>
         </tr>
+
 
         <%
 
@@ -248,9 +286,37 @@
                 <%= job.getJobType() %>
             </td>
 
+
+            <!-- STATUS -->
+
             <td>
 
-                <!-- VIEW DETAILS -->
+                <%
+                    if ("Active".equals(job.getStatus())) {
+                %>
+
+                <span class="active-status">
+                        Active
+                    </span>
+
+                <%
+                } else {
+                %>
+
+                <span class="closed-status">
+                        Closed
+                    </span>
+
+                <%
+                    }
+                %>
+
+            </td>
+
+
+            <!-- ACTIONS -->
+
+            <td>
 
                 <a href="JobServlet?action=view&id=<%= job.getId() %>"
                    class="action-link">
@@ -259,18 +325,12 @@
 
                 &nbsp; | &nbsp;
 
-
-                <!-- EDIT -->
-
                 <a href="JobServlet?action=edit&id=<%= job.getId() %>"
                    class="action-link">
                     Edit
                 </a>
 
                 &nbsp; | &nbsp;
-
-
-                <!-- DELETE -->
 
                 <a href="JobServlet?action=delete&id=<%= job.getId() %>"
                    class="action-link"
@@ -292,7 +352,7 @@
 
         <tr>
 
-            <td colspan="8"
+            <td colspan="9"
                 style="text-align:center;">
                 No jobs available.
             </td>

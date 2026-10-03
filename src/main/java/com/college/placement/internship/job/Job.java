@@ -9,6 +9,7 @@ public class Job {
     private String description;
     private String salary;
     private String jobType;
+    private String status;
 
     public Job() {
     }
@@ -78,5 +79,13 @@ public class Job {
 
     public void setJobType(String jobType) {
         this.jobType = jobType;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }
