@@ -118,6 +118,32 @@
     </form>
 
 
+    <!-- SORT -->
+    <form action="JobServlet" method="get" style="margin-bottom: 20px;">
+
+        <select name="sortBy"
+                style="padding: 10px; width: 200px;">
+
+            <option value="">Sort Jobs By</option>
+            <option value="title">Job Title</option>
+            <option value="company">Company</option>
+            <option value="jobType">Job Type</option>
+
+        </select>
+
+        <button type="submit"
+                style="padding: 10px 18px;">
+            Sort
+        </button>
+
+        <a href="JobServlet"
+           style="margin-left: 10px;">
+            Clear
+        </a>
+
+    </form>
+
+
     <!-- JOB TABLE -->
     <table>
 

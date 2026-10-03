@@ -60,7 +60,7 @@ public class JobServlet extends HttpServlet {
         response.sendRedirect("JobServlet");
     }
 
-    // VIEW, SEARCH, FILTER, EDIT OR DELETE JOB
+    // VIEW, SEARCH, FILTER, SORT, EDIT OR DELETE JOB
     @Override
     protected void doGet(HttpServletRequest request,
                          HttpServletResponse response)
@@ -69,7 +69,7 @@ public class JobServlet extends HttpServlet {
         String action = request.getParameter("action");
         String search = request.getParameter("search");
         String jobType = request.getParameter("jobType");
-
+        String sortBy = request.getParameter("sortBy");
 
         // DELETE JOB
         if ("delete".equals(action)) {
@@ -86,7 +86,6 @@ public class JobServlet extends HttpServlet {
             response.sendRedirect("JobServlet");
             return;
         }
-
 
         // EDIT JOB
         if ("edit".equals(action)) {
@@ -108,7 +107,6 @@ public class JobServlet extends HttpServlet {
             }
         }
 
-
         // VIEW JOB DETAILS
         if ("view".equals(action)) {
 
@@ -129,8 +127,7 @@ public class JobServlet extends HttpServlet {
             }
         }
 
-
-        // SEARCH, FILTER OR VIEW ALL JOBS
+        // SEARCH JOBS
         if (search != null && !search.trim().isEmpty()) {
 
             request.setAttribute(
@@ -138,6 +135,7 @@ public class JobServlet extends HttpServlet {
                     jobDAO.searchJobs(search.trim())
             );
 
+            // FILTER JOBS BY TYPE
         } else if (jobType != null && !jobType.trim().isEmpty()) {
 
             request.setAttribute(
@@ -145,6 +143,15 @@ public class JobServlet extends HttpServlet {
                     jobDAO.getJobsByType(jobType)
             );
 
+            // SORT JOBS
+        } else if (sortBy != null && !sortBy.trim().isEmpty()) {
+
+            request.setAttribute(
+                    "jobs",
+                    jobDAO.getJobsSortedBy(sortBy)
+            );
+
+            // VIEW ALL JOBS
         } else {
 
             request.setAttribute(
@@ -152,7 +159,6 @@ public class JobServlet extends HttpServlet {
                     jobDAO.getAllJobs()
             );
         }
-
 
         // SHOW JOBS PAGE
         request.getRequestDispatcher("jobs.jsp")

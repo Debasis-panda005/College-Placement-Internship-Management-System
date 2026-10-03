@@ -34,6 +34,7 @@ public class JobDAO {
         }
     }
 
+
     // VIEW ALL JOBS
     public List<Job> getAllJobs() {
 
@@ -66,6 +67,8 @@ public class JobDAO {
 
         return jobs;
     }
+
+
     // GET JOB BY ID
     public Job getJobById(int id) {
 
@@ -100,6 +103,8 @@ public class JobDAO {
 
         return job;
     }
+
+
     // DELETE JOB
     public void deleteJob(int id) {
 
@@ -118,6 +123,8 @@ public class JobDAO {
             e.printStackTrace();
         }
     }
+
+
     // UPDATE JOB
     public void updateJob(Job job) {
 
@@ -143,6 +150,8 @@ public class JobDAO {
             e.printStackTrace();
         }
     }
+
+
     // SEARCH JOBS
     public List<Job> searchJobs(String keyword) {
 
@@ -186,6 +195,8 @@ public class JobDAO {
 
         return jobs;
     }
+
+
     // FILTER JOBS BY TYPE
     public List<Job> getJobsByType(String jobType) {
 
@@ -214,6 +225,52 @@ public class JobDAO {
 
                     jobs.add(job);
                 }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return jobs;
+    }
+
+
+    // SORT JOBS
+    public List<Job> getJobsSortedBy(String sortBy) {
+
+        List<Job> jobs = new ArrayList<>();
+
+        String column;
+
+        if ("title".equals(sortBy)) {
+            column = "title";
+        } else if ("company".equals(sortBy)) {
+            column = "company";
+        } else if ("jobType".equals(sortBy)) {
+            column = "job_type";
+        } else {
+            column = "id";
+        }
+
+        String sql = "SELECT * FROM jobs ORDER BY " + column + " ASC";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+
+            while (resultSet.next()) {
+
+                Job job = new Job();
+
+                job.setId(resultSet.getInt("id"));
+                job.setTitle(resultSet.getString("title"));
+                job.setCompany(resultSet.getString("company"));
+                job.setLocation(resultSet.getString("location"));
+                job.setDescription(resultSet.getString("description"));
+                job.setSalary(resultSet.getString("salary"));
+                job.setJobType(resultSet.getString("job_type"));
+
+                jobs.add(job);
             }
 
         } catch (Exception e) {
