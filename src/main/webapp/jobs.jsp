@@ -54,6 +54,10 @@
         tr:nth-child(even) {
             background: #f9f9f9;
         }
+
+        .action-link {
+            text-decoration: none;
+        }
     </style>
 </head>
 
@@ -66,7 +70,10 @@
     <a href="add-job.jsp" class="add-button">
         + Add Job / Internship
     </a>
+
+    <!-- SEARCH -->
     <form action="JobServlet" method="get" style="margin-bottom: 20px;">
+
         <input type="text"
                name="search"
                placeholder="Search by title, company or location"
@@ -81,7 +88,11 @@
            style="margin-left: 10px;">
             Clear
         </a>
+
     </form>
+
+
+    <!-- FILTER -->
     <form action="JobServlet" method="get" style="margin-bottom: 20px;">
 
         <select name="jobType"
@@ -105,6 +116,9 @@
         </a>
 
     </form>
+
+
+    <!-- JOB TABLE -->
     <table>
 
         <tr>
@@ -127,25 +141,62 @@
         %>
 
         <tr>
-            <td><%= job.getId() %></td>
-            <td><%= job.getTitle() %></td>
-            <td><%= job.getCompany() %></td>
-            <td><%= job.getLocation() %></td>
-            <td><%= job.getDescription() %></td>
-            <td><%= job.getSalary() %></td>
-            <td><%= job.getJobType() %></td>
+
             <td>
-                <a href="JobServlet?action=edit&id=<%= job.getId() %>">
+                <%= job.getId() %>
+            </td>
+
+            <td>
+                <%= job.getTitle() %>
+            </td>
+
+            <td>
+                <%= job.getCompany() %>
+            </td>
+
+            <td>
+                <%= job.getLocation() %>
+            </td>
+
+            <td>
+                <%= job.getDescription() %>
+            </td>
+
+            <td>
+                <%= job.getSalary() %>
+            </td>
+
+            <td>
+                <%= job.getJobType() %>
+            </td>
+
+            <td>
+
+                <!-- VIEW DETAILS -->
+                <a href="JobServlet?action=view&id=<%= job.getId() %>"
+                   class="action-link">
+                    View
+                </a>
+
+                &nbsp; | &nbsp;
+
+                <!-- EDIT -->
+                <a href="JobServlet?action=edit&id=<%= job.getId() %>"
+                   class="action-link">
                     Edit
                 </a>
 
                 &nbsp; | &nbsp;
 
+                <!-- DELETE -->
                 <a href="JobServlet?action=delete&id=<%= job.getId() %>"
+                   class="action-link"
                    onclick="return confirm('Are you sure you want to delete this job?');">
                     Delete
                 </a>
+
             </td>
+
         </tr>
 
         <%
@@ -155,9 +206,11 @@
         %>
 
         <tr>
+
             <td colspan="8" style="text-align:center;">
                 No jobs available.
             </td>
+
         </tr>
 
         <%

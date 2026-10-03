@@ -70,6 +70,7 @@ public class JobServlet extends HttpServlet {
         String search = request.getParameter("search");
         String jobType = request.getParameter("jobType");
 
+
         // DELETE JOB
         if ("delete".equals(action)) {
 
@@ -85,6 +86,7 @@ public class JobServlet extends HttpServlet {
             response.sendRedirect("JobServlet");
             return;
         }
+
 
         // EDIT JOB
         if ("edit".equals(action)) {
@@ -105,6 +107,28 @@ public class JobServlet extends HttpServlet {
                 return;
             }
         }
+
+
+        // VIEW JOB DETAILS
+        if ("view".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.isEmpty()) {
+
+                int id = Integer.parseInt(idParameter);
+
+                Job job = jobDAO.getJobById(id);
+
+                request.setAttribute("job", job);
+
+                request.getRequestDispatcher("job-details.jsp")
+                        .forward(request, response);
+
+                return;
+            }
+        }
+
 
         // SEARCH, FILTER OR VIEW ALL JOBS
         if (search != null && !search.trim().isEmpty()) {
@@ -128,6 +152,7 @@ public class JobServlet extends HttpServlet {
                     jobDAO.getAllJobs()
             );
         }
+
 
         // SHOW JOBS PAGE
         request.getRequestDispatcher("jobs.jsp")
