@@ -51,13 +51,17 @@ public class JobServlet extends HttpServlet {
 
             jobDAO.updateJob(job);
 
+            // Send update success message
+            response.sendRedirect("JobServlet?message=updated");
+
         } else {
 
             // Otherwise, add a new job
             jobDAO.addJob(job);
-        }
 
-        response.sendRedirect("JobServlet");
+            // Send add success message
+            response.sendRedirect("JobServlet?message=added");
+        }
     }
 
     // VIEW, SEARCH, FILTER, SORT, EDIT OR DELETE JOB
@@ -70,6 +74,7 @@ public class JobServlet extends HttpServlet {
         String search = request.getParameter("search");
         String jobType = request.getParameter("jobType");
         String sortBy = request.getParameter("sortBy");
+        String message = request.getParameter("message");
 
         // DELETE JOB
         if ("delete".equals(action)) {
@@ -83,7 +88,8 @@ public class JobServlet extends HttpServlet {
                 jobDAO.deleteJob(id);
             }
 
-            response.sendRedirect("JobServlet");
+            // Send delete success message
+            response.sendRedirect("JobServlet?message=deleted");
             return;
         }
 
@@ -159,6 +165,9 @@ public class JobServlet extends HttpServlet {
                     jobDAO.getAllJobs()
             );
         }
+
+        // Send message to JSP
+        request.setAttribute("message", message);
 
         // SHOW JOBS PAGE
         request.getRequestDispatcher("jobs.jsp")

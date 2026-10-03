@@ -34,6 +34,17 @@
             margin-bottom: 20px;
         }
 
+        .message {
+            padding: 12px;
+            margin-bottom: 20px;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -71,7 +82,42 @@
         + Add Job / Internship
     </a>
 
+
+    <!-- SUCCESS MESSAGE -->
+
+    <%
+        String message = (String) request.getAttribute("message");
+
+        if ("added".equals(message)) {
+    %>
+
+    <div class="message">
+        Job added successfully!
+    </div>
+
+    <%
+    } else if ("updated".equals(message)) {
+    %>
+
+    <div class="message">
+        Job updated successfully!
+    </div>
+
+    <%
+    } else if ("deleted".equals(message)) {
+    %>
+
+    <div class="message">
+        Job deleted successfully!
+    </div>
+
+    <%
+        }
+    %>
+
+
     <!-- SEARCH -->
+
     <form action="JobServlet" method="get" style="margin-bottom: 20px;">
 
         <input type="text"
@@ -93,6 +139,7 @@
 
 
     <!-- FILTER -->
+
     <form action="JobServlet" method="get" style="margin-bottom: 20px;">
 
         <select name="jobType"
@@ -119,6 +166,7 @@
 
 
     <!-- SORT -->
+
     <form action="JobServlet" method="get" style="margin-bottom: 20px;">
 
         <select name="sortBy"
@@ -145,6 +193,7 @@
 
 
     <!-- JOB TABLE -->
+
     <table>
 
         <tr>
@@ -159,11 +208,14 @@
         </tr>
 
         <%
-            List<Job> jobs = (List<Job>) request.getAttribute("jobs");
+
+            List<Job> jobs =
+                    (List<Job>) request.getAttribute("jobs");
 
             if (jobs != null && !jobs.isEmpty()) {
 
                 for (Job job : jobs) {
+
         %>
 
         <tr>
@@ -199,6 +251,7 @@
             <td>
 
                 <!-- VIEW DETAILS -->
+
                 <a href="JobServlet?action=view&id=<%= job.getId() %>"
                    class="action-link">
                     View
@@ -206,7 +259,9 @@
 
                 &nbsp; | &nbsp;
 
+
                 <!-- EDIT -->
+
                 <a href="JobServlet?action=edit&id=<%= job.getId() %>"
                    class="action-link">
                     Edit
@@ -214,7 +269,9 @@
 
                 &nbsp; | &nbsp;
 
+
                 <!-- DELETE -->
+
                 <a href="JobServlet?action=delete&id=<%= job.getId() %>"
                    class="action-link"
                    onclick="return confirm('Are you sure you want to delete this job?');">
@@ -226,21 +283,26 @@
         </tr>
 
         <%
+
             }
 
         } else {
+
         %>
 
         <tr>
 
-            <td colspan="8" style="text-align:center;">
+            <td colspan="8"
+                style="text-align:center;">
                 No jobs available.
             </td>
 
         </tr>
 
         <%
+
             }
+
         %>
 
     </table>
