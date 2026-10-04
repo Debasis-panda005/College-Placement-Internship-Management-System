@@ -3,7 +3,11 @@ package com.college.backend.dao;
 import com.college.backend.entity.Application;
 import com.college.backend.util.DBConnection;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -159,13 +163,14 @@ public class ApplicationDAO {
     public boolean shortlistApplication(Long id) {
 
         String sql = "UPDATE applications " +
-                "SET status = 'SHORTLISTED' " +
+                "SET status = ? " +
                 "WHERE id = ?";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setLong(1, id);
+            statement.setString(1, "SHORTLISTED");
+            statement.setLong(2, id);
 
             return statement.executeUpdate() > 0;
 
@@ -180,13 +185,14 @@ public class ApplicationDAO {
     public boolean selectApplication(Long id) {
 
         String sql = "UPDATE applications " +
-                "SET status = 'SELECTED' " +
+                "SET status = ? " +
                 "WHERE id = ?";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setLong(1, id);
+            statement.setString(1, "SELECTED");
+            statement.setLong(2, id);
 
             return statement.executeUpdate() > 0;
 

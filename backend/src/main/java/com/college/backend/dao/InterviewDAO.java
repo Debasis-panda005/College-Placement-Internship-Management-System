@@ -33,7 +33,6 @@ public class InterviewDAO {
         }
     }
 
-
     // 2. Get All Interviews
     public List<Interview> getAllInterviews() {
 
@@ -54,13 +53,11 @@ public class InterviewDAO {
                         resultSet.getLong("application_id"));
 
                 Date date = resultSet.getDate("interview_date");
-
                 if (date != null) {
                     interview.setInterviewDate(date.toLocalDate());
                 }
 
                 Time time = resultSet.getTime("interview_time");
-
                 if (time != null) {
                     interview.setInterviewTime(time.toLocalTime());
                 }
@@ -77,7 +74,6 @@ public class InterviewDAO {
 
         return interviews;
     }
-
 
     // 3. Get Interview By ID
     public Interview getInterviewById(Long id) {
@@ -100,13 +96,11 @@ public class InterviewDAO {
                             resultSet.getLong("application_id"));
 
                     Date date = resultSet.getDate("interview_date");
-
                     if (date != null) {
                         interview.setInterviewDate(date.toLocalDate());
                     }
 
                     Time time = resultSet.getTime("interview_time");
-
                     if (time != null) {
                         interview.setInterviewTime(time.toLocalTime());
                     }
@@ -125,7 +119,6 @@ public class InterviewDAO {
         return null;
     }
 
-
     // 4. Update Interview
     public boolean updateInterview(Interview interview) {
 
@@ -141,10 +134,14 @@ public class InterviewDAO {
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setLong(1, interview.getApplicationId());
-            statement.setDate(2,
-                    Date.valueOf(interview.getInterviewDate()));
-            statement.setTime(3,
-                    Time.valueOf(interview.getInterviewTime()));
+            statement.setDate(
+                    2,
+                    Date.valueOf(interview.getInterviewDate())
+            );
+            statement.setTime(
+                    3,
+                    Time.valueOf(interview.getInterviewTime())
+            );
             statement.setString(4, interview.getMode());
             statement.setString(5, interview.getStatus());
             statement.setLong(6, interview.getId());
@@ -156,7 +153,6 @@ public class InterviewDAO {
             return false;
         }
     }
-
 
     // 5. Delete Interview
     public boolean deleteInterview(Long id) {

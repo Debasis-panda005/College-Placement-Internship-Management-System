@@ -23,6 +23,7 @@ public class ApplicationDAOTest {
 
         System.out.println("Create Application: " + created);
 
+
         // 2. Get All Applications
         List<Application> applications =
                 applicationDAO.getAllApplications();
@@ -37,6 +38,36 @@ public class ApplicationDAOTest {
                             + " | Job ID: " + app.getJobId()
                             + " | Date: " + app.getApplicationDate()
                             + " | Status: " + app.getStatus()
+            );
+        }
+
+
+        // 3. Shortlist Application
+        boolean shortlisted =
+                applicationDAO.shortlistApplication(1L);
+
+        System.out.println(
+                "\nShortlist Application: " + shortlisted
+        );
+
+
+        // 4. Verify Shortlisted Application
+        Application shortlistedApplication =
+                applicationDAO.getApplicationById(1L);
+
+        if (shortlistedApplication != null) {
+
+            System.out.println(
+                    "Application ID: "
+                            + shortlistedApplication.getId()
+                            + " | Status: "
+                            + shortlistedApplication.getStatus()
+            );
+
+        } else {
+
+            System.out.println(
+                    "Application not found."
             );
         }
     }
