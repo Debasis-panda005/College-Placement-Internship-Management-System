@@ -1,33 +1,32 @@
 package com.college.backend.entity;
 
-import jakarta.persistence.*;
 import java.time.LocalDate;
 
-@Entity
-@Table(name = "applications")
 public class Application {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private Long studentId;
-
     private Long jobId;
-
     private LocalDate applicationDate;
-
     private String status;
 
+    // Default constructor
     public Application() {
     }
 
-    public Application(Long studentId, Long jobId, LocalDate applicationDate, String status) {
+    // Parameterized constructor
+    public Application(Long studentId,
+                       Long jobId,
+                       LocalDate applicationDate,
+                       String status) {
+
         this.studentId = studentId;
         this.jobId = jobId;
         this.applicationDate = applicationDate;
         this.status = status;
     }
+
+    // Getters and Setters
 
     public Long getId() {
         return id;

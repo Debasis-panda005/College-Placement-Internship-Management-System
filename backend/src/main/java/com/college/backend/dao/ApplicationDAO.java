@@ -1,0 +1,198 @@
+package com.college.backend.dao;
+
+import com.college.backend.entity.Application;
+import com.college.backend.util.DBConnection;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ApplicationDAO {
+
+    // 1. Create Application
+    public boolean createApplication(Application application) {
+
+        String sql = "INSERT INTO applications " +
+                "(student_id, job_id, application_date, status) " +
+                "VALUES (?, ?, ?, ?)";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, application.getStudentId());
+            statement.setLong(2, application.getJobId());
+            statement.setDate(3, Date.valueOf(application.getApplicationDate()));
+            statement.setString(4, application.getStatus());
+
+            return statement.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
+    // 2. Get All Applications
+    public List<Application> getAllApplications() {
+
+        List<Application> applications = new ArrayList<>();
+
+        String sql = "SELECT * FROM applications";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+
+            while (resultSet.next()) {
+
+                Application application = new Application();
+
+                application.setId(resultSet.getLong("id"));
+                application.setStudentId(resultSet.getLong("student_id"));
+                application.setJobId(resultSet.getLong("job_id"));
+
+                Date date = resultSet.getDate("application_date");
+
+                if (date != null) {
+                    application.setApplicationDate(date.toLocalDate());
+                }
+
+                application.setStatus(resultSet.getString("status"));
+
+                applications.add(application);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return applications;
+    }
+
+
+    // 3. Get Application By ID
+    public Application getApplicationById(Long id) {
+
+        String sql = "SELECT * FROM applications WHERE id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, id);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+
+                if (resultSet.next()) {
+
+                    Application application = new Application();
+
+                    application.setId(resultSet.getLong("id"));
+                    application.setStudentId(resultSet.getLong("student_id"));
+                    application.setJobId(resultSet.getLong("job_id"));
+
+                    Date date = resultSet.getDate("application_date");
+
+                    if (date != null) {
+                        application.setApplicationDate(date.toLocalDate());
+                    }
+
+                    application.setStatus(resultSet.getString("status"));
+
+                    return application;
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+
+    // 4. Update Application
+    public boolean updateApplication(Application application) {
+
+        String sql = "UPDATE applications SET " +
+                "student_id = ?, job_id = ?, application_date = ?, status = ? " +
+                "WHERE id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, application.getStudentId());
+            statement.setLong(2, application.getJobId());
+            statement.setDate(3, Date.valueOf(application.getApplicationDate()));
+            statement.setString(4, application.getStatus());
+            statement.setLong(5, application.getId());
+
+            return statement.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
+    // 5. Delete Application
+    public boolean deleteApplication(Long id) {
+
+        String sql = "DELETE FROM applications WHERE id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, id);
+
+            return statement.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
+    // 6. Shortlist Application
+    public boolean shortlistApplication(Long id) {
+
+        String sql = "UPDATE applications " +
+                "SET status = 'SHORTLISTED' " +
+                "WHERE id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, id);
+
+            return statement.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
+    // 7. Select Application
+    public boolean selectApplication(Long id) {
+
+        String sql = "UPDATE applications " +
+                "SET status = 'SELECTED' " +
+                "WHERE id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, id);
+
+            return statement.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+}
