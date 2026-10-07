@@ -218,9 +218,41 @@ public class ApplicationServlet extends HttpServlet {
             request.getSession().removeAttribute("errorMessage");
         }
 
-        // Display all applications
-        List<Application> applications =
-                applicationDAO.getAllApplications();
+        // Parse search and filter parameters
+        String studentIdParam = request.getParameter("studentId");
+        String jobIdParam = request.getParameter("jobId");
+        String statusParam = request.getParameter("status");
+
+        Long filterStudentId = null;
+        if (studentIdParam != null && !studentIdParam.trim().isEmpty()) {
+            try {
+                filterStudentId = Long.parseLong(studentIdParam.trim());
+            } catch (NumberFormatException e) {
+                // Ignore invalid number format gracefully
+            }
+        }
+
+        Long filterJobId = null;
+        if (jobIdParam != null && !jobIdParam.trim().isEmpty()) {
+            try {
+                filterJobId = Long.parseLong(jobIdParam.trim());
+            } catch (NumberFormatException e) {
+                // Ignore invalid number format gracefully
+            }
+        }
+
+        String filterStatus = null;
+        if (statusParam != null && !statusParam.trim().isEmpty() && !"ALL".equalsIgnoreCase(statusParam.trim())) {
+            filterStatus = statusParam.trim();
+        }
+
+        // Retrieve filtered or all applications
+        List<Application> applications;
+        if (filterStudentId != null || filterJobId != null || filterStatus != null) {
+            applications = applicationDAO.searchApplications(filterStudentId, filterJobId, filterStatus);
+        } else {
+            applications = applicationDAO.getAllApplications();
+        }
 
         List<Long> completedAppIds =
                 interviewDAO.getCompletedApplicationIds();
@@ -234,6 +266,11 @@ public class ApplicationServlet extends HttpServlet {
                 "completedAppIds",
                 completedAppIds
         );
+
+        // Retain filter parameter values for JSP form inputs
+        request.setAttribute("selectedStudentId", studentIdParam != null ? studentIdParam.trim() : "");
+        request.setAttribute("selectedJobId", jobIdParam != null ? jobIdParam.trim() : "");
+        request.setAttribute("selectedStatus", statusParam != null ? statusParam.trim() : "ALL");
 
         request.getRequestDispatcher(
                 "/WEB-INF/jsp/applications.jsp"

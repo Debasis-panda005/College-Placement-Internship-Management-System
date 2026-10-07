@@ -43,11 +43,13 @@
             color: #333;
         }
 
-        input {
+        input,
+        select {
             padding: 10px;
             margin: 5px;
             border: 1px solid #ccc;
             border-radius: 5px;
+            font-size: 14px;
         }
 
         button {
@@ -57,10 +59,26 @@
             background-color: #333;
             color: white;
             cursor: pointer;
+            font-size: 14px;
         }
 
         button:hover {
             background-color: #555;
+        }
+
+        .btn-reset {
+            display: inline-block;
+            padding: 10px 18px;
+            margin: 5px;
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .btn-reset:hover {
+            background-color: #5a6268;
         }
 
         table {
@@ -218,6 +236,44 @@
             <button type="submit">
                 Apply
             </button>
+
+        </form>
+
+    </div>
+
+    <div class="form-section">
+
+        <h2>Filter Applications</h2>
+
+        <form action="${pageContext.request.contextPath}/applications"
+              method="get">
+
+            <input type="number"
+                   name="studentId"
+                   placeholder="Student ID"
+                   value="${selectedStudentId}">
+
+            <input type="number"
+                   name="jobId"
+                   placeholder="Job ID"
+                   value="${selectedJobId}">
+
+            <select name="status">
+                <option value="ALL" ${selectedStatus == 'ALL' ? 'selected' : ''}>All Statuses</option>
+                <option value="APPLIED" ${selectedStatus == 'APPLIED' ? 'selected' : ''}>APPLIED</option>
+                <option value="SHORTLISTED" ${selectedStatus == 'SHORTLISTED' ? 'selected' : ''}>SHORTLISTED</option>
+                <option value="SELECTED" ${selectedStatus == 'SELECTED' ? 'selected' : ''}>SELECTED</option>
+                <option value="REJECTED" ${selectedStatus == 'REJECTED' ? 'selected' : ''}>REJECTED</option>
+            </select>
+
+            <button type="submit">
+                Filter
+            </button>
+
+            <a class="btn-reset"
+               href="${pageContext.request.contextPath}/applications">
+                Reset
+            </a>
 
         </form>
 

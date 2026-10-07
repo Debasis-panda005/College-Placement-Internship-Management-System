@@ -396,4 +396,70 @@ public class ApplicationDAO {
 
         return false;
     }
+
+
+    // =====================================================
+    // 11. SEARCH AND FILTER APPLICATIONS
+    // =====================================================
+
+    public List<Application> searchApplications(Long studentId, Long jobId, String status) {
+
+        List<Application> applications = new ArrayList<>();
+
+        StringBuilder sql = new StringBuilder("SELECT * FROM applications WHERE 1=1");
+
+        if (studentId != null) {
+            sql.append(" AND student_id = ?");
+        }
+
+        if (jobId != null) {
+            sql.append(" AND job_id = ?");
+        }
+
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+            sql.append(" AND status = ?");
+        }
+
+        sql.append(" ORDER BY id");
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+
+            int index = 1;
+
+            if (studentId != null) {
+                statement.setLong(index++, studentId);
+            }
+
+            if (jobId != null) {
+                statement.setLong(index++, jobId);
+            }
+
+            if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+                statement.setString(index++, status.trim());
+            }
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    Application application = new Application();
+                    application.setId(resultSet.getLong("id"));
+                    application.setStudentId(resultSet.getLong("student_id"));
+                    application.setJobId(resultSet.getLong("job_id"));
+
+                    Date date = resultSet.getDate("application_date");
+                    if (date != null) {
+                        application.setApplicationDate(date.toLocalDate());
+                    }
+
+                    application.setStatus(resultSet.getString("status"));
+                    applications.add(application);
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return applications;
+    }
 }
