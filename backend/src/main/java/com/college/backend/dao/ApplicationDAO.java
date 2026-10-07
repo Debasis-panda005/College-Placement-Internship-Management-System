@@ -9,7 +9,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ApplicationDAO {
 
@@ -461,5 +463,47 @@ public class ApplicationDAO {
         }
 
         return applications;
+    }
+
+
+    // =====================================================
+    // 12. GET APPLICATION STATISTICS
+    // =====================================================
+
+    public Map<String, Integer> getApplicationStatistics() {
+
+        Map<String, Integer> stats = new HashMap<>();
+        stats.put("TOTAL", 0);
+        stats.put("APPLIED", 0);
+        stats.put("SHORTLISTED", 0);
+        stats.put("SELECTED", 0);
+        stats.put("REJECTED", 0);
+
+        String sql = "SELECT status, COUNT(*) AS cnt FROM applications GROUP BY status";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+
+            int total = 0;
+
+            while (resultSet.next()) {
+                String status = resultSet.getString("status");
+                int count = resultSet.getInt("cnt");
+
+                if (status != null) {
+                    stats.put(status.toUpperCase(), count);
+                }
+
+                total += count;
+            }
+
+            stats.put("TOTAL", total);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return stats;
     }
 }

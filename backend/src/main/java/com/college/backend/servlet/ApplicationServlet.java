@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @WebServlet({"/applications", "/shortlist"})
 public class ApplicationServlet extends HttpServlet {
@@ -271,6 +272,15 @@ public class ApplicationServlet extends HttpServlet {
         request.setAttribute("selectedStudentId", studentIdParam != null ? studentIdParam.trim() : "");
         request.setAttribute("selectedJobId", jobIdParam != null ? jobIdParam.trim() : "");
         request.setAttribute("selectedStatus", statusParam != null ? statusParam.trim() : "ALL");
+
+        // Retrieve application statistics for dashboard summary
+        Map<String, Integer> applicationStats =
+                applicationDAO.getApplicationStatistics();
+
+        request.setAttribute(
+                "applicationStats",
+                applicationStats
+        );
 
         request.getRequestDispatcher(
                 "/WEB-INF/jsp/applications.jsp"

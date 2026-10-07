@@ -81,6 +81,38 @@
             background-color: #5a6268;
         }
 
+        .stats-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            flex: 1;
+            min-width: 140px;
+            background-color: #f8f9fa;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px 12px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .stat-card h3 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+        }
+
+        .stat-card .stat-count {
+            font-size: 26px;
+            font-weight: bold;
+            margin-top: 6px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -207,6 +239,35 @@
             ${errorMessage}
         </div>
     </c:if>
+
+    <div class="stats-container">
+
+        <div class="stat-card">
+            <h3>Total Applications</h3>
+            <div class="stat-count" style="color: #333;">${applicationStats.TOTAL}</div>
+        </div>
+
+        <div class="stat-card">
+            <h3>Applied</h3>
+            <div class="stat-count applied">${applicationStats.APPLIED}</div>
+        </div>
+
+        <div class="stat-card">
+            <h3>Shortlisted</h3>
+            <div class="stat-count shortlisted">${applicationStats.SHORTLISTED}</div>
+        </div>
+
+        <div class="stat-card">
+            <h3>Selected</h3>
+            <div class="stat-count selected">${applicationStats.SELECTED}</div>
+        </div>
+
+        <div class="stat-card">
+            <h3>Rejected</h3>
+            <div class="stat-count rejected">${applicationStats.REJECTED}</div>
+        </div>
+
+    </div>
 
     <div class="form-section">
 
