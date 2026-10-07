@@ -127,6 +127,43 @@
             background-color: #dc3545;
         }
 
+        .reject-btn {
+            background-color: #6c757d;
+        }
+
+        .interview-btn {
+            background-color: #0d6efd;
+        }
+
+        .nav-links {
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .nav-links a {
+            margin: 0 12px;
+            text-decoration: none;
+            color: #0066cc;
+            font-weight: 500;
+        }
+
+        .nav-links a.active {
+            color: #333;
+            font-weight: bold;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #842029;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            border: 1px solid #f5c2c7;
+        }
+
         .empty {
             text-align: center;
             padding: 20px;
@@ -139,7 +176,19 @@
 
 <div class="container">
 
+    <div class="nav-links">
+        <a class="active" href="${pageContext.request.contextPath}/applications">All Applications</a> |
+        <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
+        <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
+    </div>
+
     <h1>College Placement Applications</h1>
+
+    <c:if test="${not empty errorMessage}">
+        <div class="alert-error">
+            ${errorMessage}
+        </div>
+    </c:if>
 
     <div class="form-section">
 
@@ -266,15 +315,48 @@
                                     Shortlist
                                 </a>
 
+                                <a class="action-button reject-btn"
+                                   href="${pageContext.request.contextPath}/applications?action=reject&id=${application.id}"
+                                   onclick="return confirm('Are you sure you want to reject this application?');">
+                                    Reject
+                                </a>
+
                             </c:if>
 
 
                             <c:if test="${application.status == 'SHORTLISTED'}">
 
-                                <a class="action-button select-btn"
-                                   href="${pageContext.request.contextPath}/applications?action=select&id=${application.id}">
-                                    Select
-                                </a>
+                                <c:choose>
+                                    <c:when test="${completedAppIds.contains(application.id)}">
+
+                                        <a class="action-button select-btn"
+                                           href="${pageContext.request.contextPath}/applications?action=select&id=${application.id}">
+                                            Select
+                                        </a>
+
+                                        <a class="action-button reject-btn"
+                                           href="${pageContext.request.contextPath}/applications?action=reject&id=${application.id}"
+                                           onclick="return confirm('Are you sure you want to reject this application?');">
+                                            Reject
+                                        </a>
+
+                                    </c:when>
+
+                                    <c:otherwise>
+
+                                        <a class="action-button interview-btn"
+                                           href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
+                                            Schedule Interview
+                                        </a>
+
+                                        <a class="action-button reject-btn"
+                                           href="${pageContext.request.contextPath}/applications?action=reject&id=${application.id}"
+                                           onclick="return confirm('Are you sure you want to reject this application?');">
+                                            Reject
+                                        </a>
+
+                                    </c:otherwise>
+                                </c:choose>
 
                             </c:if>
 

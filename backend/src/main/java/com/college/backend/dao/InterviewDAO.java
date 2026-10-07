@@ -171,4 +171,116 @@ public class InterviewDAO {
             return false;
         }
     }
+
+    // 6. Get Interview By Application ID
+    public Interview getInterviewByApplicationId(Long applicationId) {
+
+        String sql = "SELECT * FROM interviews WHERE application_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, applicationId);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+
+                if (resultSet.next()) {
+
+                    Interview interview = new Interview();
+
+                    interview.setId(resultSet.getLong("id"));
+                    interview.setApplicationId(
+                            resultSet.getLong("application_id"));
+
+                    Date date = resultSet.getDate("interview_date");
+                    if (date != null) {
+                        interview.setInterviewDate(date.toLocalDate());
+                    }
+
+                    Time time = resultSet.getTime("interview_time");
+                    if (time != null) {
+                        interview.setInterviewTime(time.toLocalTime());
+                    }
+
+                    interview.setMode(resultSet.getString("mode"));
+                    interview.setStatus(resultSet.getString("status"));
+
+                    return interview;
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    // 7. Check if Interview is Completed for an Application
+    public boolean isInterviewCompletedForApplication(Long applicationId) {
+
+        String sql = "SELECT COUNT(*) FROM interviews WHERE application_id = ? AND status = 'COMPLETED'";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, applicationId);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getInt(1) > 0;
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    // 8. Check if an Interview is already scheduled for an Application
+    public boolean hasActiveInterview(Long applicationId) {
+
+        String sql = "SELECT COUNT(*) FROM interviews WHERE application_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, applicationId);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getInt(1) > 0;
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    // 9. Get all Application IDs with Completed Interviews
+    public List<Long> getCompletedApplicationIds() {
+
+        List<Long> applicationIds = new ArrayList<>();
+
+        String sql = "SELECT application_id FROM interviews WHERE status = 'COMPLETED'";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+
+            while (resultSet.next()) {
+                applicationIds.add(resultSet.getLong("application_id"));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return applicationIds;
+    }
 }

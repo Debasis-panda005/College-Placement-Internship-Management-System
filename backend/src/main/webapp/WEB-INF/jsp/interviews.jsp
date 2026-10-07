@@ -86,12 +86,49 @@
             background: #198754;
         }
 
+        .btn-select {
+            background: #198754;
+        }
+
+        .btn-reject {
+            background: #6c757d;
+        }
+
         .btn-delete {
             background: #dc3545;
         }
 
         .btn:hover {
             opacity: 0.85;
+        }
+
+        .nav-links {
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .nav-links a {
+            margin: 0 12px;
+            text-decoration: none;
+            color: #0066cc;
+            font-weight: 500;
+        }
+
+        .nav-links a.active {
+            color: #333;
+            font-weight: bold;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #842029;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            border: 1px solid #f5c2c7;
         }
 
         table {
@@ -147,8 +184,19 @@
 
 <div class="container">
 
+    <div class="nav-links">
+        <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
+        <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
+        <a class="active" href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
+    </div>
+
     <h1>Interview Management</h1>
 
+    <c:if test="${not empty errorMessage}">
+        <div class="alert-error">
+            ${errorMessage}
+        </div>
+    </c:if>
 
     <!-- CREATE INTERVIEW -->
 
@@ -168,6 +216,7 @@
                 <input type="number"
                        name="applicationId"
                        placeholder="Application ID"
+                       value="${selectedApplicationId}"
                        required>
 
                 <input type="date"
@@ -289,6 +338,21 @@
                                     <a class="btn btn-complete"
                                        href="${pageContext.request.contextPath}/interviews?action=complete&id=${interview.id}">
                                         Complete
+                                    </a>
+
+                                </c:if>
+
+                                <c:if test="${interview.status == 'COMPLETED'}">
+
+                                    <a class="btn btn-select"
+                                       href="${pageContext.request.contextPath}/applications?action=select&id=${interview.applicationId}">
+                                        Select
+                                    </a>
+
+                                    <a class="btn btn-reject"
+                                       href="${pageContext.request.contextPath}/applications?action=reject&id=${interview.applicationId}"
+                                       onclick="return confirm('Are you sure you want to reject this candidate?');">
+                                        Reject
                                     </a>
 
                                 </c:if>

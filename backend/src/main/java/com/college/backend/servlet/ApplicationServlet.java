@@ -1,6 +1,7 @@
 package com.college.backend.servlet;
 
 import com.college.backend.dao.ApplicationDAO;
+import com.college.backend.dao.InterviewDAO;
 import com.college.backend.entity.Application;
 
 import jakarta.servlet.ServletException;
@@ -13,14 +14,16 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 
-@WebServlet("/applications")
+@WebServlet({"/applications", "/shortlist"})
 public class ApplicationServlet extends HttpServlet {
 
     private ApplicationDAO applicationDAO;
+    private InterviewDAO interviewDAO;
 
     @Override
     public void init() {
         applicationDAO = new ApplicationDAO();
+        interviewDAO = new InterviewDAO();
     }
 
     // ============================
@@ -31,6 +34,26 @@ public class ApplicationServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request,
                          HttpServletResponse response)
             throws ServletException, IOException {
+
+        String servletPath = request.getServletPath();
+
+        // Handle /shortlist route - display ONLY shortlisted applications
+        if ("/shortlist".equals(servletPath)) {
+
+            List<Application> shortlistedApplications =
+                    applicationDAO.getShortlistedApplications();
+
+            request.setAttribute(
+                    "applications",
+                    shortlistedApplications
+            );
+
+            request.getRequestDispatcher(
+                    "/WEB-INF/jsp/shortlist.jsp"
+            ).forward(request, response);
+
+            return;
+        }
 
         String action = request.getParameter("action");
 
@@ -43,12 +66,7 @@ public class ApplicationServlet extends HttpServlet {
 
                 Long id = Long.parseLong(idParameter);
 
-                boolean success =
-                        applicationDAO.shortlistApplication(id);
-
-                System.out.println(
-                        "Shortlist Application: " + success
-                );
+                applicationDAO.shortlistApplication(id);
             }
 
             response.sendRedirect(
@@ -59,7 +77,27 @@ public class ApplicationServlet extends HttpServlet {
         }
 
 
-        // Select
+        // Reject
+        if ("reject".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.isEmpty()) {
+
+                Long id = Long.parseLong(idParameter);
+
+                applicationDAO.rejectApplication(id);
+            }
+
+            response.sendRedirect(
+                    request.getContextPath() + "/applications"
+            );
+
+            return;
+        }
+
+
+        // Select (Only allowed after interview is completed)
         if ("select".equals(action)) {
 
             String idParameter = request.getParameter("id");
@@ -68,12 +106,18 @@ public class ApplicationServlet extends HttpServlet {
 
                 Long id = Long.parseLong(idParameter);
 
-                boolean success =
-                        applicationDAO.selectApplication(id);
+                // Enforce business rule: Selection only after completed interview
+                boolean completed =
+                        interviewDAO.isInterviewCompletedForApplication(id);
 
-                System.out.println(
-                        "Select Application: " + success
-                );
+                if (completed) {
+                    applicationDAO.selectApplication(id);
+                } else {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Candidate can only be SELECTED after the interview is COMPLETED!"
+                    );
+                }
             }
 
             response.sendRedirect(
@@ -93,12 +137,7 @@ public class ApplicationServlet extends HttpServlet {
 
                 Long id = Long.parseLong(idParameter);
 
-                boolean success =
-                        applicationDAO.deleteApplication(id);
-
-                System.out.println(
-                        "Delete Application: " + success
-                );
+                applicationDAO.deleteApplication(id);
             }
 
             response.sendRedirect(
@@ -109,13 +148,30 @@ public class ApplicationServlet extends HttpServlet {
         }
 
 
+        // Check for error messages from session
+        String errorMessage =
+                (String) request.getSession().getAttribute("errorMessage");
+
+        if (errorMessage != null) {
+            request.setAttribute("errorMessage", errorMessage);
+            request.getSession().removeAttribute("errorMessage");
+        }
+
         // Display all applications
         List<Application> applications =
                 applicationDAO.getAllApplications();
 
+        List<Long> completedAppIds =
+                interviewDAO.getCompletedApplicationIds();
+
         request.setAttribute(
                 "applications",
                 applications
+        );
+
+        request.setAttribute(
+                "completedAppIds",
+                completedAppIds
         );
 
         request.getRequestDispatcher(

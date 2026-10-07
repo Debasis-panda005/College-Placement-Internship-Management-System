@@ -1,6 +1,8 @@
 package com.college.backend.servlet;
 
+import com.college.backend.dao.ApplicationDAO;
 import com.college.backend.dao.InterviewDAO;
+import com.college.backend.entity.Application;
 import com.college.backend.entity.Interview;
 
 import jakarta.servlet.ServletException;
@@ -18,10 +20,12 @@ import java.util.List;
 public class InterviewServlet extends HttpServlet {
 
     private InterviewDAO interviewDAO;
+    private ApplicationDAO applicationDAO;
 
     @Override
     public void init() {
         interviewDAO = new InterviewDAO();
+        applicationDAO = new ApplicationDAO();
     }
 
     // =====================================================
@@ -85,6 +89,26 @@ public class InterviewServlet extends HttpServlet {
 
         else {
 
+            // Pre-fill applicationId if provided (e.g. from shortlist page)
+            String appIdParameter = request.getParameter("applicationId");
+            if (appIdParameter != null && !appIdParameter.isEmpty()) {
+                try {
+                    Long selectedAppId = Long.parseLong(appIdParameter);
+                    request.setAttribute("selectedApplicationId", selectedAppId);
+                } catch (NumberFormatException e) {
+                    // ignore invalid format
+                }
+            }
+
+            // Check for error messages from session
+            String errorMessage =
+                    (String) request.getSession().getAttribute("errorMessage");
+
+            if (errorMessage != null) {
+                request.setAttribute("errorMessage", errorMessage);
+                request.getSession().removeAttribute("errorMessage");
+            }
+
             List<Interview> interviews =
                     interviewDAO.getAllInterviews();
 
@@ -121,6 +145,44 @@ public class InterviewServlet extends HttpServlet {
                     Long.parseLong(
                             request.getParameter("applicationId")
                     );
+
+            // Enforce business rule: Interview should only be scheduled for a SHORTLISTED application
+            Application application =
+                    applicationDAO.getApplicationById(applicationId);
+
+            if (application == null) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Application ID " + applicationId + " does not exist!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            if (!"SHORTLISTED".equals(application.getStatus())) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Interview can only be scheduled for a SHORTLISTED application (Current status: "
+                                + application.getStatus() + ")!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            if (interviewDAO.hasActiveInterview(applicationId)) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "An interview is already scheduled for Application ID " + applicationId + "!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
 
             LocalDate interviewDate =
                     LocalDate.parse(
