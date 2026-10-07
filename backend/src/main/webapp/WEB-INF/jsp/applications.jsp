@@ -185,6 +185,10 @@
             background-color: #0d6efd;
         }
 
+        .view-btn {
+            background-color: #17a2b8;
+        }
+
         .nav-links {
             text-align: center;
             margin-bottom: 25px;
@@ -424,6 +428,11 @@
 
 
                         <td>
+
+                            <a class="action-button view-btn"
+                               href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
+                                View Details
+                            </a>
 
                             <c:if test="${application.status == 'APPLIED'}">
 

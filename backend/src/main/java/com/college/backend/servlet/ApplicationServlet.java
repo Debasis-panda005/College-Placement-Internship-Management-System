@@ -3,6 +3,7 @@ package com.college.backend.servlet;
 import com.college.backend.dao.ApplicationDAO;
 import com.college.backend.dao.InterviewDAO;
 import com.college.backend.entity.Application;
+import com.college.backend.entity.Interview;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -57,6 +58,60 @@ public class ApplicationServlet extends HttpServlet {
         }
 
         String action = request.getParameter("action");
+
+        // View Application Details
+        if ("details".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.trim().isEmpty()) {
+
+                try {
+                    Long id = Long.parseLong(idParameter.trim());
+                    Application application = applicationDAO.getApplicationById(id);
+
+                    if (application != null) {
+
+                        Interview interview =
+                                interviewDAO.getInterviewByApplicationId(id);
+
+                        request.setAttribute(
+                                "application",
+                                application
+                        );
+
+                        request.setAttribute(
+                                "interview",
+                                interview
+                        );
+
+                        request.getRequestDispatcher(
+                                "/WEB-INF/jsp/application-details.jsp"
+                        ).forward(request, response);
+
+                        return;
+
+                    } else {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Application not found with ID: " + id
+                        );
+                    }
+
+                } catch (NumberFormatException e) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Invalid Application ID: " + idParameter
+                    );
+                }
+            }
+
+            response.sendRedirect(
+                    request.getContextPath() + "/applications"
+            );
+
+            return;
+        }
 
         // Shortlist (Allowed only from APPLIED)
         if ("shortlist".equals(action)) {
