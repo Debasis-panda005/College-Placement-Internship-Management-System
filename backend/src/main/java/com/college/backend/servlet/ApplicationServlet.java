@@ -57,7 +57,7 @@ public class ApplicationServlet extends HttpServlet {
 
         String action = request.getParameter("action");
 
-        // Shortlist
+        // Shortlist (Allowed only from APPLIED)
         if ("shortlist".equals(action)) {
 
             String idParameter = request.getParameter("id");
@@ -65,8 +65,23 @@ public class ApplicationServlet extends HttpServlet {
             if (idParameter != null && !idParameter.isEmpty()) {
 
                 Long id = Long.parseLong(idParameter);
+                Application application = applicationDAO.getApplicationById(id);
 
-                applicationDAO.shortlistApplication(id);
+                if (application == null) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Application not found with ID: " + id
+                    );
+                } else if (!"APPLIED".equals(application.getStatus())) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Cannot shortlist: Application is currently "
+                                    + application.getStatus()
+                                    + " (Only APPLIED applications can be shortlisted)!"
+                    );
+                } else {
+                    applicationDAO.shortlistApplication(id);
+                }
             }
 
             response.sendRedirect(
@@ -77,7 +92,7 @@ public class ApplicationServlet extends HttpServlet {
         }
 
 
-        // Reject
+        // Reject (Allowed only from APPLIED or SHORTLISTED)
         if ("reject".equals(action)) {
 
             String idParameter = request.getParameter("id");
@@ -85,8 +100,26 @@ public class ApplicationServlet extends HttpServlet {
             if (idParameter != null && !idParameter.isEmpty()) {
 
                 Long id = Long.parseLong(idParameter);
+                Application application = applicationDAO.getApplicationById(id);
 
-                applicationDAO.rejectApplication(id);
+                if (application == null) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Application not found with ID: " + id
+                    );
+                } else if ("SELECTED".equals(application.getStatus())) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Cannot reject: Candidate has already been SELECTED!"
+                    );
+                } else if ("REJECTED".equals(application.getStatus())) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Application is already REJECTED!"
+                    );
+                } else {
+                    applicationDAO.rejectApplication(id);
+                }
             }
 
             response.sendRedirect(
@@ -97,7 +130,7 @@ public class ApplicationServlet extends HttpServlet {
         }
 
 
-        // Select (Only allowed after interview is completed)
+        // Select (Allowed only from SHORTLISTED and interview must be COMPLETED)
         if ("select".equals(action)) {
 
             String idParameter = request.getParameter("id");
@@ -105,18 +138,46 @@ public class ApplicationServlet extends HttpServlet {
             if (idParameter != null && !idParameter.isEmpty()) {
 
                 Long id = Long.parseLong(idParameter);
+                Application application = applicationDAO.getApplicationById(id);
 
-                // Enforce business rule: Selection only after completed interview
-                boolean completed =
-                        interviewDAO.isInterviewCompletedForApplication(id);
-
-                if (completed) {
-                    applicationDAO.selectApplication(id);
-                } else {
+                if (application == null) {
                     request.getSession().setAttribute(
                             "errorMessage",
-                            "Candidate can only be SELECTED after the interview is COMPLETED!"
+                            "Application not found with ID: " + id
                     );
+                } else if ("APPLIED".equals(application.getStatus())) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Cannot select: Application must be SHORTLISTED and complete an interview first!"
+                    );
+                } else if ("REJECTED".equals(application.getStatus())) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Cannot select: Application is already REJECTED!"
+                    );
+                } else if ("SELECTED".equals(application.getStatus())) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Application is already SELECTED!"
+                    );
+                } else if (!"SHORTLISTED".equals(application.getStatus())) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Cannot select: Application is currently " + application.getStatus() + "!"
+                    );
+                } else {
+                    // Application is SHORTLISTED: verify interview is COMPLETED
+                    boolean completed =
+                            interviewDAO.isInterviewCompletedForApplication(id);
+
+                    if (completed) {
+                        applicationDAO.selectApplication(id);
+                    } else {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Candidate can only be SELECTED after the interview is COMPLETED!"
+                        );
+                    }
                 }
             }
 
@@ -204,6 +265,18 @@ public class ApplicationServlet extends HttpServlet {
                         Long.parseLong(
                                 request.getParameter("jobId")
                         );
+
+                // Duplicate application prevention
+                if (applicationDAO.hasAlreadyApplied(studentId, jobId)) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Student ID " + studentId + " has already applied for Job ID " + jobId + "!"
+                    );
+                    response.sendRedirect(
+                            request.getContextPath() + "/applications"
+                    );
+                    return;
+                }
 
                 LocalDate applicationDate =
                         LocalDate.parse(

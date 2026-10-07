@@ -368,4 +368,32 @@ public class ApplicationDAO {
 
         return applications;
     }
+
+
+    // =====================================================
+    // 10. CHECK DUPLICATE APPLICATION
+    // =====================================================
+
+    public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+
+        String sql = "SELECT COUNT(*) FROM applications WHERE student_id = ? AND job_id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setLong(1, studentId);
+            statement.setLong(2, jobId);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getInt(1) > 0;
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
 }
