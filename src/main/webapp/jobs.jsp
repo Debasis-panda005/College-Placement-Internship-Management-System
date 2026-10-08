@@ -129,6 +129,14 @@
     </div>
 
     <%
+    } else if ("applicationSubmitted".equals(message)) {
+    %>
+
+    <div class="message">
+        Application submitted successfully!
+    </div>
+
+    <%
         }
     %>
 
