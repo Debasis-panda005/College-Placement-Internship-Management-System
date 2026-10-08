@@ -165,6 +165,7 @@
                        name="interviewDate"
                        class="form-control"
                        value="${interview.interviewDate}"
+                       min="${today}"
                        required>
             </div>
 

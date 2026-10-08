@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @WebServlet("/interviews")
@@ -141,6 +142,7 @@ public class InterviewServlet extends HttpServlet {
             }
 
             request.setAttribute("interview", interview);
+            request.setAttribute("today", LocalDate.now().toString());
 
             request.getRequestDispatcher(
                     "/WEB-INF/jsp/interview-edit.jsp"
@@ -181,6 +183,7 @@ public class InterviewServlet extends HttpServlet {
                     "interviews",
                     interviews
             );
+            request.setAttribute("today", LocalDate.now().toString());
 
             request.getRequestDispatcher(
                     "/WEB-INF/jsp/interviews.jsp"
@@ -206,10 +209,31 @@ public class InterviewServlet extends HttpServlet {
 
         if ("create".equals(action)) {
 
-            Long applicationId =
-                    Long.parseLong(
-                            request.getParameter("applicationId")
-                    );
+            String appIdParam = request.getParameter("applicationId");
+            if (appIdParam == null || appIdParam.trim().isEmpty()) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Application ID is required!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            Long applicationId;
+            try {
+                applicationId = Long.parseLong(appIdParam.trim());
+            } catch (NumberFormatException e) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Invalid Application ID format!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
 
             // Enforce business rule: Interview should only be scheduled for a SHORTLISTED application
             Application application =
@@ -249,25 +273,60 @@ public class InterviewServlet extends HttpServlet {
                 return;
             }
 
-            LocalDate interviewDate =
-                    LocalDate.parse(
-                            request.getParameter("interviewDate")
-                    );
+            String dateParam = request.getParameter("interviewDate");
+            String timeParam = request.getParameter("interviewTime");
+            String mode = request.getParameter("mode");
 
-            LocalTime interviewTime =
-                    LocalTime.parse(
-                            request.getParameter("interviewTime")
-                    );
+            if (dateParam == null || dateParam.trim().isEmpty() ||
+                    timeParam == null || timeParam.trim().isEmpty() ||
+                    mode == null || mode.trim().isEmpty()) {
 
-            String mode =
-                    request.getParameter("mode");
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "All fields are required to schedule an interview!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews?applicationId=" + applicationId
+                );
+                return;
+            }
+
+            LocalDate interviewDate;
+            LocalTime interviewTime;
+            try {
+                interviewDate = LocalDate.parse(dateParam.trim());
+                interviewTime = LocalTime.parse(timeParam.trim());
+            } catch (Exception e) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Invalid date or time format!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews?applicationId=" + applicationId
+                );
+                return;
+            }
+
+            String validationError =
+                    validateInterviewDateTime(interviewDate, interviewTime);
+
+            if (validationError != null) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        validationError
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews?applicationId=" + applicationId
+                );
+                return;
+            }
 
             Interview interview =
                     new Interview(
                             applicationId,
                             interviewDate,
                             interviewTime,
-                            mode,
+                            mode.trim(),
                             "SCHEDULED"
                     );
 
@@ -367,6 +426,20 @@ public class InterviewServlet extends HttpServlet {
                 return;
             }
 
+            String validationError =
+                    validateInterviewDateTime(interviewDate, interviewTime);
+
+            if (validationError != null) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        validationError
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews?action=edit&id=" + id
+                );
+                return;
+            }
+
             // Preserve interview ID, application ID, and status
             existingInterview.setInterviewDate(interviewDate);
             existingInterview.setInterviewTime(interviewTime);
@@ -388,5 +461,33 @@ public class InterviewServlet extends HttpServlet {
                     request.getContextPath() + "/interviews"
             );
         }
+    }
+
+    // =====================================================
+    // DATE / TIME VALIDATION HELPER
+    // =====================================================
+
+    private String validateInterviewDateTime(
+            LocalDate interviewDate,
+            LocalTime interviewTime) {
+
+        if (interviewDate == null || interviewTime == null) {
+            return "Interview date and time are required!";
+        }
+
+        LocalDate today = LocalDate.now();
+
+        if (interviewDate.isBefore(today)) {
+            return "Interview date cannot be in the past!";
+        }
+
+        if (interviewDate.isEqual(today)) {
+            LocalTime now = LocalTime.now().truncatedTo(ChronoUnit.MINUTES);
+            if (interviewTime.isBefore(now)) {
+                return "Interview time cannot be in the past for today's date!";
+            }
+        }
+
+        return null;
     }
 }

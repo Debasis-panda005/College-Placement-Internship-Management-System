@@ -225,6 +225,7 @@
 
                 <input type="date"
                        name="interviewDate"
+                       min="${today}"
                        required>
 
                 <input type="time"
