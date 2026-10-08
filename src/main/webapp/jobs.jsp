@@ -68,6 +68,13 @@
 
         .action-link {
             text-decoration: none;
+            white-space: nowrap;
+        }
+
+        /* Keep all action links on one line */
+        .action-cell {
+            white-space: nowrap;
+            width: 220px;
         }
 
         .active-status {
@@ -187,6 +194,7 @@
 
     </form>
 
+
     <!-- STATUS FILTER -->
 
     <form action="JobServlet"
@@ -221,6 +229,8 @@
         </a>
 
     </form>
+
+
     <!-- SORT -->
 
     <form action="JobServlet"
@@ -274,7 +284,7 @@
             <th>Salary</th>
             <th>Job Type</th>
             <th>Status</th>
-            <th>Action</th>
+            <th class="action-cell">Action</th>
         </tr>
 
 
@@ -329,16 +339,16 @@
                 %>
 
                 <span class="active-status">
-                        Active
-                    </span>
+                    Active
+                </span>
 
                 <%
                 } else {
                 %>
 
                 <span class="closed-status">
-                        Closed
-                    </span>
+                    Closed
+                </span>
 
                 <%
                     }
@@ -351,27 +361,43 @@
 
             <td>
 
-                <a href="JobServlet?action=view&id=<%= job.getId() %>"
-                   class="action-link">
-                    View
-                </a>
+                <div style="
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        min-width: 230px;
+    ">
 
-                &nbsp; | &nbsp;
+                    <a href="JobServlet?action=view&id=<%= job.getId() %>"
+                       class="action-link">
+                        View
+                    </a>
 
-                <a href="JobServlet?action=edit&id=<%= job.getId() %>"
-                   class="action-link">
-                    Edit
-                </a>
+                    <span>&nbsp; | &nbsp;</span>
 
-                &nbsp; | &nbsp;
+                    <a href="JobServlet?action=edit&id=<%= job.getId() %>"
+                       class="action-link">
+                        Edit
+                    </a>
 
-                <a href="JobServlet?action=delete&id=<%= job.getId() %>"
-                   class="action-link"
-                   onclick="return confirm('Are you sure you want to delete this job?');">
-                    Delete
-                </a>
+                    <span>&nbsp; | &nbsp;</span>
 
-            </td>
+                    <a href="JobServlet?action=delete&id=<%= job.getId() %>"
+                       class="action-link"
+                       onclick="return confirm('Are you sure you want to delete this job?');">
+                        Delete
+                    </a>
+
+                    <span>&nbsp; | &nbsp;</span>
+
+                    <a href="JobServlet?action=apply&id=<%= job.getId() %>"
+                       class="action-link">
+                        Apply
+                    </a>
+
+                </div>
+
+            </td>$env:CATALINA_HOME="D:\apache-tomcat-11.0.24"
 
         </tr>
 

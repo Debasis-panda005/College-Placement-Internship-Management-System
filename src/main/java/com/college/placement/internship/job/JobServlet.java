@@ -65,7 +65,7 @@ public class JobServlet extends HttpServlet {
     }
 
 
-    // VIEW, SEARCH, FILTER, SORT, EDIT OR DELETE JOB
+    // VIEW, SEARCH, FILTER, SORT, EDIT, DELETE OR APPLY JOB
     @Override
     protected void doGet(HttpServletRequest request,
                          HttpServletResponse response)
@@ -110,6 +110,27 @@ public class JobServlet extends HttpServlet {
                 request.setAttribute("job", job);
 
                 request.getRequestDispatcher("edit-job.jsp")
+                        .forward(request, response);
+
+                return;
+            }
+        }
+
+
+        // APPLY FOR JOB
+        if ("apply".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.isEmpty()) {
+
+                int id = Integer.parseInt(idParameter);
+
+                Job job = jobDAO.getJobById(id);
+
+                request.setAttribute("job", job);
+
+                request.getRequestDispatcher("apply-job.jsp")
                         .forward(request, response);
 
                 return;
