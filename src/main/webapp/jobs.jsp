@@ -99,6 +99,10 @@
         + Add Job / Internship
     </a>
 
+    <a href="ApplicationServlet"
+       class="add-button">
+        View Applications
+    </a>
 
     <!-- SUCCESS MESSAGE -->
 

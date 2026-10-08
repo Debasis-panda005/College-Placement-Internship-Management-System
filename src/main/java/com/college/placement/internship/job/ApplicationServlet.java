@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.util.List;
 
 @WebServlet("/ApplicationServlet")
 public class ApplicationServlet extends HttpServlet {
@@ -18,6 +19,7 @@ public class ApplicationServlet extends HttpServlet {
         applicationDAO = new ApplicationDAO();
     }
 
+    // SUBMIT APPLICATION
     @Override
     protected void doPost(HttpServletRequest request,
                           HttpServletResponse response)
@@ -48,5 +50,25 @@ public class ApplicationServlet extends HttpServlet {
         response.sendRedirect(
                 "JobServlet?message=applicationSubmitted"
         );
+    }
+
+
+    // VIEW ALL APPLICATIONS
+    @Override
+    protected void doGet(HttpServletRequest request,
+                         HttpServletResponse response)
+            throws ServletException, IOException {
+
+        List<Application> applications =
+                applicationDAO.getAllApplications();
+
+        request.setAttribute(
+                "applications",
+                applications
+        );
+
+        request.getRequestDispatcher(
+                "applications.jsp"
+        ).forward(request, response);
     }
 }
