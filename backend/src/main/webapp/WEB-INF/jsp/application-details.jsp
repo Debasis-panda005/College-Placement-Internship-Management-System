@@ -145,6 +145,15 @@
         .btn-interview:hover {
             background-color: #0b5ed7;
         }
+
+        .btn-history {
+            background-color: #6f42c1;
+            color: white;
+        }
+
+        .btn-history:hover {
+            background-color: #59359a;
+        }
     </style>
 </head>
 
@@ -269,6 +278,10 @@
 
     <!-- Navigation Actions -->
     <div class="button-bar">
+        <a class="btn btn-history"
+           href="${pageContext.request.contextPath}/applications?action=history&id=${application.id}">
+            View Status History
+        </a>
         <a class="btn btn-back"
            href="${pageContext.request.contextPath}/applications">
             Back to Applications

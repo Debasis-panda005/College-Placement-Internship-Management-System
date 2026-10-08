@@ -180,6 +180,16 @@
             color: #777;
         }
 
+        .app-link {
+            color: #0066cc;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .app-link:hover {
+            text-decoration: underline;
+        }
+
     </style>
 
 </head>
@@ -295,7 +305,10 @@
                         </td>
 
                         <td>
-                                ${interview.applicationId}
+                            <a class="app-link"
+                               href="${pageContext.request.contextPath}/applications?action=details&id=${interview.applicationId}">
+                                #${interview.applicationId}
+                            </a>
                         </td>
 
                         <td>
