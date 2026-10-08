@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -176,14 +177,58 @@ public class InterviewServlet extends HttpServlet {
                 request.getSession().removeAttribute("errorMessage");
             }
 
-            List<Interview> interviews =
-                    interviewDAO.getAllInterviews();
+            // Parse search and filter parameters
+            String filterAppIdParam = request.getParameter("filterAppId");
+            String filterDateParam = request.getParameter("filterDate");
+            String filterModeParam = request.getParameter("filterMode");
+            String filterStatusParam = request.getParameter("filterStatus");
+
+            Long filterAppId = null;
+            if (filterAppIdParam != null && !filterAppIdParam.trim().isEmpty()) {
+                try {
+                    filterAppId = Long.parseLong(filterAppIdParam.trim());
+                } catch (NumberFormatException e) {
+                    // ignore invalid format gracefully
+                }
+            }
+
+            LocalDate filterDate = null;
+            if (filterDateParam != null && !filterDateParam.trim().isEmpty()) {
+                try {
+                    filterDate = LocalDate.parse(filterDateParam.trim());
+                } catch (DateTimeParseException e) {
+                    // ignore invalid format gracefully
+                }
+            }
+
+            String filterMode = null;
+            if (filterModeParam != null && !filterModeParam.trim().isEmpty() && !"ALL".equalsIgnoreCase(filterModeParam.trim())) {
+                filterMode = filterModeParam.trim();
+            }
+
+            String filterStatus = null;
+            if (filterStatusParam != null && !filterStatusParam.trim().isEmpty() && !"ALL".equalsIgnoreCase(filterStatusParam.trim())) {
+                filterStatus = filterStatusParam.trim();
+            }
+
+            List<Interview> interviews;
+            if (filterAppId != null || filterDate != null || filterMode != null || filterStatus != null) {
+                interviews = interviewDAO.searchInterviews(filterAppId, filterDate, filterMode, filterStatus);
+            } else {
+                interviews = interviewDAO.getAllInterviews();
+            }
 
             request.setAttribute(
                     "interviews",
                     interviews
             );
             request.setAttribute("today", LocalDate.now().toString());
+
+            // Retain filter parameter values for JSP form inputs
+            request.setAttribute("selectedFilterAppId", filterAppIdParam != null ? filterAppIdParam.trim() : "");
+            request.setAttribute("selectedFilterDate", filterDateParam != null ? filterDateParam.trim() : "");
+            request.setAttribute("selectedFilterMode", filterModeParam != null ? filterModeParam.trim() : "ALL");
+            request.setAttribute("selectedFilterStatus", filterStatusParam != null ? filterStatusParam.trim() : "ALL");
 
             request.getRequestDispatcher(
                     "/WEB-INF/jsp/interviews.jsp"

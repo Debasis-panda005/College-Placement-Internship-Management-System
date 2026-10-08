@@ -5,6 +5,7 @@ import com.college.backend.entity.Interview;
 import com.college.backend.util.DBConnection;
 
 import java.sql.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -437,5 +438,89 @@ public class InterviewDAO {
                 }
             }
         }
+    }
+
+    // 11. Search and Filter Interviews
+    public List<Interview> searchInterviews(Long applicationId,
+                                            LocalDate interviewDate,
+                                            String mode,
+                                            String status) {
+
+        List<Interview> interviews = new ArrayList<>();
+
+        StringBuilder sql = new StringBuilder("SELECT * FROM interviews WHERE 1=1");
+
+        if (applicationId != null) {
+            sql.append(" AND application_id = ?");
+        }
+
+        if (interviewDate != null) {
+            sql.append(" AND interview_date = ?");
+        }
+
+        if (mode != null && !mode.trim().isEmpty() && !"ALL".equalsIgnoreCase(mode.trim())) {
+            sql.append(" AND mode = ?");
+        }
+
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+            sql.append(" AND status = ?");
+        }
+
+        sql.append(" ORDER BY interview_date DESC, interview_time DESC");
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+
+            int index = 1;
+
+            if (applicationId != null) {
+                statement.setLong(index++, applicationId);
+            }
+
+            if (interviewDate != null) {
+                statement.setDate(index++, Date.valueOf(interviewDate));
+            }
+
+            if (mode != null && !mode.trim().isEmpty() && !"ALL".equalsIgnoreCase(mode.trim())) {
+                statement.setString(index++, mode.trim());
+            }
+
+            if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+                statement.setString(index++, status.trim());
+            }
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+
+                while (resultSet.next()) {
+
+                    Interview interview = new Interview();
+
+                    interview.setId(resultSet.getLong("id"));
+                    interview.setApplicationId(
+                            resultSet.getLong("application_id")
+                    );
+
+                    Date date = resultSet.getDate("interview_date");
+                    if (date != null) {
+                        interview.setInterviewDate(date.toLocalDate());
+                    }
+
+                    Time time = resultSet.getTime("interview_time");
+                    if (time != null) {
+                        interview.setInterviewTime(time.toLocalTime());
+                    }
+
+                    interview.setMode(resultSet.getString("mode"));
+                    interview.setStatus(resultSet.getString("status"));
+
+                    interviews.add(interview);
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return interviews;
     }
 }

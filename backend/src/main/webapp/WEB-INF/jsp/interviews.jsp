@@ -102,6 +102,14 @@
             background: #dc3545;
         }
 
+        .btn-filter {
+            background: #0d6efd;
+        }
+
+        .btn-reset {
+            background: #6c757d;
+        }
+
         .btn:hover {
             opacity: 0.85;
         }
@@ -260,6 +268,55 @@
                         class="btn btn-create">
                     Schedule Interview
                 </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- FILTER INTERVIEWS -->
+
+    <div class="form-section">
+
+        <h2>Filter Interviews</h2>
+
+        <form action="${pageContext.request.contextPath}/interviews"
+              method="get">
+
+            <div class="form-row">
+
+                <input type="number"
+                       name="filterAppId"
+                       placeholder="Application ID"
+                       value="${selectedFilterAppId}">
+
+                <input type="date"
+                       name="filterDate"
+                       value="${selectedFilterDate}">
+
+                <select name="filterMode">
+                    <option value="ALL" ${selectedFilterMode == 'ALL' ? 'selected' : ''}>All Modes</option>
+                    <option value="ONLINE" ${selectedFilterMode == 'ONLINE' ? 'selected' : ''}>Online</option>
+                    <option value="OFFLINE" ${selectedFilterMode == 'OFFLINE' ? 'selected' : ''}>Offline</option>
+                </select>
+
+                <select name="filterStatus">
+                    <option value="ALL" ${selectedFilterStatus == 'ALL' ? 'selected' : ''}>All Statuses</option>
+                    <option value="SCHEDULED" ${selectedFilterStatus == 'SCHEDULED' ? 'selected' : ''}>SCHEDULED</option>
+                    <option value="COMPLETED" ${selectedFilterStatus == 'COMPLETED' ? 'selected' : ''}>COMPLETED</option>
+                </select>
+
+                <button type="submit"
+                        class="btn btn-filter">
+                    Filter
+                </button>
+
+                <a class="btn btn-reset"
+                   href="${pageContext.request.contextPath}/interviews">
+                    Reset
+                </a>
 
             </div>
 
