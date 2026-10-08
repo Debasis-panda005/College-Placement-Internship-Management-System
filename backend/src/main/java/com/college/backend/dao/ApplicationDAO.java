@@ -1,6 +1,7 @@
 package com.college.backend.dao;
 
 import com.college.backend.entity.Application;
+import com.college.backend.entity.ApplicationStatusHistory;
 import com.college.backend.util.DBConnection;
 
 import java.sql.Connection;
@@ -8,12 +9,16 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class ApplicationDAO {
+
+    private final ApplicationStatusHistoryDAO statusHistoryDAO = new ApplicationStatusHistoryDAO();
 
     // =====================================================
     // 1. CREATE APPLICATION
@@ -25,22 +30,81 @@ public class ApplicationDAO {
                 "(student_id, job_id, application_date, status) " +
                 "VALUES (?, ?, ?, ?)";
 
-        try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        Connection connection = null;
 
-            statement.setLong(1, application.getStudentId());
-            statement.setLong(2, application.getJobId());
-            statement.setDate(
-                    3,
-                    Date.valueOf(application.getApplicationDate())
+        try {
+            connection = DBConnection.getConnection();
+            connection.setAutoCommit(false);
+
+            Long generatedId = null;
+
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+                statement.setLong(1, application.getStudentId());
+                statement.setLong(2, application.getJobId());
+                statement.setDate(
+                        3,
+                        Date.valueOf(application.getApplicationDate())
+                );
+                statement.setString(4, application.getStatus());
+
+                int affected = statement.executeUpdate();
+                if (affected <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+
+                try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        generatedId = generatedKeys.getLong(1);
+                        application.setId(generatedId);
+                    }
+                }
+            }
+
+            if (generatedId == null) {
+                generatedId = application.getId();
+            }
+
+            if (generatedId == null) {
+                connection.rollback();
+                return false;
+            }
+
+            String status = application.getStatus() != null ? application.getStatus() : "APPLIED";
+            boolean historyAdded = statusHistoryDAO.addHistory(
+                    connection,
+                    new ApplicationStatusHistory(generatedId, status, LocalDateTime.now())
             );
-            statement.setString(4, application.getStatus());
 
-            return statement.executeUpdate() > 0;
+            if (!historyAdded) {
+                connection.rollback();
+                return false;
+            }
+
+            connection.commit();
+            return true;
 
         } catch (SQLException e) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             return false;
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                    connection.close();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
     }
 
@@ -248,18 +312,57 @@ public class ApplicationDAO {
                         "SET status = ? " +
                         "WHERE id = ?";
 
-        try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement =
-                     connection.prepareStatement(sql)) {
+        Connection connection = null;
 
-            statement.setString(1, "SHORTLISTED");
-            statement.setLong(2, id);
+        try {
+            connection = DBConnection.getConnection();
+            connection.setAutoCommit(false);
 
-            return statement.executeUpdate() > 0;
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sql)) {
+
+                statement.setString(1, "SHORTLISTED");
+                statement.setLong(2, id);
+
+                int updated = statement.executeUpdate();
+                if (updated <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+            }
+
+            boolean historyAdded = statusHistoryDAO.addHistory(
+                    connection,
+                    new ApplicationStatusHistory(id, "SHORTLISTED", LocalDateTime.now())
+            );
+
+            if (!historyAdded) {
+                connection.rollback();
+                return false;
+            }
+
+            connection.commit();
+            return true;
 
         } catch (SQLException e) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             return false;
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                    connection.close();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
     }
 
@@ -275,18 +378,57 @@ public class ApplicationDAO {
                         "SET status = ? " +
                         "WHERE id = ?";
 
-        try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement =
-                     connection.prepareStatement(sql)) {
+        Connection connection = null;
 
-            statement.setString(1, "SELECTED");
-            statement.setLong(2, id);
+        try {
+            connection = DBConnection.getConnection();
+            connection.setAutoCommit(false);
 
-            return statement.executeUpdate() > 0;
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sql)) {
+
+                statement.setString(1, "SELECTED");
+                statement.setLong(2, id);
+
+                int updated = statement.executeUpdate();
+                if (updated <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+            }
+
+            boolean historyAdded = statusHistoryDAO.addHistory(
+                    connection,
+                    new ApplicationStatusHistory(id, "SELECTED", LocalDateTime.now())
+            );
+
+            if (!historyAdded) {
+                connection.rollback();
+                return false;
+            }
+
+            connection.commit();
+            return true;
 
         } catch (SQLException e) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             return false;
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                    connection.close();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
     }
 
@@ -302,18 +444,57 @@ public class ApplicationDAO {
                         "SET status = ? " +
                         "WHERE id = ?";
 
-        try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement =
-                     connection.prepareStatement(sql)) {
+        Connection connection = null;
 
-            statement.setString(1, "REJECTED");
-            statement.setLong(2, id);
+        try {
+            connection = DBConnection.getConnection();
+            connection.setAutoCommit(false);
 
-            return statement.executeUpdate() > 0;
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sql)) {
+
+                statement.setString(1, "REJECTED");
+                statement.setLong(2, id);
+
+                int updated = statement.executeUpdate();
+                if (updated <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+            }
+
+            boolean historyAdded = statusHistoryDAO.addHistory(
+                    connection,
+                    new ApplicationStatusHistory(id, "REJECTED", LocalDateTime.now())
+            );
+
+            if (!historyAdded) {
+                connection.rollback();
+                return false;
+            }
+
+            connection.commit();
+            return true;
 
         } catch (SQLException e) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             return false;
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                    connection.close();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
     }
 

@@ -67,15 +67,7 @@ public class InterviewServlet extends HttpServlet {
                     request.getParameter("id")
             );
 
-            Interview interview =
-                    interviewDAO.getInterviewById(id);
-
-            if (interview != null) {
-
-                interview.setStatus("COMPLETED");
-
-                interviewDAO.updateInterview(interview);
-            }
+            interviewDAO.completeInterview(id);
 
             response.sendRedirect(
                     request.getContextPath() + "/interviews"

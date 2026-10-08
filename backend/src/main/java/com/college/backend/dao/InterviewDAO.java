@@ -1,13 +1,17 @@
 package com.college.backend.dao;
 
+import com.college.backend.entity.ApplicationStatusHistory;
 import com.college.backend.entity.Interview;
 import com.college.backend.util.DBConnection;
 
 import java.sql.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class InterviewDAO {
+
+    private final ApplicationStatusHistoryDAO statusHistoryDAO = new ApplicationStatusHistoryDAO();
 
     // 1. Create Interview
     public boolean createInterview(Interview interview) {
@@ -16,20 +20,63 @@ public class InterviewDAO {
                 "(application_id, interview_date, interview_time, mode, status) " +
                 "VALUES (?, ?, ?, ?, ?)";
 
-        try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        Connection connection = null;
 
-            statement.setLong(1, interview.getApplicationId());
-            statement.setDate(2, Date.valueOf(interview.getInterviewDate()));
-            statement.setTime(3, Time.valueOf(interview.getInterviewTime()));
-            statement.setString(4, interview.getMode());
-            statement.setString(5, interview.getStatus());
+        try {
+            connection = DBConnection.getConnection();
+            connection.setAutoCommit(false);
 
-            return statement.executeUpdate() > 0;
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+
+                statement.setLong(1, interview.getApplicationId());
+                statement.setDate(2, Date.valueOf(interview.getInterviewDate()));
+                statement.setTime(3, Time.valueOf(interview.getInterviewTime()));
+                statement.setString(4, interview.getMode());
+                statement.setString(5, interview.getStatus());
+
+                int affected = statement.executeUpdate();
+                if (affected <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+            }
+
+            boolean historyAdded = statusHistoryDAO.addHistory(
+                    connection,
+                    new ApplicationStatusHistory(
+                            interview.getApplicationId(),
+                            "INTERVIEW_SCHEDULED",
+                            LocalDateTime.now()
+                    )
+            );
+
+            if (!historyAdded) {
+                connection.rollback();
+                return false;
+            }
+
+            connection.commit();
+            return true;
 
         } catch (SQLException e) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             return false;
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                    connection.close();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
     }
 
@@ -282,5 +329,70 @@ public class InterviewDAO {
         }
 
         return applicationIds;
+    }
+
+    // 10. Complete Interview
+    public boolean completeInterview(Long id) {
+
+        Interview interview = getInterviewById(id);
+        if (interview == null) {
+            return false;
+        }
+
+        String sql = "UPDATE interviews SET status = 'COMPLETED' WHERE id = ?";
+
+        Connection connection = null;
+
+        try {
+            connection = DBConnection.getConnection();
+            connection.setAutoCommit(false);
+
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setLong(1, id);
+
+                int updated = statement.executeUpdate();
+                if (updated <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+            }
+
+            boolean historyAdded = statusHistoryDAO.addHistory(
+                    connection,
+                    new ApplicationStatusHistory(
+                            interview.getApplicationId(),
+                            "INTERVIEW_COMPLETED",
+                            LocalDateTime.now()
+                    )
+            );
+
+            if (!historyAdded) {
+                connection.rollback();
+                return false;
+            }
+
+            connection.commit();
+            return true;
+
+        } catch (SQLException e) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                    connection.close();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }
     }
 }

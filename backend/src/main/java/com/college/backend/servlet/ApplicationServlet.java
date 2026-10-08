@@ -1,8 +1,10 @@
 package com.college.backend.servlet;
 
 import com.college.backend.dao.ApplicationDAO;
+import com.college.backend.dao.ApplicationStatusHistoryDAO;
 import com.college.backend.dao.InterviewDAO;
 import com.college.backend.entity.Application;
+import com.college.backend.entity.ApplicationStatusHistory;
 import com.college.backend.entity.Interview;
 
 import jakarta.servlet.ServletException;
@@ -21,11 +23,13 @@ public class ApplicationServlet extends HttpServlet {
 
     private ApplicationDAO applicationDAO;
     private InterviewDAO interviewDAO;
+    private ApplicationStatusHistoryDAO statusHistoryDAO;
 
     @Override
     public void init() {
         applicationDAO = new ApplicationDAO();
         interviewDAO = new InterviewDAO();
+        statusHistoryDAO = new ApplicationStatusHistoryDAO();
     }
 
     // ============================
@@ -104,6 +108,65 @@ public class ApplicationServlet extends HttpServlet {
                             "Invalid Application ID: " + idParameter
                     );
                 }
+            }
+
+            response.sendRedirect(
+                    request.getContextPath() + "/applications"
+            );
+
+            return;
+        }
+
+        // View Application Status History Timeline
+        if ("history".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.trim().isEmpty()) {
+
+                try {
+                    Long id = Long.parseLong(idParameter.trim());
+                    Application application = applicationDAO.getApplicationById(id);
+
+                    if (application != null) {
+
+                        List<ApplicationStatusHistory> statusHistory =
+                                statusHistoryDAO.getHistoryByApplicationId(id);
+
+                        request.setAttribute(
+                                "application",
+                                application
+                        );
+
+                        request.setAttribute(
+                                "statusHistory",
+                                statusHistory
+                        );
+
+                        request.getRequestDispatcher(
+                                "/WEB-INF/jsp/application-history.jsp"
+                        ).forward(request, response);
+
+                        return;
+
+                    } else {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Application not found with ID: " + id
+                        );
+                    }
+
+                } catch (NumberFormatException e) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Invalid Application ID: " + idParameter
+                    );
+                }
+            } else {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Application ID is required"
+                );
             }
 
             response.sendRedirect(

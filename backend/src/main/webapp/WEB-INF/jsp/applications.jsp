@@ -189,6 +189,10 @@
             background-color: #17a2b8;
         }
 
+        .history-btn {
+            background-color: #6f42c1;
+        }
+
         .nav-links {
             text-align: center;
             margin-bottom: 25px;
@@ -432,6 +436,11 @@
                             <a class="action-button view-btn"
                                href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
                                 View Details
+                            </a>
+
+                            <a class="action-button history-btn"
+                               href="${pageContext.request.contextPath}/applications?action=history&id=${application.id}">
+                                History
                             </a>
 
                             <c:if test="${application.status == 'APPLIED'}">
