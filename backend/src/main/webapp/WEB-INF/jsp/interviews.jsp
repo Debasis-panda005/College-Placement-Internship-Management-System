@@ -82,6 +82,10 @@
             background: #333;
         }
 
+        .btn-edit {
+            background: #0d6efd;
+        }
+
         .btn-complete {
             background: #198754;
         }
@@ -333,7 +337,12 @@
 
                             <div class="actions">
 
-                                <c:if test="${interview.status != 'COMPLETED'}">
+                                <c:if test="${interview.status == 'SCHEDULED'}">
+
+                                    <a class="btn btn-edit"
+                                       href="${pageContext.request.contextPath}/interviews?action=edit&id=${interview.id}">
+                                        Edit / Reschedule
+                                    </a>
 
                                     <a class="btn btn-complete"
                                        href="${pageContext.request.contextPath}/interviews?action=complete&id=${interview.id}">

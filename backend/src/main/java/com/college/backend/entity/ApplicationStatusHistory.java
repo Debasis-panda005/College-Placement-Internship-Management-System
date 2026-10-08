@@ -94,6 +94,9 @@ public class ApplicationStatusHistory {
         if ("INTERVIEW_SCHEDULED".equalsIgnoreCase(status)) {
             return "INTERVIEW SCHEDULED";
         }
+        if ("INTERVIEW_RESCHEDULED".equalsIgnoreCase(status)) {
+            return "INTERVIEW RESCHEDULED";
+        }
         if ("INTERVIEW_COMPLETED".equalsIgnoreCase(status)) {
             return "INTERVIEW COMPLETED";
         }
@@ -113,6 +116,9 @@ public class ApplicationStatusHistory {
             case "INTERVIEW_SCHEDULED":
             case "INTERVIEW SCHEDULED":
                 return "Interview scheduled";
+            case "INTERVIEW_RESCHEDULED":
+            case "INTERVIEW RESCHEDULED":
+                return "Interview rescheduled";
             case "INTERVIEW_COMPLETED":
             case "INTERVIEW COMPLETED":
                 return "Interview completed";
@@ -137,6 +143,8 @@ public class ApplicationStatusHistory {
                 return "shortlisted";
             case "INTERVIEW_SCHEDULED":
             case "INTERVIEW SCHEDULED":
+            case "INTERVIEW_RESCHEDULED":
+            case "INTERVIEW RESCHEDULED":
             case "INTERVIEW_COMPLETED":
             case "INTERVIEW COMPLETED":
                 return "interview";

@@ -166,7 +166,7 @@ public class InterviewDAO {
         return null;
     }
 
-    // 4. Update Interview
+    // 4. Update Interview (Reschedule with atomic history logging)
     public boolean updateInterview(Interview interview) {
 
         String sql = "UPDATE interviews SET " +
@@ -177,27 +177,70 @@ public class InterviewDAO {
                 "status = ? " +
                 "WHERE id = ?";
 
-        try (Connection connection = DBConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        Connection connection = null;
 
-            statement.setLong(1, interview.getApplicationId());
-            statement.setDate(
-                    2,
-                    Date.valueOf(interview.getInterviewDate())
-            );
-            statement.setTime(
-                    3,
-                    Time.valueOf(interview.getInterviewTime())
-            );
-            statement.setString(4, interview.getMode());
-            statement.setString(5, interview.getStatus());
-            statement.setLong(6, interview.getId());
+        try {
+            connection = DBConnection.getConnection();
+            connection.setAutoCommit(false);
 
-            return statement.executeUpdate() > 0;
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+
+                statement.setLong(1, interview.getApplicationId());
+                statement.setDate(
+                        2,
+                        Date.valueOf(interview.getInterviewDate())
+                );
+                statement.setTime(
+                        3,
+                        Time.valueOf(interview.getInterviewTime())
+                );
+                statement.setString(4, interview.getMode());
+                statement.setString(5, interview.getStatus());
+                statement.setLong(6, interview.getId());
+
+                int affected = statement.executeUpdate();
+                if (affected <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+            }
+
+            boolean historyAdded = statusHistoryDAO.addHistory(
+                    connection,
+                    new ApplicationStatusHistory(
+                            interview.getApplicationId(),
+                            "INTERVIEW_RESCHEDULED",
+                            LocalDateTime.now()
+                    )
+            );
+
+            if (!historyAdded) {
+                connection.rollback();
+                return false;
+            }
+
+            connection.commit();
+            return true;
 
         } catch (SQLException e) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             return false;
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                    connection.close();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
     }
 

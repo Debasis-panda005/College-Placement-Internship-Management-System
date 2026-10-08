@@ -102,7 +102,8 @@
             color: #e67e22;
         }
 
-        .interview {
+        .interview,
+        .interview-rescheduled {
             color: #0d6efd;
         }
 
@@ -163,7 +164,8 @@
             background-color: #e67e22;
         }
 
-        .timeline-marker.interview {
+        .timeline-marker.interview,
+        .timeline-marker.interview-rescheduled {
             border-color: #0d6efd;
             background-color: #0d6efd;
         }
@@ -195,7 +197,8 @@
             border-left-color: #e67e22;
         }
 
-        .timeline-content.interview {
+        .timeline-content.interview,
+        .timeline-content.interview-rescheduled {
             border-left-color: #0d6efd;
         }
 
@@ -353,7 +356,14 @@
 
                                 <div class="timeline-header">
                                     <span class="timeline-status ${history.statusClass}">
-                                        ${history.displayStatus}
+                                        <c:choose>
+                                            <c:when test="${history.status == 'INTERVIEW_RESCHEDULED'}">
+                                                INTERVIEW RESCHEDULED
+                                            </c:when>
+                                            <c:otherwise>
+                                                ${history.displayStatus}
+                                            </c:otherwise>
+                                        </c:choose>
                                     </span>
                                     <span class="timeline-time">
                                         ${history.formattedChangedAt}
@@ -361,7 +371,14 @@
                                 </div>
 
                                 <p class="timeline-desc">
-                                    ${history.statusDescription}
+                                    <c:choose>
+                                        <c:when test="${history.status == 'INTERVIEW_RESCHEDULED'}">
+                                            Interview rescheduled
+                                        </c:when>
+                                        <c:otherwise>
+                                            ${history.statusDescription}
+                                        </c:otherwise>
+                                    </c:choose>
                                 </p>
 
                             </div>

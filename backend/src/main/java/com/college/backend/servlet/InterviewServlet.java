@@ -76,6 +76,79 @@ public class InterviewServlet extends HttpServlet {
         }
 
         // -------------------------------------------------
+        // EDIT INTERVIEW
+        // -------------------------------------------------
+
+        else if ("edit".equals(action)) {
+
+            String idParam = request.getParameter("id");
+            if (idParam == null || idParam.trim().isEmpty()) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Interview ID is required!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            Long id;
+            try {
+                id = Long.parseLong(idParam.trim());
+            } catch (NumberFormatException e) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Invalid Interview ID format!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            Interview interview = interviewDAO.getInterviewById(id);
+
+            if (interview == null) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Interview ID " + id + " does not exist!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            if (!"SCHEDULED".equals(interview.getStatus())) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Only SCHEDULED interviews can be edited or rescheduled."
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            // Check for error messages from session
+            String errorMessage =
+                    (String) request.getSession().getAttribute("errorMessage");
+
+            if (errorMessage != null) {
+                request.setAttribute("errorMessage", errorMessage);
+                request.getSession().removeAttribute("errorMessage");
+            }
+
+            request.setAttribute("interview", interview);
+
+            request.getRequestDispatcher(
+                    "/WEB-INF/jsp/interview-edit.jsp"
+            ).forward(request, response);
+
+        }
+
+        // -------------------------------------------------
         // DEFAULT - SHOW ALL INTERVIEWS
         // -------------------------------------------------
 
@@ -211,44 +284,105 @@ public class InterviewServlet extends HttpServlet {
 
         else if ("update".equals(action)) {
 
-            Long id =
-                    Long.parseLong(
-                            request.getParameter("id")
-                    );
+            String idParam = request.getParameter("id");
+            if (idParam == null || idParam.trim().isEmpty()) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Interview ID is required!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
 
-            Long applicationId =
-                    Long.parseLong(
-                            request.getParameter("applicationId")
-                    );
+            Long id;
+            try {
+                id = Long.parseLong(idParam.trim());
+            } catch (NumberFormatException e) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Invalid Interview ID format!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
 
-            LocalDate interviewDate =
-                    LocalDate.parse(
-                            request.getParameter("interviewDate")
-                    );
+            Interview existingInterview = interviewDAO.getInterviewById(id);
+            if (existingInterview == null) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Interview ID " + id + " does not exist!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
 
-            LocalTime interviewTime =
-                    LocalTime.parse(
-                            request.getParameter("interviewTime")
-                    );
+            if (!"SCHEDULED".equals(existingInterview.getStatus())) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Only SCHEDULED interviews can be edited or rescheduled."
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
 
-            String mode =
-                    request.getParameter("mode");
+            String dateParam = request.getParameter("interviewDate");
+            String timeParam = request.getParameter("interviewTime");
+            String mode = request.getParameter("mode");
 
-            String status =
-                    request.getParameter("status");
+            if (dateParam == null || dateParam.trim().isEmpty() ||
+                    timeParam == null || timeParam.trim().isEmpty() ||
+                    mode == null || mode.trim().isEmpty()) {
 
-            Interview interview =
-                    new Interview(
-                            applicationId,
-                            interviewDate,
-                            interviewTime,
-                            mode,
-                            status
-                    );
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "All fields are required to update an interview!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews?action=edit&id=" + id
+                );
+                return;
+            }
 
-            interview.setId(id);
+            LocalDate interviewDate;
+            LocalTime interviewTime;
+            try {
+                interviewDate = LocalDate.parse(dateParam.trim());
+                interviewTime = LocalTime.parse(timeParam.trim());
+            } catch (Exception e) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Invalid date or time format!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews?action=edit&id=" + id
+                );
+                return;
+            }
 
-            interviewDAO.updateInterview(interview);
+            // Preserve interview ID, application ID, and status
+            existingInterview.setInterviewDate(interviewDate);
+            existingInterview.setInterviewTime(interviewTime);
+            existingInterview.setMode(mode.trim());
+
+            boolean updated = interviewDAO.updateInterview(existingInterview);
+            if (!updated) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Failed to update interview ID " + id + "!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews?action=edit&id=" + id
+                );
+                return;
+            }
 
             response.sendRedirect(
                     request.getContextPath() + "/interviews"
