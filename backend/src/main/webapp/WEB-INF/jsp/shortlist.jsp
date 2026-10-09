@@ -190,6 +190,7 @@
 <div class="container">
 
     <div class="nav-links">
+        <a href="${pageContext.request.contextPath}/jobs">Jobs &amp; Internships</a> |
         <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
         <a class="active" href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
         <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
