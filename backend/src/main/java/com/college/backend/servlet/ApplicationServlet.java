@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -46,12 +47,43 @@ public class ApplicationServlet extends HttpServlet {
         // Handle /shortlist route - display ONLY shortlisted applications
         if ("/shortlist".equals(servletPath)) {
 
+            String errorMessage =
+                    (String) request.getSession().getAttribute("errorMessage");
+            if (errorMessage != null) {
+                request.setAttribute("errorMessage", errorMessage);
+                request.getSession().removeAttribute("errorMessage");
+            }
+
+            String successMessage =
+                    (String) request.getSession().getAttribute("successMessage");
+            if (successMessage != null) {
+                request.setAttribute("successMessage", successMessage);
+                request.getSession().removeAttribute("successMessage");
+            }
+
             List<Application> shortlistedApplications =
                     applicationDAO.getShortlistedApplications();
+
+            List<Interview> allInterviews =
+                    interviewDAO.getAllInterviews();
+
+            Map<Long, Interview> interviewMap = new HashMap<>();
+            if (allInterviews != null) {
+                for (Interview interview : allInterviews) {
+                    if (interview.getApplicationId() != null) {
+                        interviewMap.put(interview.getApplicationId(), interview);
+                    }
+                }
+            }
 
             request.setAttribute(
                     "applications",
                     shortlistedApplications
+            );
+
+            request.setAttribute(
+                    "interviewMap",
+                    interviewMap
             );
 
             request.getRequestDispatcher(
@@ -237,12 +269,26 @@ public class ApplicationServlet extends HttpServlet {
                             "Application is already REJECTED!"
                     );
                 } else {
-                    applicationDAO.rejectApplication(id);
+                    boolean rejected = applicationDAO.rejectApplication(id);
+                    if (rejected) {
+                        request.getSession().setAttribute(
+                                "successMessage",
+                                "Application rejected successfully."
+                        );
+                    } else {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Failed to reject application ID: " + id
+                        );
+                    }
                 }
             }
 
+            String from = request.getParameter("from");
+            String redirectTarget = "shortlist".equals(from) ? "/shortlist" : "/applications";
+
             response.sendRedirect(
-                    request.getContextPath() + "/applications"
+                    request.getContextPath() + redirectTarget
             );
 
             return;
@@ -290,7 +336,18 @@ public class ApplicationServlet extends HttpServlet {
                             interviewDAO.isInterviewCompletedForApplication(id);
 
                     if (completed) {
-                        applicationDAO.selectApplication(id);
+                        boolean selected = applicationDAO.selectApplication(id);
+                        if (selected) {
+                            request.getSession().setAttribute(
+                                    "successMessage",
+                                    "Application selected successfully."
+                            );
+                        } else {
+                            request.getSession().setAttribute(
+                                    "errorMessage",
+                                    "Failed to select application ID: " + id
+                            );
+                        }
                     } else {
                         request.getSession().setAttribute(
                                 "errorMessage",
@@ -300,8 +357,11 @@ public class ApplicationServlet extends HttpServlet {
                 }
             }
 
+            String from = request.getParameter("from");
+            String redirectTarget = "shortlist".equals(from) ? "/shortlist" : "/applications";
+
             response.sendRedirect(
-                    request.getContextPath() + "/applications"
+                    request.getContextPath() + redirectTarget
             );
 
             return;
@@ -335,6 +395,14 @@ public class ApplicationServlet extends HttpServlet {
         if (errorMessage != null) {
             request.setAttribute("errorMessage", errorMessage);
             request.getSession().removeAttribute("errorMessage");
+        }
+
+        String successMessage =
+                (String) request.getSession().getAttribute("successMessage");
+
+        if (successMessage != null) {
+            request.setAttribute("successMessage", successMessage);
+            request.getSession().removeAttribute("successMessage");
         }
 
         // Parse search and filter parameters
