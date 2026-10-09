@@ -25,33 +25,72 @@ public class ApplicationServlet extends HttpServlet {
                           HttpServletResponse response)
             throws ServletException, IOException {
 
-        int jobId = Integer.parseInt(
-                request.getParameter("jobId")
-        );
+        String action = request.getParameter("action");
 
-        String studentName =
-                request.getParameter("studentName");
+        // UPDATE APPLICATION STATUS
+        if ("updateStatus".equals(action)) {
 
-        String studentEmail =
-                request.getParameter("studentEmail");
+            String idValue = request.getParameter("id");
+            String status = request.getParameter("status");
 
-        String resume =
-                request.getParameter("resume");
+            if (idValue != null &&
+                    ("Pending".equals(status)
+                            || "Shortlisted".equals(status)
+                            || "Selected".equals(status)
+                            || "Rejected".equals(status))) {
 
-        Application application = new Application();
+                try {
+                    int applicationId = Integer.parseInt(idValue);
 
-        application.setJobId(jobId);
-        application.setStudentName(studentName);
-        application.setStudentEmail(studentEmail);
-        application.setResume(resume);
+                    if (applicationId > 0) {
+                        applicationDAO.updateApplicationStatus(
+                                applicationId, status);
+                    }
 
-        applicationDAO.addApplication(application);
+                } catch (NumberFormatException e) {
+                    response.sendError(
+                            HttpServletResponse.SC_BAD_REQUEST,
+                            "Invalid application ID");
+                    return;
+                }
 
-        response.sendRedirect(
-                "JobServlet?message=applicationSubmitted"
-        );
+                response.sendRedirect(
+                        "ApplicationServlet?message=statusUpdated");
+                return;
+            }
+
+            response.sendError(
+                    HttpServletResponse.SC_BAD_REQUEST,
+                    "Invalid application status or ID");
+            return;
+        }
+
+        // SUBMIT A NEW APPLICATION
+        try {
+            int jobId = Integer.parseInt(
+                    request.getParameter("jobId"));
+
+            String studentName = request.getParameter("studentName");
+            String studentEmail = request.getParameter("studentEmail");
+            String resume = request.getParameter("resume");
+
+            Application application = new Application();
+            application.setJobId(jobId);
+            application.setStudentName(studentName);
+            application.setStudentEmail(studentEmail);
+            application.setResume(resume);
+
+            applicationDAO.addApplication(application);
+
+            response.sendRedirect(
+                    "JobServlet?message=applicationSubmitted");
+
+        } catch (NumberFormatException e) {
+            response.sendError(
+                    HttpServletResponse.SC_BAD_REQUEST,
+                    "Invalid job ID");
+        }
     }
-
 
     // VIEW ALL APPLICATIONS
     @Override
@@ -62,13 +101,9 @@ public class ApplicationServlet extends HttpServlet {
         List<Application> applications =
                 applicationDAO.getAllApplications();
 
-        request.setAttribute(
-                "applications",
-                applications
-        );
+        request.setAttribute("applications", applications);
 
-        request.getRequestDispatcher(
-                "applications.jsp"
-        ).forward(request, response);
+        request.getRequestDispatcher("applications.jsp")
+                .forward(request, response);
     }
 }

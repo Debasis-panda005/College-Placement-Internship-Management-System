@@ -30,7 +30,6 @@ public class ApplicationDAO {
         }
     }
 
-
     // GET ALL APPLICATIONS
     public List<Application> getAllApplications() {
 
@@ -49,17 +48,15 @@ public class ApplicationDAO {
                 application.setId(resultSet.getInt("id"));
                 application.setJobId(resultSet.getInt("job_id"));
                 application.setStudentName(
-                        resultSet.getString("student_name")
-                );
+                        resultSet.getString("student_name"));
                 application.setStudentEmail(
-                        resultSet.getString("student_email")
-                );
+                        resultSet.getString("student_email"));
                 application.setResume(
-                        resultSet.getString("resume")
-                );
+                        resultSet.getString("resume"));
                 application.setAppliedDate(
-                        resultSet.getString("applied_date")
-                );
+                        resultSet.getString("applied_date"));
+                application.setStatus(
+                        resultSet.getString("status"));
 
                 applications.add(application);
             }
@@ -69,5 +66,23 @@ public class ApplicationDAO {
         }
 
         return applications;
+    }
+
+    // UPDATE APPLICATION STATUS
+    public void updateApplicationStatus(int applicationId, String status) {
+
+        String sql = "UPDATE applications SET status = ? WHERE id = ?";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, status);
+            statement.setInt(2, applicationId);
+
+            statement.executeUpdate();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

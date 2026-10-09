@@ -8,6 +8,7 @@ public class Application {
     private String studentEmail;
     private String resume;
     private String appliedDate;
+    private String status;
 
     public Application() {
     }
@@ -58,5 +59,13 @@ public class Application {
 
     public void setAppliedDate(String appliedDate) {
         this.appliedDate = appliedDate;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }
