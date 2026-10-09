@@ -115,6 +115,10 @@
             color: #dc3545;
         }
 
+        .cancelled {
+            color: #dc3545;
+        }
+
         /* Vertical Timeline Styles */
         .timeline {
             position: relative;
@@ -180,6 +184,11 @@
             background-color: #dc3545;
         }
 
+        .timeline-marker.cancelled {
+            border-color: #dc3545;
+            background-color: #dc3545;
+        }
+
         .timeline-content {
             background: #ffffff;
             border: 1px solid #dee2e6;
@@ -207,6 +216,10 @@
         }
 
         .timeline-content.rejected {
+            border-left-color: #dc3545;
+        }
+
+        .timeline-content.cancelled {
             border-left-color: #dc3545;
         }
 
@@ -360,6 +373,9 @@
                                             <c:when test="${history.status == 'INTERVIEW_RESCHEDULED'}">
                                                 INTERVIEW RESCHEDULED
                                             </c:when>
+                                            <c:when test="${history.status == 'INTERVIEW_CANCELLED'}">
+                                                INTERVIEW CANCELLED
+                                            </c:when>
                                             <c:otherwise>
                                                 ${history.displayStatus}
                                             </c:otherwise>
@@ -374,6 +390,9 @@
                                     <c:choose>
                                         <c:when test="${history.status == 'INTERVIEW_RESCHEDULED'}">
                                             Interview rescheduled
+                                        </c:when>
+                                        <c:when test="${history.status == 'INTERVIEW_CANCELLED'}">
+                                            Interview cancelled
                                         </c:when>
                                         <c:otherwise>
                                             ${history.statusDescription}

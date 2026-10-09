@@ -266,7 +266,7 @@ public class InterviewDAO {
     // 6. Get Interview By Application ID
     public Interview getInterviewByApplicationId(Long applicationId) {
 
-        String sql = "SELECT * FROM interviews WHERE application_id = ?";
+        String sql = "SELECT * FROM interviews WHERE application_id = ? ORDER BY id DESC LIMIT 1";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -333,7 +333,7 @@ public class InterviewDAO {
     // 8. Check if an Interview is already scheduled for an Application
     public boolean hasActiveInterview(Long applicationId) {
 
-        String sql = "SELECT COUNT(*) FROM interviews WHERE application_id = ?";
+        String sql = "SELECT COUNT(*) FROM interviews WHERE application_id = ? AND status IN ('SCHEDULED', 'COMPLETED')";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -522,5 +522,89 @@ public class InterviewDAO {
         }
 
         return interviews;
+    }
+
+    // 12. Cancel Interview (Transactional with history logging)
+    public boolean cancelInterview(Long id) {
+
+        if (id == null) {
+            return false;
+        }
+
+        Connection connection = null;
+
+        try {
+            connection = DBConnection.getConnection();
+            connection.setAutoCommit(false);
+
+            Long applicationId = null;
+            String currentStatus = null;
+
+            String selectSql = "SELECT application_id, status FROM interviews WHERE id = ?";
+            try (PreparedStatement selectStmt = connection.prepareStatement(selectSql)) {
+                selectStmt.setLong(1, id);
+                try (ResultSet rs = selectStmt.executeQuery()) {
+                    if (rs.next()) {
+                        applicationId = rs.getLong("application_id");
+                        currentStatus = rs.getString("status");
+                    } else {
+                        connection.rollback();
+                        return false;
+                    }
+                }
+            }
+
+            if (!"SCHEDULED".equals(currentStatus)) {
+                connection.rollback();
+                return false;
+            }
+
+            String updateSql = "UPDATE interviews SET status = 'CANCELLED' WHERE id = ?";
+            try (PreparedStatement updateStmt = connection.prepareStatement(updateSql)) {
+                updateStmt.setLong(1, id);
+                int affected = updateStmt.executeUpdate();
+                if (affected <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+            }
+
+            boolean historyAdded = statusHistoryDAO.addHistory(
+                    connection,
+                    new ApplicationStatusHistory(
+                            applicationId,
+                            "INTERVIEW_CANCELLED",
+                            LocalDateTime.now()
+                    )
+            );
+
+            if (!historyAdded) {
+                connection.rollback();
+                return false;
+            }
+
+            connection.commit();
+            return true;
+
+        } catch (SQLException e) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(true);
+                    connection.close();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }
     }
 }

@@ -78,6 +78,76 @@ public class InterviewServlet extends HttpServlet {
         }
 
         // -------------------------------------------------
+        // CANCEL INTERVIEW
+        // -------------------------------------------------
+
+        else if ("cancel".equals(action)) {
+
+            String idParam = request.getParameter("id");
+            if (idParam == null || idParam.trim().isEmpty()) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Interview ID is required!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            Long id;
+            try {
+                id = Long.parseLong(idParam.trim());
+            } catch (NumberFormatException e) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Invalid Interview ID format!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            Interview interview = interviewDAO.getInterviewById(id);
+
+            if (interview == null) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Interview ID " + id + " does not exist!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            if (!"SCHEDULED".equals(interview.getStatus())) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Only SCHEDULED interviews can be cancelled."
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            boolean cancelled = interviewDAO.cancelInterview(id);
+            if (!cancelled) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Failed to cancel the interview!"
+                );
+            }
+
+            response.sendRedirect(
+                    request.getContextPath() + "/interviews"
+            );
+            return;
+        }
+
+        // -------------------------------------------------
         // EDIT INTERVIEW
         // -------------------------------------------------
 

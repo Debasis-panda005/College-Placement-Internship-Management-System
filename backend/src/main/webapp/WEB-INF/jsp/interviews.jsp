@@ -110,6 +110,10 @@
             background: #6c757d;
         }
 
+        .btn-cancel {
+            background: #dc3545;
+        }
+
         .btn:hover {
             opacity: 0.85;
         }
@@ -174,6 +178,10 @@
 
         .completed {
             color: #198754;
+        }
+
+        .cancelled {
+            color: #dc3545;
         }
 
         .actions {
@@ -306,6 +314,7 @@
                     <option value="ALL" ${selectedFilterStatus == 'ALL' ? 'selected' : ''}>All Statuses</option>
                     <option value="SCHEDULED" ${selectedFilterStatus == 'SCHEDULED' ? 'selected' : ''}>SCHEDULED</option>
                     <option value="COMPLETED" ${selectedFilterStatus == 'COMPLETED' ? 'selected' : ''}>COMPLETED</option>
+                    <option value="CANCELLED" ${selectedFilterStatus == 'CANCELLED' ? 'selected' : ''}>CANCELLED</option>
                 </select>
 
                 <button type="submit"
@@ -392,6 +401,14 @@
 
                                 </c:when>
 
+                                <c:when test="${interview.status == 'CANCELLED'}">
+
+                                    <span class="cancelled">
+                                        CANCELLED
+                                    </span>
+
+                                </c:when>
+
                                 <c:otherwise>
 
                                     <span class="scheduled">
@@ -420,6 +437,12 @@
                                         Complete
                                     </a>
 
+                                    <a class="btn btn-cancel"
+                                       href="${pageContext.request.contextPath}/interviews?action=cancel&id=${interview.id}"
+                                       onclick="return confirm('Are you sure you want to cancel this interview?');">
+                                        Cancel Interview
+                                    </a>
+
                                 </c:if>
 
                                 <c:if test="${interview.status == 'COMPLETED'}">
@@ -436,12 +459,6 @@
                                     </a>
 
                                 </c:if>
-
-                                <a class="btn btn-delete"
-                                   href="${pageContext.request.contextPath}/interviews?action=delete&id=${interview.id}"
-                                   onclick="return confirm('Are you sure you want to delete this interview?');">
-                                    Delete
-                                </a>
 
                             </div>
 

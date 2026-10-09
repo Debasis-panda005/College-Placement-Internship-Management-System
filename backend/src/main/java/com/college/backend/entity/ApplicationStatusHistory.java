@@ -100,6 +100,9 @@ public class ApplicationStatusHistory {
         if ("INTERVIEW_COMPLETED".equalsIgnoreCase(status)) {
             return "INTERVIEW COMPLETED";
         }
+        if ("INTERVIEW_CANCELLED".equalsIgnoreCase(status)) {
+            return "INTERVIEW CANCELLED";
+        }
         return status;
     }
 
@@ -122,6 +125,9 @@ public class ApplicationStatusHistory {
             case "INTERVIEW_COMPLETED":
             case "INTERVIEW COMPLETED":
                 return "Interview completed";
+            case "INTERVIEW_CANCELLED":
+            case "INTERVIEW CANCELLED":
+                return "Interview cancelled";
             case "SELECTED":
                 return "Candidate selected";
             case "REJECTED":
@@ -148,6 +154,9 @@ public class ApplicationStatusHistory {
             case "INTERVIEW_COMPLETED":
             case "INTERVIEW COMPLETED":
                 return "interview";
+            case "INTERVIEW_CANCELLED":
+            case "INTERVIEW CANCELLED":
+                return "cancelled";
             case "SELECTED":
                 return "selected";
             case "REJECTED":
