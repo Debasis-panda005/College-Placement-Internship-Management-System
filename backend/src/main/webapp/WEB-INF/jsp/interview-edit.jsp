@@ -148,6 +148,7 @@
         <form action="${pageContext.request.contextPath}/interviews" method="post">
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="${interview.id}">
+            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
 
             <div class="form-group">
                 <label for="applicationId">Application ID</label>

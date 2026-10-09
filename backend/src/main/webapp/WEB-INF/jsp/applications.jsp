@@ -160,9 +160,23 @@
             padding: 7px 10px;
             margin: 2px;
             text-decoration: none;
+            border: none;
             border-radius: 4px;
             color: white;
             font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            vertical-align: middle;
+        }
+
+        .action-button:hover {
+            opacity: 0.85;
+        }
+
+        .inline-form {
+            display: inline;
+            margin: 0;
+            padding: 0;
         }
 
         .shortlist-btn {
@@ -287,6 +301,10 @@
             <input type="hidden"
                    name="action"
                    value="create">
+
+            <input type="hidden"
+                   name="csrfToken"
+                   value="${sessionScope.csrfToken}">
 
             <input type="number"
                    name="studentId"
@@ -445,16 +463,22 @@
 
                             <c:if test="${application.status == 'APPLIED'}">
 
-                                <a class="action-button shortlist-btn"
-                                   href="${pageContext.request.contextPath}/applications?action=shortlist&id=${application.id}">
-                                    Shortlist
-                                </a>
+                                <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                    <input type="hidden" name="action" value="shortlist">
+                                    <input type="hidden" name="id" value="${application.id}">
+                                    <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                    <button type="submit" class="action-button shortlist-btn">Shortlist</button>
+                                </form>
 
-                                <a class="action-button reject-btn"
-                                   href="${pageContext.request.contextPath}/applications?action=reject&id=${application.id}"
-                                   onclick="return confirm('Are you sure you want to reject this application?');">
-                                    Reject
-                                </a>
+                                <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                    <input type="hidden" name="action" value="reject">
+                                    <input type="hidden" name="id" value="${application.id}">
+                                    <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                    <button type="submit" class="action-button reject-btn"
+                                            onclick="return confirm('Are you sure you want to reject this application?');">
+                                        Reject
+                                    </button>
+                                </form>
 
                             </c:if>
 
@@ -464,16 +488,22 @@
                                 <c:choose>
                                     <c:when test="${completedAppIds.contains(application.id)}">
 
-                                        <a class="action-button select-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=select&id=${application.id}">
-                                            Select
-                                        </a>
+                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                            <input type="hidden" name="action" value="select">
+                                            <input type="hidden" name="id" value="${application.id}">
+                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                            <button type="submit" class="action-button select-btn">Select</button>
+                                        </form>
 
-                                        <a class="action-button reject-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=reject&id=${application.id}"
-                                           onclick="return confirm('Are you sure you want to reject this application?');">
-                                            Reject
-                                        </a>
+                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                            <input type="hidden" name="action" value="reject">
+                                            <input type="hidden" name="id" value="${application.id}">
+                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                            <button type="submit" class="action-button reject-btn"
+                                                    onclick="return confirm('Are you sure you want to reject this application?');">
+                                                Reject
+                                            </button>
+                                        </form>
 
                                     </c:when>
 
@@ -484,11 +514,15 @@
                                             Schedule Interview
                                         </a>
 
-                                        <a class="action-button reject-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=reject&id=${application.id}"
-                                           onclick="return confirm('Are you sure you want to reject this application?');">
-                                            Reject
-                                        </a>
+                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                            <input type="hidden" name="action" value="reject">
+                                            <input type="hidden" name="id" value="${application.id}">
+                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                            <button type="submit" class="action-button reject-btn"
+                                                    onclick="return confirm('Are you sure you want to reject this application?');">
+                                                Reject
+                                            </button>
+                                        </form>
 
                                     </c:otherwise>
                                 </c:choose>
@@ -496,11 +530,15 @@
                             </c:if>
 
 
-                            <a class="action-button delete-btn"
-                               href="${pageContext.request.contextPath}/applications?action=delete&id=${application.id}"
-                               onclick="return confirm('Are you sure you want to delete this application?');">
-                                Delete
-                            </a>
+                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="id" value="${application.id}">
+                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                <button type="submit" class="action-button delete-btn"
+                                        onclick="return confirm('Are you sure you want to delete this application?');">
+                                    Delete
+                                </button>
+                            </form>
 
                         </td>
 

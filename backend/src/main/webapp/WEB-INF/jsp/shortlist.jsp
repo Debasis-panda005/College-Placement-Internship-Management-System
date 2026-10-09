@@ -138,13 +138,23 @@
             padding: 6px 10px;
             margin: 2px;
             text-decoration: none;
+            border: none;
             border-radius: 4px;
             color: white;
             font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            vertical-align: middle;
         }
 
         .action-button:hover {
             opacity: 0.85;
+        }
+
+        .inline-form {
+            display: inline;
+            margin: 0;
+            padding: 0;
         }
 
         .interview-btn {
@@ -319,15 +329,23 @@
                                     </c:when>
 
                                     <c:when test="${interview.status == 'COMPLETED'}">
-                                        <a class="action-button select-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=select&id=${application.id}&from=shortlist">
-                                            Select
-                                        </a>
-                                        <a class="action-button reject-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=reject&id=${application.id}&from=shortlist"
-                                           onclick="return confirm('Are you sure you want to reject this candidate?');">
-                                            Reject
-                                        </a>
+                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                            <input type="hidden" name="action" value="select">
+                                            <input type="hidden" name="id" value="${application.id}">
+                                            <input type="hidden" name="from" value="shortlist">
+                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                            <button type="submit" class="action-button select-btn">Select</button>
+                                        </form>
+                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                            <input type="hidden" name="action" value="reject">
+                                            <input type="hidden" name="id" value="${application.id}">
+                                            <input type="hidden" name="from" value="shortlist">
+                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                            <button type="submit" class="action-button reject-btn"
+                                                    onclick="return confirm('Are you sure you want to reject this candidate?');">
+                                                Reject
+                                            </button>
+                                        </form>
                                         <a class="action-button view-btn"
                                            href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
                                             View Details

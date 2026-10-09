@@ -76,6 +76,14 @@
             cursor: pointer;
             text-decoration: none;
             font-size: 14px;
+            font-family: inherit;
+            vertical-align: middle;
+        }
+
+        .inline-form {
+            display: inline;
+            margin: 0;
+            padding: 0;
         }
 
         .btn-create {
@@ -321,6 +329,10 @@
                    name="action"
                    value="create">
 
+            <input type="hidden"
+                   name="csrfToken"
+                   value="${sessionScope.csrfToken}">
+
             <div class="form-row">
 
                 <input type="number"
@@ -520,31 +532,45 @@
                                         Edit / Reschedule
                                     </a>
 
-                                    <a class="btn btn-complete"
-                                       href="${pageContext.request.contextPath}/interviews?action=complete&id=${interview.id}">
-                                        Complete
-                                    </a>
+                                    <form action="${pageContext.request.contextPath}/interviews" method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="complete">
+                                        <input type="hidden" name="id" value="${interview.id}">
+                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                        <button type="submit" class="btn btn-complete">Complete</button>
+                                    </form>
 
-                                    <a class="btn btn-cancel"
-                                       href="${pageContext.request.contextPath}/interviews?action=cancel&id=${interview.id}"
-                                       onclick="return confirm('Are you sure you want to cancel this interview?');">
-                                        Cancel Interview
-                                    </a>
+                                    <form action="${pageContext.request.contextPath}/interviews" method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="cancel">
+                                        <input type="hidden" name="id" value="${interview.id}">
+                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                        <button type="submit" class="btn btn-cancel"
+                                                onclick="return confirm('Are you sure you want to cancel this interview?');">
+                                            Cancel Interview
+                                        </button>
+                                    </form>
 
                                 </c:if>
 
                                 <c:if test="${interview.status == 'COMPLETED'}">
 
-                                    <a class="btn btn-select"
-                                       href="${pageContext.request.contextPath}/applications?action=select&id=${interview.applicationId}">
-                                        Select
-                                    </a>
+                                    <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="select">
+                                        <input type="hidden" name="id" value="${interview.applicationId}">
+                                        <input type="hidden" name="from" value="interviews">
+                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                        <button type="submit" class="btn btn-select">Select</button>
+                                    </form>
 
-                                    <a class="btn btn-reject"
-                                       href="${pageContext.request.contextPath}/applications?action=reject&id=${interview.applicationId}"
-                                       onclick="return confirm('Are you sure you want to reject this candidate?');">
-                                        Reject
-                                    </a>
+                                    <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="reject">
+                                        <input type="hidden" name="id" value="${interview.applicationId}">
+                                        <input type="hidden" name="from" value="interviews">
+                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                        <button type="submit" class="btn btn-reject"
+                                                onclick="return confirm('Are you sure you want to reject this candidate?');">
+                                            Reject
+                                        </button>
+                                    </form>
 
                                 </c:if>
 

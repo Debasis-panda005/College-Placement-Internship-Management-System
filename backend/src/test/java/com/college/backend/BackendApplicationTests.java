@@ -3,12 +3,18 @@ package com.college.backend;
 import com.college.backend.entity.Application;
 import com.college.backend.entity.ApplicationStatusHistory;
 import com.college.backend.entity.Interview;
+import com.college.backend.util.CsrfUtil;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Proxy;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -176,5 +182,134 @@ class BackendApplicationTests {
 
         history.setChangedAt(null);
         assertEquals("", history.getFormattedChangedAt());
+    }
+
+    // =====================================================
+    // 7. CSRF TOKEN GENERATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("CsrfUtil generateToken generates non-empty, URL-safe, unique tokens")
+    void testCsrfGenerateToken() {
+        String token1 = CsrfUtil.generateToken();
+        String token2 = CsrfUtil.generateToken();
+
+        assertNotNull(token1);
+        assertNotNull(token2);
+        assertFalse(token1.trim().isEmpty());
+        assertFalse(token2.trim().isEmpty());
+        assertEquals(43, token1.length(), "32-byte Base64 URL token without padding should be 43 chars");
+        assertNotEquals(token1, token2, "Successive tokens should be unique due to cryptographic randomness");
+        assertTrue(token1.matches("^[A-Za-z0-9_-]+$"), "Token should be URL-safe");
+    }
+
+    // =====================================================
+    // 8. CSRF TOKEN SESSION CACHING TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("CsrfUtil getOrCreateToken caches and returns consistent token in session")
+    void testCsrfGetOrCreateToken() {
+        assertNull(CsrfUtil.getOrCreateToken(null));
+        assertNull(CsrfUtil.getToken(null));
+
+        Map<String, Object> sessionAttributes = new HashMap<>();
+        HttpSession session = createMockSession(sessionAttributes);
+
+        assertNull(CsrfUtil.getToken(session));
+
+        String token = CsrfUtil.getOrCreateToken(session);
+        assertNotNull(token);
+        assertEquals(token, sessionAttributes.get(CsrfUtil.CSRF_TOKEN_SESSION_ATTR));
+        assertEquals(token, CsrfUtil.getToken(session));
+
+        // Subsequent call must return the exact same cached token
+        String secondToken = CsrfUtil.getOrCreateToken(session);
+        assertEquals(token, secondToken);
+    }
+
+    // =====================================================
+    // 9. CSRF TOKEN VALIDATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("CsrfUtil isValid accurately validates matching and rejecting invalid tokens")
+    void testCsrfValidation() {
+        assertFalse(CsrfUtil.isValid(null));
+
+        Map<String, Object> sessionAttributes = new HashMap<>();
+        HttpSession session = createMockSession(sessionAttributes);
+
+        // No token in session yet
+        Map<String, String> requestParams = new HashMap<>();
+        requestParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "test-token");
+        HttpServletRequest requestWithoutSessionToken = createMockRequest(session, requestParams);
+        assertFalse(CsrfUtil.isValid(requestWithoutSessionToken));
+
+        // Populate session token
+        String validToken = CsrfUtil.getOrCreateToken(session);
+
+        // Matching token -> true
+        requestParams.put(CsrfUtil.CSRF_TOKEN_PARAM, validToken);
+        HttpServletRequest validRequest = createMockRequest(session, requestParams);
+        assertTrue(CsrfUtil.isValid(validRequest));
+
+        // Mismatched token -> false
+        requestParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "invalid-tampered-token");
+        HttpServletRequest tamperedRequest = createMockRequest(session, requestParams);
+        assertFalse(CsrfUtil.isValid(tamperedRequest));
+
+        // Missing request token -> false
+        requestParams.remove(CsrfUtil.CSRF_TOKEN_PARAM);
+        HttpServletRequest missingTokenRequest = createMockRequest(session, requestParams);
+        assertFalse(CsrfUtil.isValid(missingTokenRequest));
+
+        // Empty request token -> false
+        requestParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "   ");
+        HttpServletRequest emptyTokenRequest = createMockRequest(session, requestParams);
+        assertFalse(CsrfUtil.isValid(emptyTokenRequest));
+
+        // Request with null session -> false
+        HttpServletRequest requestWithNullSession = createMockRequest(null, requestParams);
+        assertFalse(CsrfUtil.isValid(requestWithNullSession));
+    }
+
+    // =====================================================
+    // TEST HELPERS
+    // =====================================================
+
+    private HttpSession createMockSession(Map<String, Object> attributes) {
+        return (HttpSession) Proxy.newProxyInstance(
+                HttpSession.class.getClassLoader(),
+                new Class<?>[]{HttpSession.class},
+                (proxy, method, args) -> {
+                    String name = method.getName();
+                    if ("getAttribute".equals(name)) {
+                        return attributes.get(args[0]);
+                    } else if ("setAttribute".equals(name)) {
+                        attributes.put((String) args[0], args[1]);
+                        return null;
+                    } else if ("removeAttribute".equals(name)) {
+                        return attributes.remove(args[0]);
+                    }
+                    return null;
+                }
+        );
+    }
+
+    private HttpServletRequest createMockRequest(HttpSession session, Map<String, String> params) {
+        return (HttpServletRequest) Proxy.newProxyInstance(
+                HttpServletRequest.class.getClassLoader(),
+                new Class<?>[]{HttpServletRequest.class},
+                (proxy, method, args) -> {
+                    String name = method.getName();
+                    if ("getSession".equals(name)) {
+                        return session;
+                    } else if ("getParameter".equals(name)) {
+                        return params != null ? params.get(args[0]) : null;
+                    }
+                    return null;
+                }
+        );
     }
 }

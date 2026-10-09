@@ -6,6 +6,7 @@ import com.college.backend.dao.InterviewDAO;
 import com.college.backend.entity.Application;
 import com.college.backend.entity.ApplicationStatusHistory;
 import com.college.backend.entity.Interview;
+import com.college.backend.util.CsrfUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -41,6 +42,8 @@ public class ApplicationServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request,
                          HttpServletResponse response)
             throws ServletException, IOException {
+
+        CsrfUtil.getOrCreateToken(request.getSession());
 
         String servletPath = request.getServletPath();
 
@@ -106,6 +109,13 @@ public class ApplicationServlet extends HttpServlet {
         }
 
         String action = request.getParameter("action");
+
+        // Reject state-changing actions on GET with HTTP 405 Method Not Allowed
+        if ("shortlist".equals(action) || "select".equals(action) || "reject".equals(action) || "delete".equals(action)) {
+            response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+                    "HTTP method GET is not supported for action: " + action);
+            return;
+        }
 
         // View Application Details
         if ("details".equals(action)) {
@@ -220,186 +230,6 @@ public class ApplicationServlet extends HttpServlet {
             return;
         }
 
-        // Shortlist (Allowed only from APPLIED)
-        if ("shortlist".equals(action)) {
-
-            String idParameter = request.getParameter("id");
-
-            if (idParameter != null && !idParameter.isEmpty()) {
-
-                Long id = Long.parseLong(idParameter);
-                Application application = applicationDAO.getApplicationById(id);
-
-                if (application == null) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Application not found with ID: " + id
-                    );
-                } else if (!"APPLIED".equals(application.getStatus())) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Cannot shortlist: Application is currently "
-                                    + application.getStatus()
-                                    + " (Only APPLIED applications can be shortlisted)!"
-                    );
-                } else {
-                    applicationDAO.shortlistApplication(id);
-                }
-            }
-
-            response.sendRedirect(
-                    request.getContextPath() + "/applications"
-            );
-
-            return;
-        }
-
-
-        // Reject (Allowed only from APPLIED or SHORTLISTED)
-        if ("reject".equals(action)) {
-
-            String idParameter = request.getParameter("id");
-
-            if (idParameter != null && !idParameter.isEmpty()) {
-
-                Long id = Long.parseLong(idParameter);
-                Application application = applicationDAO.getApplicationById(id);
-
-                if (application == null) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Application not found with ID: " + id
-                    );
-                } else if ("SELECTED".equals(application.getStatus())) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Cannot reject: Candidate has already been SELECTED!"
-                    );
-                } else if ("REJECTED".equals(application.getStatus())) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Application is already REJECTED!"
-                    );
-                } else {
-                    boolean rejected = applicationDAO.rejectApplication(id);
-                    if (rejected) {
-                        request.getSession().setAttribute(
-                                "successMessage",
-                                "Application rejected successfully."
-                        );
-                    } else {
-                        request.getSession().setAttribute(
-                                "errorMessage",
-                                "Failed to reject application ID: " + id
-                        );
-                    }
-                }
-            }
-
-            String from = request.getParameter("from");
-            String redirectTarget = "shortlist".equals(from) ? "/shortlist" : "/applications";
-
-            response.sendRedirect(
-                    request.getContextPath() + redirectTarget
-            );
-
-            return;
-        }
-
-
-        // Select (Allowed only from SHORTLISTED and interview must be COMPLETED)
-        if ("select".equals(action)) {
-
-            String idParameter = request.getParameter("id");
-
-            if (idParameter != null && !idParameter.isEmpty()) {
-
-                Long id = Long.parseLong(idParameter);
-                Application application = applicationDAO.getApplicationById(id);
-
-                if (application == null) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Application not found with ID: " + id
-                    );
-                } else if ("APPLIED".equals(application.getStatus())) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Cannot select: Application must be SHORTLISTED and complete an interview first!"
-                    );
-                } else if ("REJECTED".equals(application.getStatus())) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Cannot select: Application is already REJECTED!"
-                    );
-                } else if ("SELECTED".equals(application.getStatus())) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Application is already SELECTED!"
-                    );
-                } else if (!"SHORTLISTED".equals(application.getStatus())) {
-                    request.getSession().setAttribute(
-                            "errorMessage",
-                            "Cannot select: Application is currently " + application.getStatus() + "!"
-                    );
-                } else {
-                    // Application is SHORTLISTED: verify interview is COMPLETED
-                    boolean completed =
-                            interviewDAO.isInterviewCompletedForApplication(id);
-
-                    if (completed) {
-                        boolean selected = applicationDAO.selectApplication(id);
-                        if (selected) {
-                            request.getSession().setAttribute(
-                                    "successMessage",
-                                    "Application selected successfully."
-                            );
-                        } else {
-                            request.getSession().setAttribute(
-                                    "errorMessage",
-                                    "Failed to select application ID: " + id
-                            );
-                        }
-                    } else {
-                        request.getSession().setAttribute(
-                                "errorMessage",
-                                "Candidate can only be SELECTED after the interview is COMPLETED!"
-                        );
-                    }
-                }
-            }
-
-            String from = request.getParameter("from");
-            String redirectTarget = "shortlist".equals(from) ? "/shortlist" : "/applications";
-
-            response.sendRedirect(
-                    request.getContextPath() + redirectTarget
-            );
-
-            return;
-        }
-
-
-        // Delete
-        if ("delete".equals(action)) {
-
-            String idParameter = request.getParameter("id");
-
-            if (idParameter != null && !idParameter.isEmpty()) {
-
-                Long id = Long.parseLong(idParameter);
-
-                applicationDAO.deleteApplication(id);
-            }
-
-            response.sendRedirect(
-                    request.getContextPath() + "/applications"
-            );
-
-            return;
-        }
-
-
         // Check for error messages from session
         String errorMessage =
                 (String) request.getSession().getAttribute("errorMessage");
@@ -495,8 +325,15 @@ public class ApplicationServlet extends HttpServlet {
                           HttpServletResponse response)
             throws ServletException, IOException {
 
+        // Validate CSRF Token
+        if (!CsrfUtil.isValid(request)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid or missing CSRF token.");
+            return;
+        }
+
         String action = request.getParameter("action");
 
+        // Create
         if ("create".equals(action)) {
 
             try {
@@ -592,6 +429,213 @@ public class ApplicationServlet extends HttpServlet {
                         "/WEB-INF/jsp/applications.jsp"
                 ).forward(request, response);
             }
+
+        }
+
+        // Shortlist (Allowed only from APPLIED)
+        else if ("shortlist".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.trim().isEmpty()) {
+
+                try {
+                    Long id = Long.parseLong(idParameter.trim());
+                    Application application = applicationDAO.getApplicationById(id);
+
+                    if (application == null) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Application not found with ID: " + id
+                        );
+                    } else if (!"APPLIED".equals(application.getStatus())) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Cannot shortlist: Application is currently "
+                                        + application.getStatus()
+                                        + " (Only APPLIED applications can be shortlisted)!"
+                        );
+                    } else {
+                        applicationDAO.shortlistApplication(id);
+                    }
+                } catch (NumberFormatException e) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Invalid Application ID: " + idParameter
+                    );
+                }
+            }
+
+            response.sendRedirect(
+                    request.getContextPath() + "/applications"
+            );
+
+        }
+
+        // Reject (Allowed only from APPLIED or SHORTLISTED)
+        else if ("reject".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.trim().isEmpty()) {
+
+                try {
+                    Long id = Long.parseLong(idParameter.trim());
+                    Application application = applicationDAO.getApplicationById(id);
+
+                    if (application == null) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Application not found with ID: " + id
+                        );
+                    } else if ("SELECTED".equals(application.getStatus())) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Cannot reject: Candidate has already been SELECTED!"
+                        );
+                    } else if ("REJECTED".equals(application.getStatus())) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Application is already REJECTED!"
+                        );
+                    } else {
+                        boolean rejected = applicationDAO.rejectApplication(id);
+                        if (rejected) {
+                            request.getSession().setAttribute(
+                                    "successMessage",
+                                    "Application rejected successfully."
+                            );
+                        } else {
+                            request.getSession().setAttribute(
+                                    "errorMessage",
+                                    "Failed to reject application ID: " + id
+                            );
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Invalid Application ID: " + idParameter
+                    );
+                }
+            }
+
+            String from = request.getParameter("from");
+            String redirectTarget = "shortlist".equals(from) ? "/shortlist" : ("interviews".equals(from) ? "/interviews" : "/applications");
+
+            response.sendRedirect(
+                    request.getContextPath() + redirectTarget
+            );
+
+        }
+
+        // Select (Allowed only from SHORTLISTED and interview must be COMPLETED)
+        else if ("select".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.trim().isEmpty()) {
+
+                try {
+                    Long id = Long.parseLong(idParameter.trim());
+                    Application application = applicationDAO.getApplicationById(id);
+
+                    if (application == null) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Application not found with ID: " + id
+                        );
+                    } else if ("APPLIED".equals(application.getStatus())) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Cannot select: Application must be SHORTLISTED and complete an interview first!"
+                        );
+                    } else if ("REJECTED".equals(application.getStatus())) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Cannot select: Application is already REJECTED!"
+                        );
+                    } else if ("SELECTED".equals(application.getStatus())) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Application is already SELECTED!"
+                        );
+                    } else if (!"SHORTLISTED".equals(application.getStatus())) {
+                        request.getSession().setAttribute(
+                                "errorMessage",
+                                "Cannot select: Application is currently " + application.getStatus() + "!"
+                        );
+                    } else {
+                        // Application is SHORTLISTED: verify interview is COMPLETED
+                        boolean completed =
+                                interviewDAO.isInterviewCompletedForApplication(id);
+
+                        if (completed) {
+                            boolean selected = applicationDAO.selectApplication(id);
+                            if (selected) {
+                                request.getSession().setAttribute(
+                                        "successMessage",
+                                        "Application selected successfully."
+                                );
+                            } else {
+                                request.getSession().setAttribute(
+                                        "errorMessage",
+                                        "Failed to select application ID: " + id
+                                );
+                            }
+                        } else {
+                            request.getSession().setAttribute(
+                                    "errorMessage",
+                                    "Candidate can only be SELECTED after the interview is COMPLETED!"
+                            );
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Invalid Application ID: " + idParameter
+                    );
+                }
+            }
+
+            String from = request.getParameter("from");
+            String redirectTarget = "shortlist".equals(from) ? "/shortlist" : ("interviews".equals(from) ? "/interviews" : "/applications");
+
+            response.sendRedirect(
+                    request.getContextPath() + redirectTarget
+            );
+
+        }
+
+        // Delete
+        else if ("delete".equals(action)) {
+
+            String idParameter = request.getParameter("id");
+
+            if (idParameter != null && !idParameter.trim().isEmpty()) {
+
+                try {
+                    Long id = Long.parseLong(idParameter.trim());
+                    applicationDAO.deleteApplication(id);
+                } catch (NumberFormatException e) {
+                    request.getSession().setAttribute(
+                            "errorMessage",
+                            "Invalid Application ID: " + idParameter
+                    );
+                }
+            }
+
+            response.sendRedirect(
+                    request.getContextPath() + "/applications"
+            );
+
+        }
+
+        // Default fallback
+        else {
+            response.sendRedirect(
+                    request.getContextPath() + "/applications"
+            );
         }
     }
 }
