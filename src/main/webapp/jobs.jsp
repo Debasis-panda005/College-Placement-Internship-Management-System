@@ -409,7 +409,7 @@
 
                 </div>
 
-            </td>$env:CATALINA_HOME="D:\apache-tomcat-11.0.24"
+            </td>
 
         </tr>
 
