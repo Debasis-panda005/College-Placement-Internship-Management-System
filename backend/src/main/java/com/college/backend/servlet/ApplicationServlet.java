@@ -71,10 +71,17 @@ public class ApplicationServlet extends HttpServlet {
             if (allInterviews != null) {
                 for (Interview interview : allInterviews) {
                     if (interview.getApplicationId() != null) {
-                        interviewMap.put(interview.getApplicationId(), interview);
+                        Long appId = interview.getApplicationId();
+                        Interview existing = interviewMap.get(appId);
+                        if (existing == null || (interview.getId() != null && (existing.getId() == null || interview.getId() > existing.getId()))) {
+                            interviewMap.put(appId, interview);
+                        }
                     }
                 }
             }
+
+            Map<Long, Boolean> rescheduledMap =
+                    interviewDAO.getRescheduledApplicationsMap();
 
             request.setAttribute(
                     "applications",
@@ -84,6 +91,11 @@ public class ApplicationServlet extends HttpServlet {
             request.setAttribute(
                     "interviewMap",
                     interviewMap
+            );
+
+            request.setAttribute(
+                    "rescheduledMap",
+                    rescheduledMap
             );
 
             request.getRequestDispatcher(

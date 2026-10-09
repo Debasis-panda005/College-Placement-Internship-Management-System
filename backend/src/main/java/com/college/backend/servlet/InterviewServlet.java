@@ -17,6 +17,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 
 @WebServlet("/interviews")
 public class InterviewServlet extends HttpServlet {
@@ -65,16 +66,84 @@ public class InterviewServlet extends HttpServlet {
 
         else if ("complete".equals(action)) {
 
-            Long id = Long.parseLong(
-                    request.getParameter("id")
-            );
+            String idParam = request.getParameter("id");
+            if (idParam == null || idParam.trim().isEmpty()) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Interview ID is required!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
 
-            interviewDAO.completeInterview(id);
+            Long id;
+            try {
+                id = Long.parseLong(idParam.trim());
+            } catch (NumberFormatException e) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Invalid Interview ID format!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            if (id <= 0) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Invalid Interview ID!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            Interview interview = interviewDAO.getInterviewById(id);
+
+            if (interview == null) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Interview ID " + id + " does not exist!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            if (!"SCHEDULED".equals(interview.getStatus())) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Only SCHEDULED interviews can be completed."
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
+            boolean completed = interviewDAO.completeInterview(id);
+            if (completed) {
+                request.getSession().setAttribute(
+                        "successMessage",
+                        "Interview completed successfully."
+                );
+            } else {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Failed to complete the interview!"
+                );
+            }
 
             response.sendRedirect(
                     request.getContextPath() + "/interviews"
             );
-
+            return;
         }
 
         // -------------------------------------------------
@@ -109,6 +178,17 @@ public class InterviewServlet extends HttpServlet {
                 return;
             }
 
+            if (id <= 0) {
+                request.getSession().setAttribute(
+                        "errorMessage",
+                        "Invalid Interview ID!"
+                );
+                response.sendRedirect(
+                        request.getContextPath() + "/interviews"
+                );
+                return;
+            }
+
             Interview interview = interviewDAO.getInterviewById(id);
 
             if (interview == null) {
@@ -134,7 +214,12 @@ public class InterviewServlet extends HttpServlet {
             }
 
             boolean cancelled = interviewDAO.cancelInterview(id);
-            if (!cancelled) {
+            if (cancelled) {
+                request.getSession().setAttribute(
+                        "successMessage",
+                        "Interview cancelled successfully."
+                );
+            } else {
                 request.getSession().setAttribute(
                         "errorMessage",
                         "Failed to cancel the interview!"
@@ -246,6 +331,32 @@ public class InterviewServlet extends HttpServlet {
                 request.setAttribute("errorMessage", errorMessage);
                 request.getSession().removeAttribute("errorMessage");
             }
+
+            // Check for success messages from session
+            String successMessage =
+                    (String) request.getSession().getAttribute("successMessage");
+
+            if (successMessage != null) {
+                request.setAttribute("successMessage", successMessage);
+                request.getSession().removeAttribute("successMessage");
+            }
+
+            // Retrieve interview statistics
+            Map<String, Integer> interviewStats =
+                    interviewDAO.getInterviewStatistics();
+
+            request.setAttribute(
+                    "interviewStats",
+                    interviewStats
+            );
+
+            Map<Long, Boolean> rescheduledMap =
+                    interviewDAO.getRescheduledApplicationsMap();
+
+            request.setAttribute(
+                    "rescheduledMap",
+                    rescheduledMap
+            );
 
             // Parse search and filter parameters
             String filterAppIdParam = request.getParameter("filterAppId");

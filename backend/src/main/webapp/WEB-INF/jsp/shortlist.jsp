@@ -115,6 +115,11 @@
             color: #dc3545;
         }
 
+        .rescheduled {
+            font-weight: bold;
+            color: #fd7e14;
+        }
+
         .not-scheduled {
             font-weight: bold;
             color: #6c757d;
@@ -234,18 +239,22 @@
                         </td>
 
                         <td>
+                            <c:set var="isRescheduled" value="${not empty rescheduledMap[application.id] && rescheduledMap[application.id]}" />
                             <c:choose>
                                 <c:when test="${empty interview}">
                                     <span class="not-scheduled">NOT SCHEDULED</span>
-                                </c:when>
-                                <c:when test="${interview.status == 'SCHEDULED'}">
-                                    <span class="scheduled">SCHEDULED</span>
                                 </c:when>
                                 <c:when test="${interview.status == 'COMPLETED'}">
                                     <span class="completed">COMPLETED</span>
                                 </c:when>
                                 <c:when test="${interview.status == 'CANCELLED'}">
                                     <span class="cancelled">CANCELLED</span>
+                                </c:when>
+                                <c:when test="${interview.status == 'SCHEDULED' && isRescheduled}">
+                                    <span class="rescheduled">RESCHEDULED</span>
+                                </c:when>
+                                <c:when test="${interview.status == 'SCHEDULED'}">
+                                    <span class="scheduled">SCHEDULED</span>
                                 </c:when>
                                 <c:otherwise>
                                     <span class="status">${interview.status}</span>

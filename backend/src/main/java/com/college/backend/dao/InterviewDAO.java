@@ -8,7 +8,11 @@ import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class InterviewDAO {
 
@@ -86,7 +90,7 @@ public class InterviewDAO {
 
         List<Interview> interviews = new ArrayList<>();
 
-        String sql = "SELECT * FROM interviews";
+        String sql = "SELECT * FROM interviews ORDER BY id ASC";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql);
@@ -375,15 +379,12 @@ public class InterviewDAO {
         return applicationIds;
     }
 
-    // 10. Complete Interview
+    // 10. Complete Interview (Transactional with status guard and history logging)
     public boolean completeInterview(Long id) {
 
-        Interview interview = getInterviewById(id);
-        if (interview == null) {
+        if (id == null || id <= 0) {
             return false;
         }
-
-        String sql = "UPDATE interviews SET status = 'COMPLETED' WHERE id = ?";
 
         Connection connection = null;
 
@@ -391,11 +392,33 @@ public class InterviewDAO {
             connection = DBConnection.getConnection();
             connection.setAutoCommit(false);
 
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setLong(1, id);
+            Long applicationId = null;
+            String currentStatus = null;
 
-                int updated = statement.executeUpdate();
-                if (updated <= 0) {
+            String selectSql = "SELECT application_id, status FROM interviews WHERE id = ?";
+            try (PreparedStatement selectStmt = connection.prepareStatement(selectSql)) {
+                selectStmt.setLong(1, id);
+                try (ResultSet rs = selectStmt.executeQuery()) {
+                    if (rs.next()) {
+                        applicationId = rs.getLong("application_id");
+                        currentStatus = rs.getString("status");
+                    } else {
+                        connection.rollback();
+                        return false;
+                    }
+                }
+            }
+
+            if (!"SCHEDULED".equals(currentStatus)) {
+                connection.rollback();
+                return false;
+            }
+
+            String updateSql = "UPDATE interviews SET status = 'COMPLETED' WHERE id = ? AND status = 'SCHEDULED'";
+            try (PreparedStatement updateStmt = connection.prepareStatement(updateSql)) {
+                updateStmt.setLong(1, id);
+                int affected = updateStmt.executeUpdate();
+                if (affected <= 0) {
                     connection.rollback();
                     return false;
                 }
@@ -404,7 +427,7 @@ public class InterviewDAO {
             boolean historyAdded = statusHistoryDAO.addHistory(
                     connection,
                     new ApplicationStatusHistory(
-                            interview.getApplicationId(),
+                            applicationId,
                             "INTERVIEW_COMPLETED",
                             LocalDateTime.now()
                     )
@@ -606,5 +629,95 @@ public class InterviewDAO {
                 }
             }
         }
+    }
+
+    // 13. Get Interview Statistics
+    public Map<String, Integer> getInterviewStatistics() {
+
+        Map<String, Integer> stats = new HashMap<>();
+        stats.put("TOTAL", 0);
+        stats.put("SCHEDULED", 0);
+        stats.put("COMPLETED", 0);
+        stats.put("CANCELLED", 0);
+        stats.put("RESCHEDULED", 0);
+
+        String sql = "SELECT status, COUNT(*) AS cnt FROM interviews GROUP BY status";
+        String rescheduledSql = "SELECT COUNT(DISTINCT application_id) AS cnt " +
+                "FROM application_status_history " +
+                "WHERE status = 'INTERVIEW_RESCHEDULED'";
+
+        try (Connection connection = DBConnection.getConnection()) {
+
+            try (PreparedStatement statement = connection.prepareStatement(sql);
+                 ResultSet resultSet = statement.executeQuery()) {
+
+                int total = 0;
+
+                while (resultSet.next()) {
+                    String status = resultSet.getString("status");
+                    int count = resultSet.getInt("cnt");
+
+                    if (status != null) {
+                        stats.put(status.toUpperCase(), count);
+                    }
+
+                    total += count;
+                }
+
+                stats.put("TOTAL", total);
+            }
+
+            try (PreparedStatement statement = connection.prepareStatement(rescheduledSql);
+                 ResultSet resultSet = statement.executeQuery()) {
+
+                if (resultSet.next()) {
+                    stats.put("RESCHEDULED", resultSet.getInt("cnt"));
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return stats;
+    }
+
+    // 14. Get Application IDs with Rescheduled Interviews
+    public Set<Long> getRescheduledApplicationIds() {
+
+        Set<Long> applicationIds = new HashSet<>();
+
+        String sql = "SELECT application_id " +
+                "FROM application_status_history " +
+                "GROUP BY application_id " +
+                "HAVING MAX(CASE WHEN status IN ('INTERVIEW_RESCHEDULED', 'INTERVIEW RESCHEDULED') THEN id ELSE 0 END) > " +
+                "       MAX(CASE WHEN status IN ('INTERVIEW_SCHEDULED', 'INTERVIEW SCHEDULED') THEN id ELSE 0 END)";
+
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+
+            while (resultSet.next()) {
+                applicationIds.add(resultSet.getLong("application_id"));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return applicationIds;
+    }
+
+    // 15. Get Map of Application IDs to Rescheduled Flag
+    public Map<Long, Boolean> getRescheduledApplicationsMap() {
+
+        Set<Long> applicationIds = getRescheduledApplicationIds();
+        Map<Long, Boolean> map = new HashMap<>();
+
+        for (Long appId : applicationIds) {
+            map.put(appId, Boolean.TRUE);
+        }
+
+        return map;
     }
 }

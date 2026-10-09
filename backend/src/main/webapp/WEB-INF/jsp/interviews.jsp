@@ -184,6 +184,10 @@
             color: #dc3545;
         }
 
+        .rescheduled {
+            color: #fd7e14;
+        }
+
         .actions {
             display: flex;
             justify-content: center;
@@ -204,6 +208,47 @@
 
         .app-link:hover {
             text-decoration: underline;
+        }
+
+        .alert-success {
+            background-color: #d1e7dd;
+            color: #0f5132;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            border: 1px solid #badbcc;
+        }
+
+        .stats-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            flex: 1;
+            min-width: 140px;
+            background-color: #f8f9fa;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px 12px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .stat-card h3 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+        }
+
+        .stat-card .stat-count {
+            font-size: 26px;
+            font-weight: bold;
+            margin-top: 6px;
         }
 
     </style>
@@ -227,6 +272,41 @@
             ${errorMessage}
         </div>
     </c:if>
+
+    <c:if test="${not empty successMessage}">
+        <div class="alert-success">
+            ${successMessage}
+        </div>
+    </c:if>
+
+    <div class="stats-container">
+
+        <div class="stat-card">
+            <h3>Total Interviews</h3>
+            <div class="stat-count" style="color: #333;">${not empty interviewStats ? interviewStats['TOTAL'] : 0}</div>
+        </div>
+
+        <div class="stat-card">
+            <h3>Scheduled</h3>
+            <div class="stat-count scheduled">${not empty interviewStats ? interviewStats['SCHEDULED'] : 0}</div>
+        </div>
+
+        <div class="stat-card">
+            <h3>Completed</h3>
+            <div class="stat-count completed">${not empty interviewStats ? interviewStats['COMPLETED'] : 0}</div>
+        </div>
+
+        <div class="stat-card">
+            <h3>Cancelled</h3>
+            <div class="stat-count cancelled">${not empty interviewStats ? interviewStats['CANCELLED'] : 0}</div>
+        </div>
+
+        <div class="stat-card">
+            <h3>Rescheduled</h3>
+            <div class="stat-count rescheduled">${not empty interviewStats ? interviewStats['RESCHEDULED'] : 0}</div>
+        </div>
+
+    </div>
 
     <!-- CREATE INTERVIEW -->
 
@@ -405,6 +485,14 @@
 
                                     <span class="cancelled">
                                         CANCELLED
+                                    </span>
+
+                                </c:when>
+
+                                <c:when test="${interview.status == 'SCHEDULED' && not empty rescheduledMap[interview.applicationId] && rescheduledMap[interview.applicationId]}">
+
+                                    <span class="rescheduled">
+                                        RESCHEDULED
                                     </span>
 
                                 </c:when>
