@@ -1,36 +1,36 @@
 package com.college.backend.entity;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+@Entity
 public class Interview {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     private Long applicationId;
     private LocalDate interviewDate;
     private LocalTime interviewTime;
     private String mode;
     private String status;
 
-    // Default constructor
     public Interview() {
     }
 
-    // Parameterized constructor
-    public Interview(Long applicationId,
-                     LocalDate interviewDate,
-                     LocalTime interviewTime,
-                     String mode,
-                     String status) {
-
+    public Interview(Long applicationId, LocalDate interviewDate,
+                     LocalTime interviewTime, String mode, String status) {
         this.applicationId = applicationId;
         this.interviewDate = interviewDate;
         this.interviewTime = interviewTime;
         this.mode = mode;
         this.status = status;
     }
-
-    // Getters and Setters
 
     public Long getId() {
         return id;

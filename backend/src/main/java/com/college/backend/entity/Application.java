@@ -1,32 +1,33 @@
 package com.college.backend.entity;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import java.time.LocalDate;
 
+@Entity
 public class Application {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     private Long studentId;
     private Long jobId;
     private LocalDate applicationDate;
     private String status;
 
-    // Default constructor
     public Application() {
     }
 
-    // Parameterized constructor
-    public Application(Long studentId,
-                       Long jobId,
-                       LocalDate applicationDate,
-                       String status) {
-
+    public Application(Long studentId, Long jobId,
+                       LocalDate applicationDate, String status) {
         this.studentId = studentId;
         this.jobId = jobId;
         this.applicationDate = applicationDate;
         this.status = status;
     }
-
-    // Getters and Setters
 
     public Long getId() {
         return id;
