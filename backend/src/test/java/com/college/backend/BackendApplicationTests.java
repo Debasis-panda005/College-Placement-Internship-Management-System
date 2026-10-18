@@ -1,12 +1,19 @@
 package com.college.backend;
 
 import com.college.backend.dao.JobDAO;
+import com.college.backend.dao.StudentDAO;
+import com.college.backend.dao.UserDAO;
 import com.college.backend.entity.Application;
 import com.college.backend.entity.ApplicationStatusHistory;
 import com.college.backend.entity.Interview;
 import com.college.backend.entity.Job;
+import com.college.backend.entity.Student;
+import com.college.backend.entity.User;
+import com.college.backend.exception.DAOException;
+import com.college.backend.exception.DuplicateRecordException;
 import com.college.backend.servlet.JobServlet;
 import com.college.backend.util.CsrfUtil;
+import com.college.backend.util.PasswordHashService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -15,6 +22,8 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -472,6 +481,403 @@ class BackendApplicationTests {
         assertEquals(sal50kWithComma, sal50k);
         assertTrue(sal50k > sal15k);
         assertTrue(sal15k > salCompetitive);
+    }
+
+    // =====================================================
+    // 16. USER ENTITY AND SAFE TOSTRING TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("User entity populates correctly and excludes password hash from toString")
+    void testUserEntityAndSafeToString() {
+        LocalDateTime created = LocalDateTime.of(2026, 10, 18, 9, 30);
+        String secretHash = "$2a$10$e8w.49vKxR7aV0hJtJ1hze3xYgX0zC8J3VvJ1kX7yR4hZ1e9jK3a.";
+
+        User user = new User(1L, "Alice Johnson", "alice@example.com", secretHash, "STUDENT", created);
+
+        assertEquals(1L, user.getId());
+        assertEquals("Alice Johnson", user.getName());
+        assertEquals("alice@example.com", user.getEmail());
+        assertEquals(secretHash, user.getPasswordHash());
+        assertEquals("STUDENT", user.getRole());
+        assertEquals(created, user.getCreatedAt());
+
+        // Verify toString excludes the secret password hash
+        String userString = user.toString();
+        assertFalse(userString.contains(secretHash), "User.toString() must never expose the password hash");
+        assertTrue(userString.contains("alice@example.com"));
+        assertTrue(userString.contains("STUDENT"));
+    }
+
+    // =====================================================
+    // 17. USER SUPPORTED ROLE VALIDATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("User validates supported roles and rejects unsupported roles")
+    void testUserRoleValidation() {
+        assertTrue(User.isValidRole("STUDENT"));
+        assertTrue(User.isValidRole("student"));
+        assertTrue(User.isValidRole("COORDINATOR"));
+        assertTrue(User.isValidRole("ADMIN"));
+
+        assertFalse(User.isValidRole("GUEST"));
+        assertFalse(User.isValidRole("MANAGER"));
+        assertFalse(User.isValidRole(null));
+        assertFalse(User.isValidRole(""));
+
+        User user = new User();
+        user.setRole("COORDINATOR");
+        assertEquals("COORDINATOR", user.getRole());
+
+        user.setRole("admin");
+        assertEquals("ADMIN", user.getRole());
+
+        assertThrows(IllegalArgumentException.class, () -> user.setRole("SUPERUSER"),
+                "Setting an invalid role must throw IllegalArgumentException");
+        assertThrows(IllegalArgumentException.class, () -> user.setRole(null),
+                "Setting a null role must throw IllegalArgumentException");
+    }
+
+    // =====================================================
+    // 18. USER EMAIL NORMALIZATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("User normalizes email consistently to trimmed lower-case")
+    void testUserEmailNormalization() {
+        assertEquals("student@college.edu", User.normalizeEmail("  Student@College.EDU  "));
+        assertEquals("test.user@domain.com", User.normalizeEmail("TEST.USER@DOMAIN.COM"));
+        assertNull(User.normalizeEmail(null));
+
+        User user = new User("Bob", "  BOB.SMITH@example.COM  ", "hash123", "STUDENT");
+        assertEquals("bob.smith@example.com", user.getEmail());
+
+        user.setEmail("  NEW.EMAIL@DOMAIN.ORG  ");
+        assertEquals("new.email@domain.org", user.getEmail());
+    }
+
+    // =====================================================
+    // 19. STUDENT ENTITY AND VALIDATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("Student entity enforces valid CGPA range and graduation year bounds")
+    void testStudentEntityAndValidation() {
+        BigDecimal validCgpa = new BigDecimal("8.75");
+        Student student = new Student(1L, 10L, "CS2026-042", "Computer Science",
+                validCgpa, 2026, "+91-9876543210", "Java, MySQL, Git", "https://resume.example/cs042.pdf");
+
+        assertEquals(1L, student.getId());
+        assertEquals(10L, student.getUserId());
+        assertEquals("CS2026-042", student.getRollNumber());
+        assertEquals("Computer Science", student.getDepartment());
+        assertEquals(validCgpa, student.getCgpa());
+        assertEquals(2026, student.getGraduationYear());
+        assertEquals("+91-9876543210", student.getPhone());
+        assertEquals("Java, MySQL, Git", student.getSkills());
+        assertEquals("https://resume.example/cs042.pdf", student.getResumeUrl());
+
+        // CGPA Validation
+        assertTrue(Student.isValidCgpa(BigDecimal.ZERO));
+        assertTrue(Student.isValidCgpa(new BigDecimal("10.00")));
+        assertTrue(Student.isValidCgpa(new BigDecimal("7.50")));
+        assertFalse(Student.isValidCgpa(new BigDecimal("10.01")));
+        assertFalse(Student.isValidCgpa(new BigDecimal("-0.10")));
+        assertFalse(Student.isValidCgpa(null));
+
+        assertThrows(IllegalArgumentException.class, () -> student.setCgpa(new BigDecimal("10.50")),
+                "CGPA above 10.00 must throw IllegalArgumentException");
+        assertThrows(IllegalArgumentException.class, () -> student.setCgpa(new BigDecimal("-1.00")),
+                "Negative CGPA must throw IllegalArgumentException");
+
+        // Graduation Year Validation
+        assertTrue(Student.isValidGraduationYear(2000));
+        assertTrue(Student.isValidGraduationYear(2026));
+        assertTrue(Student.isValidGraduationYear(2100));
+        assertFalse(Student.isValidGraduationYear(1999));
+        assertFalse(Student.isValidGraduationYear(2101));
+        assertFalse(Student.isValidGraduationYear(null));
+
+        assertThrows(IllegalArgumentException.class, () -> student.setGraduationYear(1990),
+                "Graduation year before 2000 must throw IllegalArgumentException");
+        assertThrows(IllegalArgumentException.class, () -> student.setGraduationYear(2150),
+                "Graduation year after 2100 must throw IllegalArgumentException");
+    }
+
+    // =====================================================
+    // 20. BCRYPT PASSWORD HASHING AND VERIFICATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("PasswordHashService correctly hashes plaintext and verifies matching password")
+    void testPasswordHashingAndVerification() {
+        String plainPassword = "StudentSecret@2026";
+
+        String hash = PasswordHashService.hashPassword(plainPassword);
+        assertNotNull(hash);
+        assertFalse(hash.trim().isEmpty());
+        assertTrue(hash.startsWith("$2a$") || hash.startsWith("$2b$"),
+                "BCrypt hash should start with standard $2a$ or $2b$ prefix");
+        assertEquals(60, hash.length(), "Standard BCrypt hash string must be 60 characters long");
+
+        // Verify correct password returns true
+        assertTrue(PasswordHashService.verifyPassword(plainPassword, hash),
+                "Candidate matching the plaintext password must verify as true");
+
+        // Null and empty password hashing should be rejected
+        assertThrows(IllegalArgumentException.class, () -> PasswordHashService.hashPassword(null));
+        assertThrows(IllegalArgumentException.class, () -> PasswordHashService.hashPassword(""));
+    }
+
+    // =====================================================
+    // 21. PASSWORD INCORRECT REJECTION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("PasswordHashService safely rejects incorrect passwords, empty passwords, and invalid hashes")
+    void testPasswordIncorrectRejection() {
+        String plainPassword = "CorrectPassword#1";
+        String hash = PasswordHashService.hashPassword(plainPassword);
+
+        assertFalse(PasswordHashService.verifyPassword("WrongPassword#1", hash),
+                "Incorrect password must return false");
+        assertFalse(PasswordHashService.verifyPassword("correctpassword#1", hash),
+                "Password comparison must be case-sensitive and return false for wrong casing");
+        assertFalse(PasswordHashService.verifyPassword(null, hash),
+                "Null candidate password must return false");
+        assertFalse(PasswordHashService.verifyPassword("", hash),
+                "Empty candidate password must return false");
+        assertFalse(PasswordHashService.verifyPassword(plainPassword, null),
+                "Null stored hash must return false");
+        assertFalse(PasswordHashService.verifyPassword(plainPassword, ""),
+                "Empty stored hash must return false");
+        assertFalse(PasswordHashService.verifyPassword(plainPassword, "invalid-non-bcrypt-hash"),
+                "Malformed stored hash must safely return false without crashing");
+    }
+
+    // =====================================================
+    // 22. DIFFERENT HASHES FOR IDENTICAL PASSWORDS (SALT UNIQUENESS)
+    // =====================================================
+
+    @Test
+    @DisplayName("PasswordHashService generates unique salts resulting in distinct hashes for identical passwords")
+    void testPasswordUniqueSaltsForIdenticalPasswords() {
+        String password = "IdenticalPassword@123";
+
+        String hash1 = PasswordHashService.hashPassword(password);
+        String hash2 = PasswordHashService.hashPassword(password);
+
+        assertNotNull(hash1);
+        assertNotNull(hash2);
+        assertNotEquals(hash1, hash2,
+                "Due to cryptographic random salts, two hashes of the same password must produce distinct hash strings");
+
+        // Both distinct hashes must independently verify against the same plaintext password
+        assertTrue(PasswordHashService.verifyPassword(password, hash1),
+                "Hash 1 must verify against the original password");
+        assertTrue(PasswordHashService.verifyPassword(password, hash2),
+                "Hash 2 must verify against the original password");
+    }
+
+    // =====================================================
+    // 23. BCRYPT FORMAT VALIDATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("PasswordHashService validates BCrypt format correctly rejecting plaintext and malformed hashes")
+    void testBCryptFormatValidation() {
+        // Valid BCrypt hashes
+        String generatedHash = PasswordHashService.hashPassword("SecureStudent2026!");
+        assertTrue(PasswordHashService.isBCryptHash(generatedHash),
+                "Newly generated BCrypt hash must pass isBCryptHash check");
+
+        assertTrue(PasswordHashService.isBCryptHash("$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"),
+                "Standard $2a$ 60-character hash must be recognized as valid BCrypt format");
+        assertTrue(PasswordHashService.isBCryptHash("$2b$12$e8OfkV8.H79fC8s6a9/CteJ5GZ5yL5qX1.B0H8cO64L8o5n17hQym"),
+                "Standard $2b$ 60-character hash must be recognized as valid BCrypt format");
+        assertTrue(PasswordHashService.isBCryptHash("$2y$10$abcdefghijklmnopqrstuvABCDEFGHIJKLMNOPQRSTUVWXYZ01234"),
+                "Standard $2y$ 60-character hash must be recognized as valid BCrypt format");
+
+        // Plaintext passwords mistakenly supplied as passwordHash must be rejected
+        assertFalse(PasswordHashService.isBCryptHash("Student@2026"),
+                "Plaintext password must not be recognized as a BCrypt hash");
+        assertFalse(PasswordHashService.isBCryptHash("PlaintextPassword123!"),
+                "Plaintext password must not be recognized as a BCrypt hash");
+        assertFalse(PasswordHashService.isBCryptHash("admin123"),
+                "Short plaintext password must not be recognized as a BCrypt hash");
+
+        // Malformed hashes must be rejected
+        assertFalse(PasswordHashService.isBCryptHash("not-a-bcrypt-hash"),
+                "Arbitrary non-BCrypt string must be rejected");
+        assertFalse(PasswordHashService.isBCryptHash("$2a$10$short"),
+                "Truncated BCrypt hash must be rejected");
+        assertFalse(PasswordHashService.isBCryptHash("$2a$invalidcost$abcdefghijklmnopqrstuvABCDEFGHIJKLMNOPQRSTUVWXYZ01234"),
+                "Non-numeric cost factor must be rejected");
+        assertFalse(PasswordHashService.isBCryptHash("$3a$10$abcdefghijklmnopqrstuvABCDEFGHIJKLMNOPQRSTUVWXYZ01234"),
+                "Unsupported prefix $3a$ must be rejected");
+        assertFalse(PasswordHashService.isBCryptHash("$2a$10$abcdefghijklmnopqrstuvABCDEFGHIJKLMNOPQRSTUVWXYZ01234extra"),
+                "Hash with trailing extra characters must be rejected");
+
+        // Null or empty values must be rejected
+        assertFalse(PasswordHashService.isBCryptHash(null),
+                "Null hash must return false");
+        assertFalse(PasswordHashService.isBCryptHash(""),
+                "Empty hash must return false");
+        assertFalse(PasswordHashService.isBCryptHash("   "),
+                "Whitespace-only hash must return false");
+    }
+
+    // =====================================================
+    // 24. USER DAO DEFENSIVE BEHAVIOR & ERROR DISTINCTION
+    // =====================================================
+
+    @Test
+    @DisplayName("UserDAO distinguishes missing records, invalid input, and protects against privilege escalation")
+    void testUserDAODefensiveBehaviorAndPrivilegeEscalationPrevention() {
+        UserDAO userDAO = new UserDAO();
+        String validHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
+        // Record not found: Null and blank parameter lookups safely return null/false without throwing
+        assertNull(userDAO.findById(null));
+        assertNull(userDAO.findByEmail(null));
+        assertNull(userDAO.findByEmail("   "));
+        assertFalse(userDAO.existsByEmail(null));
+        assertFalse(userDAO.existsByEmail("   "));
+
+        // Invalid input: createUser rejects null entity, missing/blank email, missing/blank password hash
+        assertThrows(IllegalArgumentException.class, () -> userDAO.createUser(null),
+                "Null user entity must throw IllegalArgumentException");
+
+        User userWithoutEmail = new User("Jane", null, validHash, "STUDENT");
+        assertThrows(IllegalArgumentException.class, () -> userDAO.createUser(userWithoutEmail),
+                "User without email must throw IllegalArgumentException");
+
+        User userWithBlankEmail = new User("Jane", "   ", validHash, "STUDENT");
+        assertThrows(IllegalArgumentException.class, () -> userDAO.createUser(userWithBlankEmail),
+                "User with blank email must throw IllegalArgumentException");
+
+        User userWithoutHash = new User("Jane", "jane@example.com", null, "STUDENT");
+        assertThrows(IllegalArgumentException.class, () -> userDAO.createUser(userWithoutHash),
+                "User without password hash must throw IllegalArgumentException");
+
+        User userWithBlankHash = new User("Jane", "jane@example.com", "   ", "STUDENT");
+        assertThrows(IllegalArgumentException.class, () -> userDAO.createUser(userWithBlankHash),
+                "User with blank password hash must throw IllegalArgumentException");
+
+        // Password hash validation: Plaintext passwords accidentally passed in passwordHash must throw IllegalArgumentException
+        User userWithPlaintextPassword = new User("Jane", "jane@example.com", "PlaintextPassword123!", "STUDENT");
+        assertThrows(IllegalArgumentException.class, () -> userDAO.createUser(userWithPlaintextPassword),
+                "Plaintext password mistakenly supplied as passwordHash must throw IllegalArgumentException");
+
+        User userWithMalformedHash = new User("Jane", "jane@example.com", "$2a$badcost$short", "STUDENT");
+        assertThrows(IllegalArgumentException.class, () -> userDAO.createUser(userWithMalformedHash),
+                "Malformed hash must throw IllegalArgumentException");
+
+        // Unsupported role rejection
+        assertThrows(IllegalArgumentException.class,
+                () -> new User("Jane", "jane@example.com", validHash, "SUPERUSER"),
+                "User entity constructor must reject unsupported roles");
+
+        // registerStudentUser validation and privilege escalation prevention
+        assertThrows(IllegalArgumentException.class, () -> userDAO.registerStudentUser(null),
+                "Null user to registerStudentUser must throw IllegalArgumentException");
+
+        User privilegedAttempt = new User("Mallory", null, validHash, "ADMIN");
+        assertEquals("ADMIN", privilegedAttempt.getRole());
+
+        // registerStudentUser overrides role to STUDENT before any DB operation
+        assertThrows(IllegalArgumentException.class, () -> userDAO.registerStudentUser(privilegedAttempt));
+        assertEquals(User.ROLE_STUDENT, privilegedAttempt.getRole(),
+                "registerStudentUser must strictly force role to STUDENT, preventing privilege escalation");
+    }
+
+    // =====================================================
+    // 25. STUDENT DAO DEFENSIVE VALIDATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("StudentDAO distinguishes missing records, invalid input, and enforces profile update immutability")
+    void testStudentDAODefensiveValidation() {
+        StudentDAO studentDAO = new StudentDAO();
+
+        // Record not found: Null and blank lookups safely return null/false without throwing
+        assertNull(studentDAO.findById(null));
+        assertNull(studentDAO.findByUserId(null));
+        assertNull(studentDAO.findByRollNumber(null));
+        assertNull(studentDAO.findByRollNumber("   "));
+        assertFalse(studentDAO.existsByRollNumber(null));
+        assertFalse(studentDAO.existsByRollNumber("   "));
+
+        // Invalid input: createStudent rejects null entity, missing userId, missing rollNumber, invalid CGPA/year
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.createStudent(null),
+                "Null student profile must throw IllegalArgumentException");
+
+        Student studentWithoutUserId = new Student(null, "CS2026-001", "CS", new BigDecimal("8.50"), 2026, null, null, null);
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.createStudent(studentWithoutUserId),
+                "Student without userId must throw IllegalArgumentException");
+
+        Student studentWithoutRoll = new Student(10L, null, "CS", new BigDecimal("8.50"), 2026, null, null, null);
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.createStudent(studentWithoutRoll),
+                "Student without roll number must throw IllegalArgumentException");
+
+        Student studentWithBlankRoll = new Student(10L, "   ", "CS", new BigDecimal("8.50"), 2026, null, null, null);
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.createStudent(studentWithBlankRoll),
+                "Student with blank roll number must throw IllegalArgumentException");
+
+        // Update profile validation guards: null student and missing ID throw IllegalArgumentException
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.updateProfile(null),
+                "Null student profile update must throw IllegalArgumentException");
+
+        Student studentWithoutId = new Student();
+        studentWithoutId.setDepartment("ECE");
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.updateProfile(studentWithoutId),
+                "Student update without ID must throw IllegalArgumentException");
+
+        // Academic boundary checks throw IllegalArgumentException
+        Student studentWithInvalidCgpa = new Student();
+        studentWithInvalidCgpa.setId(1L);
+        assertThrows(IllegalArgumentException.class, () -> studentWithInvalidCgpa.setCgpa(new BigDecimal("11.00")),
+                "Setting invalid CGPA > 10.00 on student must throw IllegalArgumentException");
+        assertThrows(IllegalArgumentException.class, () -> studentWithInvalidCgpa.setCgpa(new BigDecimal("-0.01")),
+                "Setting negative CGPA on student must throw IllegalArgumentException");
+
+        Student studentWithInvalidYear = new Student();
+        studentWithInvalidYear.setId(1L);
+        assertThrows(IllegalArgumentException.class, () -> studentWithInvalidYear.setGraduationYear(1980),
+                "Setting invalid graduation year < 2000 on student must throw IllegalArgumentException");
+        assertThrows(IllegalArgumentException.class, () -> studentWithInvalidYear.setGraduationYear(2150),
+                "Setting invalid graduation year > 2100 on student must throw IllegalArgumentException");
+    }
+
+    // =====================================================
+    // 26. CUSTOM DAO EXCEPTIONS DISTINCTION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("DAOException and DuplicateRecordException provide clean error distinction hierarchy")
+    void testCustomDAOExceptionsHierarchy() {
+        // DAOException is an unchecked RuntimeException wrapping SQL or connectivity errors
+        SQLException sqlEx = new SQLException("Connection refused to database", "08001");
+        DAOException daoEx = new DAOException("Failed to execute database query", sqlEx);
+
+        assertTrue(daoEx instanceof RuntimeException, "DAOException must be an unchecked RuntimeException");
+        assertEquals("Failed to execute database query", daoEx.getMessage());
+        assertEquals(sqlEx, daoEx.getCause());
+
+        // DuplicateRecordException extends DAOException for specific unique constraint violation handling
+        SQLException duplicateSqlEx = new SQLException("Duplicate entry 'test@example.com' for key 'users.email'", "23000", 1062);
+        DuplicateRecordException dupEx = new DuplicateRecordException("User already exists", duplicateSqlEx);
+
+        assertTrue(dupEx instanceof DAOException, "DuplicateRecordException must extend DAOException");
+        assertTrue(dupEx instanceof RuntimeException, "DuplicateRecordException must be a RuntimeException");
+        assertEquals("User already exists", dupEx.getMessage());
+        assertEquals(duplicateSqlEx, dupEx.getCause());
+        assertEquals(1062, ((SQLException) dupEx.getCause()).getErrorCode());
+
+        DuplicateRecordException dupWithoutCause = new DuplicateRecordException("Roll number already registered");
+        assertNull(dupWithoutCause.getCause());
+        assertEquals("Roll number already registered", dupWithoutCause.getMessage());
     }
 
     // =====================================================
