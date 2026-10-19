@@ -5,118 +5,19 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Student Applications</title>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            margin: 0;
-            padding: 30px;
-        }
-
-        .container {
-            width: 98%;
-            margin: auto;
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 25px;
-        }
-
-        .back-button {
-            display: inline-block;
-            padding: 10px 18px;
-            background: #1976d2;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-
-        .message {
-            background: #e0f2e9;
-            color: #176b3a;
-            padding: 12px;
-            margin-bottom: 15px;
-            border-radius: 5px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
-
-        th, td {
-            padding: 12px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-
-        th {
-            background: #1976d2;
-            color: white;
-        }
-
-        tr:nth-child(even) {
-            background: #f9f9f9;
-        }
-
-        select {
-            padding: 7px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
-        button {
-            padding: 7px 10px;
-            background: #1976d2;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #125ca1;
-        }
-
-        .status {
-            font-weight: bold;
-        }
-
-        .pending {
-            color: #9a6700;
-        }
-
-        .shortlisted {
-            color: #1565c0;
-        }
-
-        .selected {
-            color: #16803c;
-        }
-
-        .rejected {
-            color: #c62828;
-        }
-
-        .status-form {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-    </style>
+    <link rel="stylesheet"
+          href="${pageContext.request.contextPath}/css/style.css">
 </head>
 
 <body>
 <div class="container">
 
-    <h1>Student Applications</h1>
-
-    <a href="JobServlet" class="back-button">Back to Jobs</a>
+    <div class="details-page-header">
+        <h1>Student Applications</h1>
+    </div>
 
     <%
         String message = request.getParameter("message");
@@ -226,6 +127,15 @@
         %>
 
     </table>
+
+    <div class="page-actions">
+        <a href="JobServlet" class="back-button">Back to Jobs</a>
+
+        <a href="<%= request.getContextPath() %>/admin/dashboard"
+           class="dashboard-button">
+            Back to Dashboard
+        </a>
+    </div>
 
 </div>
 </body>

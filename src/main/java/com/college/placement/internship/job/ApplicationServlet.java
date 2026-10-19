@@ -1,3 +1,4 @@
+
 package com.college.placement.internship.job;
 
 import jakarta.servlet.ServletException;
@@ -12,14 +13,16 @@ import java.util.List;
 @WebServlet("/ApplicationServlet")
 public class ApplicationServlet extends HttpServlet {
 
+    private static final long serialVersionUID = 1L;
+
     private ApplicationDAO applicationDAO;
 
     @Override
-    public void init() {
+    public void init() throws ServletException {
         applicationDAO = new ApplicationDAO();
     }
 
-    // SUBMIT APPLICATION
+    // Submit an application or update its status
     @Override
     protected void doPost(HttpServletRequest request,
                           HttpServletResponse response)
@@ -27,45 +30,48 @@ public class ApplicationServlet extends HttpServlet {
 
         String action = request.getParameter("action");
 
-        // UPDATE APPLICATION STATUS
         if ("updateStatus".equals(action)) {
-
             String idValue = request.getParameter("id");
             String status = request.getParameter("status");
 
-            if (idValue != null &&
-                    ("Pending".equals(status)
+            if (idValue == null ||
+                    !("Pending".equals(status)
                             || "Shortlisted".equals(status)
                             || "Selected".equals(status)
                             || "Rejected".equals(status))) {
 
-                try {
-                    int applicationId = Integer.parseInt(idValue);
+                response.sendError(
+                        HttpServletResponse.SC_BAD_REQUEST,
+                        "Invalid application status or ID");
+                return;
+            }
 
-                    if (applicationId > 0) {
-                        applicationDAO.updateApplicationStatus(
-                                applicationId, status);
-                    }
+            try {
+                int applicationId = Integer.parseInt(idValue);
 
-                } catch (NumberFormatException e) {
+                if (applicationId <= 0) {
                     response.sendError(
                             HttpServletResponse.SC_BAD_REQUEST,
                             "Invalid application ID");
                     return;
                 }
 
+                applicationDAO.updateApplicationStatus(
+                        applicationId, status);
+
                 response.sendRedirect(
-                        "ApplicationServlet?message=statusUpdated");
-                return;
+                        request.getContextPath()
+                                + "/ApplicationServlet?message=statusUpdated");
+
+            } catch (NumberFormatException e) {
+                response.sendError(
+                        HttpServletResponse.SC_BAD_REQUEST,
+                        "Invalid application ID");
             }
 
-            response.sendError(
-                    HttpServletResponse.SC_BAD_REQUEST,
-                    "Invalid application status or ID");
             return;
         }
 
-        // SUBMIT A NEW APPLICATION
         try {
             int jobId = Integer.parseInt(
                     request.getParameter("jobId"));
@@ -83,7 +89,8 @@ public class ApplicationServlet extends HttpServlet {
             applicationDAO.addApplication(application);
 
             response.sendRedirect(
-                    "JobServlet?message=applicationSubmitted");
+                    request.getContextPath()
+                            + "/JobServlet?message=applicationSubmitted");
 
         } catch (NumberFormatException e) {
             response.sendError(
@@ -92,7 +99,7 @@ public class ApplicationServlet extends HttpServlet {
         }
     }
 
-    // VIEW ALL APPLICATIONS
+    // Display all applications
     @Override
     protected void doGet(HttpServletRequest request,
                          HttpServletResponse response)
@@ -103,7 +110,7 @@ public class ApplicationServlet extends HttpServlet {
 
         request.setAttribute("applications", applications);
 
-        request.getRequestDispatcher("applications.jsp")
+        request.getRequestDispatcher("/applications.jsp")
                 .forward(request, response);
     }
 }
