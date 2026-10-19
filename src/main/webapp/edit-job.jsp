@@ -8,81 +8,24 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Edit Job</title>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-      margin: 0;
-      padding: 40px;
-    }
-
-    .container {
-      width: 500px;
-      margin: auto;
-      background: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-
-    h2 {
-      text-align: center;
-    }
-
-    label {
-      display: block;
-      margin-top: 15px;
-      font-weight: bold;
-    }
-
-    input,
-    textarea,
-    select {
-      width: 100%;
-      padding: 10px;
-      margin-top: 5px;
-      box-sizing: border-box;
-    }
-
-    textarea {
-      height: 100px;
-    }
-
-    button {
-      width: 100%;
-      margin-top: 20px;
-      padding: 12px;
-      background: #1976d2;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #125aa0;
-    }
-
-    .back-button {
-      display: block;
-      text-align: center;
-      margin-top: 15px;
-      text-decoration: none;
-    }
-  </style>
+  <link rel="stylesheet"
+        href="${pageContext.request.contextPath}/css/style.css">
 </head>
 
 <body>
 
-<div class="container">
-
+<div class="details-page-header">
   <h2>Edit Job / Internship</h2>
+</div>
 
   <form action="JobServlet"
         method="post"
-        onsubmit="return validateForm()">
+        onsubmit="return validateForm()"
+        class="job-edit-form">
 
     <!-- JOB ID -->
     <input type="hidden"
@@ -182,12 +125,11 @@
 
   </form>
 
-
-  <a href="JobServlet" class="back-button">
-    ← Back to Jobs
-  </a>
-
-</div>
+  <div class="form-actions">
+    <a href="JobServlet" class="btn btn-secondary">
+      ← Back to Jobs
+    </a>
+  </div>
 
 
 <script>

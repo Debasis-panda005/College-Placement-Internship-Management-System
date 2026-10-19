@@ -8,126 +8,97 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Job Details</title>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            margin: 0;
-            padding: 40px;
-        }
-
-        .container {
-            width: 600px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        h2 {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .detail {
-            margin-bottom: 15px;
-        }
-
-        .label {
-            font-weight: bold;
-        }
-
-        .active-status {
-            color: green;
-            font-weight: bold;
-        }
-
-        .closed-status {
-            color: red;
-            font-weight: bold;
-        }
-
-        .back-button {
-            display: block;
-            text-align: center;
-            margin-top: 25px;
-            text-decoration: none;
-        }
-    </style>
+    <link rel="stylesheet"
+          href="${pageContext.request.contextPath}/css/style.css">
 </head>
 
-<body>
+<body class="compact-page">
 
-<div class="container">
+<div class="compact-container">
 
+<div class="details-page-header">
     <h2>Job / Internship Details</h2>
+</div>
 
-    <div class="detail">
-        <span class="label">Job ID:</span>
-        <%= job.getId() %>
+<div class="details-card internship-details-card">
+
+    <div class="details-card-heading">
+        <span class="details-icon">&#128188;</span>
+        <div>
+            <h2><%= job != null && job.getTitle() != null ? job.getTitle() : "Job Details" %></h2>
+            <p class="company-name">
+                <%= job != null && job.getCompany() != null ? job.getCompany() : "" %>
+            </p>
+        </div>
     </div>
 
-    <div class="detail">
-        <span class="label">Job Title:</span>
-        <%= job.getTitle() %>
-    </div>
+    <div class="internship-info-grid">
 
-    <div class="detail">
-        <span class="label">Company:</span>
-        <%= job.getCompany() %>
-    </div>
+        <div class="info-item">
+            <span class="info-label">Job ID</span>
+            <span class="info-value"><%= job != null ? job.getId() : "" %></span>
+        </div>
 
-    <div class="detail">
-        <span class="label">Location:</span>
-        <%= job.getLocation() %>
-    </div>
+        <div class="info-item">
+            <span class="info-label">Job Title</span>
+            <span class="info-value"><%= job != null && job.getTitle() != null ? job.getTitle() : "" %></span>
+        </div>
 
-    <div class="detail">
-        <span class="label">Description:</span>
-        <%= job.getDescription() %>
-    </div>
+        <div class="info-item">
+            <span class="info-label">Company</span>
+            <span class="info-value"><%= job != null && job.getCompany() != null ? job.getCompany() : "" %></span>
+        </div>
 
-    <div class="detail">
-        <span class="label">Salary:</span>
-        <%= job.getSalary() %>
-    </div>
+        <div class="info-item">
+            <span class="info-label">Location</span>
+            <span class="info-value"><%= job != null && job.getLocation() != null ? job.getLocation() : "" %></span>
+        </div>
 
-    <div class="detail">
-        <span class="label">Job Type:</span>
-        <%= job.getJobType() %>
-    </div>
+        <div class="info-item">
+            <span class="info-label">Salary</span>
+            <span class="info-value"><%= job != null && job.getSalary() != null ? job.getSalary() : "" %></span>
+        </div>
 
-    <div class="detail">
-        <span class="label">Status:</span>
+        <div class="info-item">
+            <span class="info-label">Job Type</span>
+            <span class="info-value"><%= job != null && job.getJobType() != null ? job.getJobType() : "" %></span>
+        </div>
 
-        <%
-            if ("Active".equals(job.getStatus())) {
-        %>
-
-        <span class="active-status">
-                Active
+        <div class="info-item">
+            <span class="info-label">Status</span>
+            <span class="info-value">
+                <%
+                    if (job != null && "Active".equals(job.getStatus())) {
+                %>
+                <span class="active-status">Active</span>
+                <%
+                    } else {
+                %>
+                <span class="closed-status">Closed</span>
+                <%
+                    }
+                %>
             </span>
-
-        <%
-        } else {
-        %>
-
-        <span class="closed-status">
-                Closed
-            </span>
-
-        <%
-            }
-        %>
+        </div>
 
     </div>
 
-    <a href="JobServlet" class="back-button">
-        ← Back to Jobs
-    </a>
+    <div class="description-section">
+        <h3>Description</h3>
+        <p><%= job != null && job.getDescription() != null && !job.getDescription().isEmpty() ? job.getDescription() : "No description provided." %></p>
+    </div>
+
+    <div class="details-actions">
+        <a href="JobServlet" class="btn btn-secondary">
+            ← Back to Jobs
+        </a>
+    </div>
+
+</div>
 
 </div>
 
