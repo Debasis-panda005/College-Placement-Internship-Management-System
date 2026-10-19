@@ -5,104 +5,30 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Job & Internship List</title>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            margin: 0;
-            padding: 30px;
-        }
-
-        .container {
-            width: 95%;
-            margin: auto;
-        }
-
-        h1 {
-            text-align: center;
-        }
-
-        .add-button {
-            display: inline-block;
-            padding: 10px 18px;
-            background: #1976d2;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-
-        .message {
-            padding: 12px;
-            margin-bottom: 20px;
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-            border-radius: 5px;
-            text-align: center;
-            font-weight: bold;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
-
-        th, td {
-            padding: 12px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-
-        th {
-            background: #1976d2;
-            color: white;
-        }
-
-        tr:nth-child(even) {
-            background: #f9f9f9;
-        }
-
-        .action-link {
-            text-decoration: none;
-            white-space: nowrap;
-        }
-
-        /* Keep all action links on one line */
-        .action-cell {
-            white-space: nowrap;
-            width: 220px;
-        }
-
-        .active-status {
-            color: green;
-            font-weight: bold;
-        }
-
-        .closed-status {
-            color: red;
-            font-weight: bold;
-        }
-    </style>
+    <link rel="stylesheet"
+          href="${pageContext.request.contextPath}/css/style.css">
 </head>
 
 <body>
 
 <div class="container">
 
-    <h1>Available Jobs & Internships</h1>
+    <div class="details-page-header">
+        <h1>Available Jobs & Internships</h1>
+    </div>
 
-    <a href="add-job.jsp" class="add-button">
-        + Add Job / Internship
-    </a>
+    <div class="jobs-actions">
+        <a href="add-job.jsp" class="add-button">
+            + Add Job / Internship
+        </a>
 
-    <a href="ApplicationServlet"
-       class="add-button">
-        View Applications
-    </a>
+        <a href="ApplicationServlet" class="add-button">
+            View Applications
+        </a>
+    </div>
 
     <!-- SUCCESS MESSAGE -->
 
@@ -144,143 +70,119 @@
         }
     %>
 
+    <!-- CONTROLS TOOLBAR -->
+    <div class="jobs-toolbar">
 
-    <!-- SEARCH -->
+        <!-- SEARCH -->
+        <form action="JobServlet"
+              method="get"
+              class="toolbar-group">
 
-    <form action="JobServlet"
-          method="get"
-          style="margin-bottom: 20px;">
+            <input type="text"
+                   name="search"
+                   placeholder="Search by title, company or location"
+                   value="<%= request.getParameter("search") != null ? request.getParameter("search") : "" %>">
 
-        <input type="text"
-               name="search"
-               placeholder="Search by title, company or location"
-               style="width: 300px; padding: 10px;">
+            <button type="submit">
+                Search
+            </button>
 
-        <button type="submit"
-                style="padding: 10px 18px;">
-            Search
-        </button>
+            <a href="JobServlet"
+               class="btn-clear">
+                Clear
+            </a>
 
-        <a href="JobServlet"
-           style="margin-left: 10px;">
-            Clear
-        </a>
+        </form>
 
-    </form>
+        <!-- FILTER -->
+        <form action="JobServlet"
+              method="get"
+              class="toolbar-group">
 
+            <select name="jobType">
+                <option value="">All Job Types</option>
+                <option value="Full Time" <%= "Full Time".equals(request.getParameter("jobType")) ? "selected" : "" %>>
+                    Full Time
+                </option>
+                <option value="Part Time" <%= "Part Time".equals(request.getParameter("jobType")) ? "selected" : "" %>>
+                    Part Time
+                </option>
+                <option value="Internship" <%= "Internship".equals(request.getParameter("jobType")) ? "selected" : "" %>>
+                    Internship
+                </option>
+            </select>
 
-    <!-- FILTER -->
+            <button type="submit">
+                Filter
+            </button>
 
-    <form action="JobServlet"
-          method="get"
-          style="margin-bottom: 20px;">
+            <a href="JobServlet"
+               class="btn-clear">
+                Clear
+            </a>
 
-        <select name="jobType"
-                style="padding: 10px; width: 200px;">
+        </form>
 
-            <option value="">All Job Types</option>
+        <!-- STATUS FILTER -->
+        <form action="JobServlet"
+              method="get"
+              class="toolbar-group">
 
-            <option value="Full Time">
-                Full Time
-            </option>
+            <select name="status">
+                <option value="">
+                    All Statuses
+                </option>
+                <option value="Active" <%= "Active".equals(request.getParameter("status")) ? "selected" : "" %>>
+                    Active
+                </option>
+                <option value="Closed" <%= "Closed".equals(request.getParameter("status")) ? "selected" : "" %>>
+                    Closed
+                </option>
+            </select>
 
-            <option value="Part Time">
-                Part Time
-            </option>
+            <button type="submit">
+                Filter Status
+            </button>
 
-            <option value="Internship">
-                Internship
-            </option>
+            <a href="JobServlet"
+               class="btn-clear">
+                Clear
+            </a>
 
-        </select>
+        </form>
 
-        <button type="submit"
-                style="padding: 10px 18px;">
-            Filter
-        </button>
+        <!-- SORT -->
+        <form action="JobServlet"
+              method="get"
+              class="toolbar-group">
 
-        <a href="JobServlet"
-           style="margin-left: 10px;">
-            Clear
-        </a>
+            <select name="sortBy">
+                <option value="">
+                    Sort Jobs By
+                </option>
+                <option value="title" <%= "title".equals(request.getParameter("sortBy")) ? "selected" : "" %>>
+                    Job Title
+                </option>
+                <option value="company" <%= "company".equals(request.getParameter("sortBy")) ? "selected" : "" %>>
+                    Company
+                </option>
+                <option value="jobType" <%= "jobType".equals(request.getParameter("sortBy")) ? "selected" : "" %>>
+                    Job Type
+                </option>
+            </select>
 
-    </form>
+            <button type="submit">
+                Sort
+            </button>
 
+            <a href="JobServlet"
+               class="btn-clear">
+                Clear
+            </a>
 
-    <!-- STATUS FILTER -->
+        </form>
 
-    <form action="JobServlet"
-          method="get"
-          style="margin-bottom: 20px;">
-
-        <select name="status"
-                style="padding: 10px; width: 200px;">
-
-            <option value="">
-                All Statuses
-            </option>
-
-            <option value="Active">
-                Active
-            </option>
-
-            <option value="Closed">
-                Closed
-            </option>
-
-        </select>
-
-        <button type="submit"
-                style="padding: 10px 18px;">
-            Filter Status
-        </button>
-
-        <a href="JobServlet"
-           style="margin-left: 10px;">
-            Clear
-        </a>
-
-    </form>
-
-
-    <!-- SORT -->
-
-    <form action="JobServlet"
-          method="get"
-          style="margin-bottom: 20px;">
-
-        <select name="sortBy"
-                style="padding: 10px; width: 200px;">
-
-            <option value="">
-                Sort Jobs By
-            </option>
-
-            <option value="title">
-                Job Title
-            </option>
-
-            <option value="company">
-                Company
-            </option>
-
-            <option value="jobType">
-                Job Type
-            </option>
-
-        </select>
-
-        <button type="submit"
-                style="padding: 10px 18px;">
-            Sort
-        </button>
-
-        <a href="JobServlet"
-           style="margin-left: 10px;">
-            Clear
-        </a>
-
-    </form>
+    </div>
 
 
     <!-- JOB TABLE -->
@@ -437,6 +339,13 @@
         %>
 
     </table>
+
+    <div class="dashboard-footer">
+        <a href="<%= request.getContextPath() %>/admin/dashboard"
+           class="dashboard-button">
+            Back to Dashboard
+        </a>
+    </div>
 
 </div>
 

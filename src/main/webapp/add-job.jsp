@@ -3,160 +3,101 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Job</title>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            margin: 0;
-            padding: 40px;
-        }
-
-        .container {
-            width: 500px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        h2 {
-            text-align: center;
-        }
-
-        label {
-            display: block;
-            margin-top: 15px;
-            font-weight: bold;
-        }
-
-        input,
-        textarea,
-        select {
-            width: 100%;
-            padding: 10px;
-            margin-top: 5px;
-            box-sizing: border-box;
-        }
-
-        textarea {
-            height: 100px;
-        }
-
-        button {
-            width: 100%;
-            margin-top: 20px;
-            padding: 12px;
-            background: #1976d2;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #125aa0;
-        }
-    </style>
+    <link rel="stylesheet"
+          href="${pageContext.request.contextPath}/css/style.css">
 </head>
 
-<body>
+<body class="compact-page">
 
-<div class="container">
+<div class="compact-container">
 
+<div class="details-page-header">
     <h2>Add Job / Internship</h2>
+</div>
 
-    <form action="JobServlet"
-          method="post"
-          onsubmit="return validateForm()">
+<form action="JobServlet"
+      method="post"
+      onsubmit="return validateForm()"
+      class="add-job-form">
 
-        <label>Job Title</label>
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="title">Job Title</label>
+            <input type="text"
+                   id="title"
+                   name="title"
+                   required>
+        </div>
 
-        <input type="text"
-               id="title"
-               name="title"
-               required>
+        <div class="form-group">
+            <label for="company">Company</label>
+            <input type="text"
+                   id="company"
+                   name="company"
+                   required>
+        </div>
 
+        <div class="form-group">
+            <label for="location">Location</label>
+            <input type="text"
+                   id="location"
+                   name="location"
+                   required>
+        </div>
 
-        <label>Company</label>
+        <div class="form-group">
+            <label for="salary">Salary</label>
+            <input type="text"
+                   id="salary"
+                   name="salary"
+                   required>
+        </div>
 
-        <input type="text"
-               id="company"
-               name="company"
-               required>
+        <div class="form-group">
+            <label for="jobType">Job Type</label>
+            <select id="jobType"
+                    name="jobType"
+                    required>
+                <option value="">Select Job Type</option>
+                <option value="Full Time">Full Time</option>
+                <option value="Part Time">Part Time</option>
+                <option value="Internship">Internship</option>
+            </select>
+        </div>
 
+        <div class="form-group">
+            <label for="status">Status</label>
+            <select id="status"
+                    name="status"
+                    required>
+                <option value="Active">Active</option>
+                <option value="Closed">Closed</option>
+            </select>
+        </div>
 
-        <label>Location</label>
+        <div class="form-group form-group-full">
+            <label for="description">Description</label>
+            <textarea id="description"
+                      name="description"></textarea>
+        </div>
+    </div>
 
-        <input type="text"
-               id="location"
-               name="location"
-               required>
-
-
-        <label>Description</label>
-
-        <textarea name="description"></textarea>
-
-
-        <label>Salary</label>
-
-        <input type="text"
-               id="salary"
-               name="salary"
-               required>
-
-
-        <label>Job Type</label>
-
-        <select id="jobType"
-                name="jobType"
-                required>
-
-            <option value="">Select Job Type</option>
-
-            <option value="Full Time">
-                Full Time
-            </option>
-
-            <option value="Part Time">
-                Part Time
-            </option>
-
-            <option value="Internship">
-                Internship
-            </option>
-
-        </select>
-
-
-        <label>Status</label>
-
-        <select id="status"
-                name="status"
-                required>
-
-            <option value="Active">
-                Active
-            </option>
-
-            <option value="Closed">
-                Closed
-            </option>
-
-        </select>
-
-
+    <div class="form-actions">
         <button type="submit">
             Add Job
         </button>
+        <a href="JobServlet" class="btn btn-secondary">
+            ← Back to Jobs
+        </a>
+    </div>
 
-    </form>
+</form>
 
 </div>
-
 
 <script>
 
@@ -186,36 +127,30 @@
             return false;
         }
 
-
         if (company === "") {
             alert("Please enter the company name.");
             return false;
         }
-
 
         if (location === "") {
             alert("Please enter the location.");
             return false;
         }
 
-
         if (salary === "") {
             alert("Please enter the salary.");
             return false;
         }
-
 
         if (jobType === "") {
             alert("Please select a job type.");
             return false;
         }
 
-
         if (status === "") {
             alert("Please select a status.");
             return false;
         }
-
 
         return true;
     }
