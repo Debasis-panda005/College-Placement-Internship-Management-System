@@ -131,9 +131,9 @@
     <div class="page-actions">
         <a href="JobServlet" class="back-button">Back to Jobs</a>
 
-        <a href="<%= request.getContextPath() %>/admin/dashboard"
+        <a href="<%= request.getContextPath() %>/index.jsp"
            class="dashboard-button">
-            Back to Dashboard
+            Back to Home
         </a>
     </div>
 

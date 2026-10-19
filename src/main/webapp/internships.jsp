@@ -99,8 +99,8 @@
 
 <div class="dashboard-footer">
     <a class="dashboard-button"
-       href="${pageContext.request.contextPath}/admin/dashboard">
-        &#8592; Back to Dashboard
+       href="${pageContext.request.contextPath}/index.jsp">
+        &#8592; Back to Home
     </a>
 </div>
 

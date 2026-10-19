@@ -341,9 +341,9 @@
     </table>
 
     <div class="dashboard-footer">
-        <a href="<%= request.getContextPath() %>/admin/dashboard"
+        <a href="<%= request.getContextPath() %>/index.jsp"
            class="dashboard-button">
-            Back to Dashboard
+            Back to Home
         </a>
     </div>
 
