@@ -115,4 +115,31 @@ class AuthServiceTest {
                 )
         );
     }
+
+    @Test
+    void registerShouldRejectMissingName() {
+        User input = new User(
+                " ",
+                "student@example.com",
+                "StrongPass123",
+                "STUDENT"
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> authService.register(input)
+        );
+
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void loginShouldRejectBlankCredentials() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> authService.login("", "")
+        );
+
+        verify(userRepository, never()).findByEmail(anyString());
+    }
 }
