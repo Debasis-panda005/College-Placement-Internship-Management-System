@@ -1,6 +1,8 @@
+
 package com.collegeplacement.admin;
 
 import java.io.IOException;
+import java.sql.SQLException;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -22,14 +24,31 @@ public class AdminDashboardServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest request,
-                          HttpServletResponse response)
+                         HttpServletResponse response)
             throws ServletException, IOException {
 
-        int totalJobs = adminDAO.getTotalJobs();
-        int totalApplications = adminDAO.getTotalApplications();
+        try {
+            request.setAttribute(
+                    "totalJobs", adminDAO.getTotalJobs()
+            );
 
-        request.setAttribute("totalJobs", totalJobs);
-        request.setAttribute("totalApplications", totalApplications);
+            request.setAttribute(
+                    "totalApplications",
+                    adminDAO.getTotalApplications()
+            );
+
+        } catch (SQLException e) {
+            getServletContext().log(
+                    "Failed to load admin dashboard.", e
+            );
+
+            response.sendError(
+                    HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Unable to load dashboard statistics. "
+                    + "Check the database connection."
+            );
+            return;
+        }
 
         request.getRequestDispatcher("/admin/dashboard.jsp")
                .forward(request, response);
