@@ -142,4 +142,43 @@ class AuthServiceTest {
 
         verify(userRepository, never()).findByEmail(anyString());
     }
+
+    @Test
+    void loginShouldSucceedWithCorrectPassword() {
+        String rawPassword = "StrongPass123";
+        String hashedPassword = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder()
+                .encode(rawPassword);
+
+        User storedUser = new User(
+                "Test Student",
+                "student@example.com",
+                hashedPassword,
+                "STUDENT"
+        );
+
+        when(userRepository.findByEmail("student@example.com"))
+                .thenReturn(Optional.of(storedUser));
+
+        User result = authService.login(
+                "student@example.com",
+                rawPassword
+        );
+
+        assertEquals("student@example.com", result.getEmail());
+        assertEquals("STUDENT", result.getRole());
+    }
+
+    @Test
+    void loginShouldRejectUnknownEmail() {
+        when(userRepository.findByEmail("unknown@example.com"))
+                .thenReturn(Optional.empty());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> authService.login(
+                        "unknown@example.com",
+                        "StrongPass123"
+                )
+        );
+    }
 }
