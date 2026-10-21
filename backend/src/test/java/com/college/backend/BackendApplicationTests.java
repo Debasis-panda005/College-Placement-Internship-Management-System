@@ -15,10 +15,12 @@ import com.college.backend.entity.User;
 import com.college.backend.exception.DAOException;
 import com.college.backend.exception.DuplicateRecordException;
 import com.college.backend.servlet.ApplicationServlet;
+import com.college.backend.servlet.InterviewServlet;
 import com.college.backend.servlet.JobServlet;
 import com.college.backend.servlet.LoginServlet;
 import com.college.backend.servlet.LogoutServlet;
 import com.college.backend.servlet.RegisterServlet;
+import com.college.backend.util.AuthUtil;
 import com.college.backend.util.CsrfUtil;
 import com.college.backend.util.PasswordHashService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -4096,6 +4098,680 @@ class BackendApplicationTests {
         assertFalse(ex instanceof DuplicateRecordException, "Non-1062 integrity error must not be classified as DuplicateRecordException");
         assertEquals("Database error occurred while creating application.", ex.getMessage(), "Generic DAOException must shield internal details");
         assertEquals(1, (int) connState.getOrDefault("rollbackCount", 0), "Transaction must be rolled back on integrity error");
+    }
+
+    // =====================================================
+    // PHASE 5: AUTHUTIL AND ROLE-BASED AUTHORIZATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("AuthUtil correctly resolves user session ID, role, and authentication states")
+    void testAuthUtilMethods() {
+        assertNull(AuthUtil.getSessionUserId(null));
+        assertNull(AuthUtil.getSessionUserRole(null));
+        assertFalse(AuthUtil.isAuthenticated(null));
+        assertFalse(AuthUtil.isStudent(null));
+        assertFalse(AuthUtil.isCoordinator(null));
+        assertFalse(AuthUtil.isAdmin(null));
+        assertFalse(AuthUtil.isCoordinatorOrAdmin(null));
+        assertFalse(AuthUtil.hasAnyRole(null, User.ROLE_STUDENT));
+
+        // Request with null session
+        HttpServletRequest nullSessionReq = createMockRequest(null, new HashMap<>());
+        assertNull(AuthUtil.getSessionUserId(nullSessionReq));
+        assertNull(AuthUtil.getSessionUserRole(nullSessionReq));
+        assertFalse(AuthUtil.isAuthenticated(nullSessionReq));
+        assertFalse(AuthUtil.isStudent(nullSessionReq));
+        assertFalse(AuthUtil.isCoordinator(nullSessionReq));
+        assertFalse(AuthUtil.isAdmin(nullSessionReq));
+        assertFalse(AuthUtil.isCoordinatorOrAdmin(nullSessionReq));
+        assertFalse(AuthUtil.hasAnyRole(nullSessionReq, User.ROLE_STUDENT));
+
+        // Student session
+        Map<String, Object> studentAttrs = new HashMap<>();
+        studentAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        studentAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession studentSession = createMockSession(studentAttrs);
+        HttpServletRequest studentReq = createMockRequest(studentSession, new HashMap<>());
+
+        assertEquals(101L, AuthUtil.getSessionUserId(studentReq));
+        assertEquals(User.ROLE_STUDENT, AuthUtil.getSessionUserRole(studentReq));
+        assertTrue(AuthUtil.isAuthenticated(studentReq));
+        assertTrue(AuthUtil.isStudent(studentReq));
+        assertFalse(AuthUtil.isCoordinator(studentReq));
+        assertFalse(AuthUtil.isAdmin(studentReq));
+        assertFalse(AuthUtil.isCoordinatorOrAdmin(studentReq));
+        assertTrue(AuthUtil.hasAnyRole(studentReq, User.ROLE_STUDENT, User.ROLE_COORDINATOR));
+        assertFalse(AuthUtil.hasAnyRole(studentReq, User.ROLE_COORDINATOR, User.ROLE_ADMIN));
+
+        // Coordinator session
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordAttrs);
+        HttpServletRequest coordReq = createMockRequest(coordSession, new HashMap<>());
+
+        assertEquals(201L, AuthUtil.getSessionUserId(coordReq));
+        assertEquals(User.ROLE_COORDINATOR, AuthUtil.getSessionUserRole(coordReq));
+        assertTrue(AuthUtil.isAuthenticated(coordReq));
+        assertFalse(AuthUtil.isStudent(coordReq));
+        assertTrue(AuthUtil.isCoordinator(coordReq));
+        assertFalse(AuthUtil.isAdmin(coordReq));
+        assertTrue(AuthUtil.isCoordinatorOrAdmin(coordReq));
+        assertTrue(AuthUtil.hasAnyRole(coordReq, User.ROLE_COORDINATOR));
+
+        // Admin session
+        Map<String, Object> adminAttrs = new HashMap<>();
+        adminAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        adminAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_ADMIN);
+        HttpSession adminSession = createMockSession(adminAttrs);
+        HttpServletRequest adminReq = createMockRequest(adminSession, new HashMap<>());
+
+        assertEquals(301L, AuthUtil.getSessionUserId(adminReq));
+        assertEquals(User.ROLE_ADMIN, AuthUtil.getSessionUserRole(adminReq));
+        assertTrue(AuthUtil.isAuthenticated(adminReq));
+        assertFalse(AuthUtil.isStudent(adminReq));
+        assertFalse(AuthUtil.isCoordinator(adminReq));
+        assertTrue(AuthUtil.isAdmin(adminReq));
+        assertTrue(AuthUtil.isCoordinatorOrAdmin(adminReq));
+        assertTrue(AuthUtil.hasAnyRole(adminReq, User.ROLE_ADMIN));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doGet redirects unauthenticated user to /login")
+    void testInterviewServletGetUnauthenticatedRedirectsToLogin() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doGetMethod = InterviewServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(null, new HashMap<>(), new HashMap<>(), state);
+        HttpServletResponse resp = createMockResponse(state);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/college/login", state.get("redirectUrl"));
+        HttpSession session = req.getSession(false);
+        assertNotNull(session);
+        assertEquals("You must log in to view interview schedules.", session.getAttribute("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doGet rejects mutating actions with HTTP 405 Method Not Allowed")
+    void testInterviewServletGetMutatingActionsReturn405() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doGetMethod = InterviewServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(coordAttrs);
+
+        String[] mutatingActions = {"create", "update", "complete", "cancel", "delete"};
+        for (String action : mutatingActions) {
+            Map<String, String> params = new HashMap<>();
+            params.put("action", action);
+            Map<String, Object> state = new HashMap<>();
+            HttpServletRequest req = createMockRequest(session, params, new HashMap<>(), state);
+            HttpServletResponse resp = createMockResponse(state);
+
+            doGetMethod.invoke(servlet, req, resp);
+
+            assertEquals(HttpServletResponse.SC_METHOD_NOT_ALLOWED, state.get("errorCode"),
+                    "Action " + action + " on GET must return HTTP 405");
+        }
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doGet action=edit denies access to students with 403 Forbidden")
+    void testInterviewServletGetEditStudentForbidden() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doGetMethod = InterviewServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                Student s = new Student();
+                s.setId(10L);
+                return s;
+            }
+        });
+
+        Map<String, Object> studentAttrs = new HashMap<>();
+        studentAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        studentAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(studentAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("action", "edit");
+        params.put("id", "1");
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, params, new HashMap<>(), state);
+        HttpServletResponse resp = createMockResponse(state);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, state.get("errorCode"));
+        assertEquals("Access denied: Only coordinators and administrators can edit interviews.", state.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doGet action=edit allows coordinator to view edit form for SCHEDULED interview")
+    void testInterviewServletGetEditCoordinatorAllowed() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doGetMethod = InterviewServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Interview scheduledInterview = new Interview(50L, LocalDate.now().plusDays(2), LocalTime.of(10, 0), "ONLINE", "SCHEDULED");
+        scheduledInterview.setId(1L);
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public Interview getInterviewById(Long id) {
+                return 1L == id ? scheduledInterview : null;
+            }
+        });
+
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(coordAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("action", "edit");
+        params.put("id", "1");
+        Map<String, Object> reqAttrs = new HashMap<>();
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, params, reqAttrs, state);
+        HttpServletResponse resp = createMockResponse(state);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/WEB-INF/jsp/interview-edit.jsp", state.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(state.get("forwarded")));
+        assertEquals(scheduledInterview, reqAttrs.get("interview"));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doGet action=edit rejects non-SCHEDULED interviews with redirect and error")
+    void testInterviewServletGetEditNonScheduledInterviewRedirects() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doGetMethod = InterviewServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Interview completedInterview = new Interview(50L, LocalDate.now().minusDays(1), LocalTime.of(10, 0), "ONLINE", "COMPLETED");
+        completedInterview.setId(2L);
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public Interview getInterviewById(Long id) {
+                return 2L == id ? completedInterview : null;
+            }
+        });
+
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(coordAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("action", "edit");
+        params.put("id", "2");
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, params, new HashMap<>(), state);
+        HttpServletResponse resp = createMockResponse(state);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/college/interviews", state.get("redirectUrl"));
+        assertEquals("Only SCHEDULED interviews can be edited or rescheduled.", session.getAttribute("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doGet student view strictly scopes interviews and statistics to own applications")
+    void testInterviewServletGetStudentViewScopedToOwnApplications() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doGetMethod = InterviewServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                Student s = new Student();
+                s.setId(55L);
+                return s;
+            }
+        });
+
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public List<Application> searchApplications(Long studentId, Long jobId, String status) {
+                if (Long.valueOf(55L).equals(studentId)) {
+                    List<Application> apps = new ArrayList<>();
+                    apps.add(createTestApplication(101L, 55L, 1L, LocalDate.now(), "SHORTLISTED"));
+                    apps.add(createTestApplication(102L, 55L, 2L, LocalDate.now(), "SHORTLISTED"));
+                    return apps;
+                }
+                return new ArrayList<>();
+            }
+        });
+
+        Interview interview1 = new Interview(101L, LocalDate.now().plusDays(1), LocalTime.of(10, 0), "ONLINE", "SCHEDULED");
+        interview1.setId(1L);
+        Interview interview2 = new Interview(102L, LocalDate.now().plusDays(2), LocalTime.of(14, 0), "OFFLINE", "COMPLETED");
+        interview2.setId(2L);
+        Interview interviewOther = new Interview(999L, LocalDate.now().plusDays(3), LocalTime.of(11, 0), "ONLINE", "SCHEDULED");
+        interviewOther.setId(3L);
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public List<Interview> getAllInterviews() {
+                List<Interview> all = new ArrayList<>();
+                all.add(interview1);
+                all.add(interview2);
+                all.add(interviewOther);
+                return all;
+            }
+            @Override
+            public Map<Long, Boolean> getRescheduledApplicationsMap() {
+                return new HashMap<>();
+            }
+        });
+
+        Map<String, Object> studentAttrs = new HashMap<>();
+        studentAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        studentAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(studentAttrs);
+
+        Map<String, Object> reqAttrs = new HashMap<>();
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, new HashMap<>(), reqAttrs, state);
+        HttpServletResponse resp = createMockResponse(state);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/WEB-INF/jsp/interviews.jsp", state.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(state.get("forwarded")));
+
+        @SuppressWarnings("unchecked")
+        List<Interview> returnedInterviews = (List<Interview>) reqAttrs.get("interviews");
+        assertNotNull(returnedInterviews);
+        assertEquals(2, returnedInterviews.size());
+        assertTrue(returnedInterviews.contains(interview1));
+        assertTrue(returnedInterviews.contains(interview2));
+        assertFalse(returnedInterviews.contains(interviewOther), "Other student's interview must be excluded");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> stats = (Map<String, Integer>) reqAttrs.get("interviewStats");
+        assertNotNull(stats);
+        assertEquals(2, stats.get("TOTAL"), "Total count must be scoped to student");
+        assertEquals(1, stats.get("SCHEDULED"));
+        assertEquals(1, stats.get("COMPLETED"));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doGet student filter on other applicant application ID returns empty results")
+    void testInterviewServletGetStudentFilterOtherApplicantAppReturnsEmpty() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doGetMethod = InterviewServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                Student s = new Student();
+                s.setId(55L);
+                return s;
+            }
+        });
+
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public List<Application> searchApplications(Long studentId, Long jobId, String status) {
+                List<Application> apps = new ArrayList<>();
+                apps.add(createTestApplication(101L, 55L, 1L, LocalDate.now(), "SHORTLISTED"));
+                return apps;
+            }
+        });
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public Map<Long, Boolean> getRescheduledApplicationsMap() {
+                return new HashMap<>();
+            }
+        });
+
+        Map<String, Object> studentAttrs = new HashMap<>();
+        studentAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        studentAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(studentAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("filterAppId", "999"); // Application 999 not owned by student 55
+
+        Map<String, Object> reqAttrs = new HashMap<>();
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, params, reqAttrs, state);
+        HttpServletResponse resp = createMockResponse(state);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        @SuppressWarnings("unchecked")
+        List<Interview> returnedInterviews = (List<Interview>) reqAttrs.get("interviews");
+        assertNotNull(returnedInterviews);
+        assertTrue(returnedInterviews.isEmpty(), "Student filtering for unowned application ID must receive empty results");
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doGet coordinator sees full institutional interviews and global statistics")
+    void testInterviewServletGetCoordinatorViewShowsAll() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doGetMethod = InterviewServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Interview in1 = new Interview(101L, LocalDate.now().plusDays(1), LocalTime.of(10, 0), "ONLINE", "SCHEDULED");
+        Interview in2 = new Interview(202L, LocalDate.now().plusDays(2), LocalTime.of(14, 0), "OFFLINE", "COMPLETED");
+
+        Map<String, Integer> globalStats = new HashMap<>();
+        globalStats.put("TOTAL", 10);
+        globalStats.put("SCHEDULED", 5);
+        globalStats.put("COMPLETED", 3);
+        globalStats.put("CANCELLED", 2);
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public List<Interview> getAllInterviews() {
+                List<Interview> list = new ArrayList<>();
+                list.add(in1);
+                list.add(in2);
+                return list;
+            }
+            @Override
+            public Map<String, Integer> getInterviewStatistics() {
+                return globalStats;
+            }
+            @Override
+            public Map<Long, Boolean> getRescheduledApplicationsMap() {
+                return new HashMap<>();
+            }
+        });
+
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(coordAttrs);
+
+        Map<String, Object> reqAttrs = new HashMap<>();
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, new HashMap<>(), reqAttrs, state);
+        HttpServletResponse resp = createMockResponse(state);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/WEB-INF/jsp/interviews.jsp", state.get("dispatchedPath"));
+        @SuppressWarnings("unchecked")
+        List<Interview> returnedInterviews = (List<Interview>) reqAttrs.get("interviews");
+        assertEquals(2, returnedInterviews.size());
+        assertEquals(globalStats, reqAttrs.get("interviewStats"));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doPost rejects requests with invalid or missing CSRF token")
+    void testInterviewServletPostMissingCsrfForbidden() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doPostMethod = InterviewServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "expected-token");
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(coordAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("action", "create");
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "wrong-token");
+
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, params, new HashMap<>(), state);
+        HttpServletResponse resp = createMockResponse(state);
+
+        doPostMethod.invoke(servlet, req, resp);
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, state.get("errorCode"));
+        assertEquals("Invalid or missing CSRF token.", state.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doPost rejects student attempts on all mutating actions with 403 Forbidden")
+    void testInterviewServletPostStudentForbidden() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doPostMethod = InterviewServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> studentAttrs = new HashMap<>();
+        studentAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        studentAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        studentAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(studentAttrs);
+
+        String[] mutatingActions = {"create", "update", "complete", "cancel", "delete"};
+        for (String action : mutatingActions) {
+            Map<String, String> params = new HashMap<>();
+            params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+            params.put("action", action);
+            params.put("id", "1");
+            params.put("applicationId", "1");
+
+            Map<String, Object> state = new HashMap<>();
+            HttpServletRequest req = createMockRequest(session, params, new HashMap<>(), state);
+            HttpServletResponse resp = createMockResponse(state);
+
+            doPostMethod.invoke(servlet, req, resp);
+
+            assertEquals(HttpServletResponse.SC_FORBIDDEN, state.get("errorCode"),
+                    "Student invoking " + action + " on doPost must receive HTTP 403 Forbidden");
+            assertEquals("Access denied: Only coordinators and administrators can manage interviews.", state.get("errorMessage"));
+        }
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doPost allows coordinator to perform create, update, complete, cancel, delete")
+    void testInterviewServletPostCoordinatorAllowedAllActions() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doPostMethod = InterviewServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final boolean[] created = {false};
+        final boolean[] updated = {false};
+        final boolean[] completed = {false};
+        final boolean[] cancelled = {false};
+        final boolean[] deleted = {false};
+
+        Interview testInterview = new Interview(10L, LocalDate.now().plusDays(2), LocalTime.of(10, 0), "ONLINE", "SCHEDULED");
+        testInterview.setId(1L);
+
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Application getApplicationById(Long id) {
+                return createTestApplication(id, 55L, 2L, LocalDate.now(), "SHORTLISTED");
+            }
+        });
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public boolean hasActiveInterview(Long applicationId) {
+                return false;
+            }
+            @Override
+            public boolean createInterview(Interview in) {
+                created[0] = true;
+                return true;
+            }
+            @Override
+            public Interview getInterviewById(Long id) {
+                return testInterview;
+            }
+            @Override
+            public boolean updateInterview(Interview in) {
+                updated[0] = true;
+                return true;
+            }
+            @Override
+            public boolean completeInterview(Long id) {
+                completed[0] = true;
+                return true;
+            }
+            @Override
+            public boolean cancelInterview(Long id) {
+                cancelled[0] = true;
+                return true;
+            }
+            @Override
+            public boolean deleteInterview(Long id) {
+                deleted[0] = true;
+                return true;
+            }
+        });
+
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(coordAttrs);
+
+        // 1. Create
+        Map<String, String> createParams = new HashMap<>();
+        createParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        createParams.put("action", "create");
+        createParams.put("applicationId", "10");
+        createParams.put("interviewDate", LocalDate.now().plusDays(2).toString());
+        createParams.put("interviewTime", "10:00");
+        createParams.put("mode", "ONLINE");
+        Map<String, Object> state1 = new HashMap<>();
+        doPostMethod.invoke(servlet, createMockRequest(session, createParams, new HashMap<>(), state1), createMockResponse(state1));
+        assertTrue(created[0]);
+        assertEquals("/college/interviews", state1.get("redirectUrl"));
+
+        // 2. Update
+        Map<String, String> updateParams = new HashMap<>();
+        updateParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        updateParams.put("action", "update");
+        updateParams.put("id", "1");
+        updateParams.put("interviewDate", LocalDate.now().plusDays(3).toString());
+        updateParams.put("interviewTime", "11:00");
+        updateParams.put("mode", "OFFLINE");
+        Map<String, Object> state2 = new HashMap<>();
+        doPostMethod.invoke(servlet, createMockRequest(session, updateParams, new HashMap<>(), state2), createMockResponse(state2));
+        assertTrue(updated[0]);
+        assertEquals("/college/interviews", state2.get("redirectUrl"));
+
+        // 3. Complete
+        Map<String, String> completeParams = new HashMap<>();
+        completeParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        completeParams.put("action", "complete");
+        completeParams.put("id", "1");
+        Map<String, Object> state3 = new HashMap<>();
+        doPostMethod.invoke(servlet, createMockRequest(session, completeParams, new HashMap<>(), state3), createMockResponse(state3));
+        assertTrue(completed[0]);
+        assertEquals("/college/interviews", state3.get("redirectUrl"));
+
+        // 4. Cancel
+        Map<String, String> cancelParams = new HashMap<>();
+        cancelParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        cancelParams.put("action", "cancel");
+        cancelParams.put("id", "1");
+        Map<String, Object> state4 = new HashMap<>();
+        doPostMethod.invoke(servlet, createMockRequest(session, cancelParams, new HashMap<>(), state4), createMockResponse(state4));
+        assertTrue(cancelled[0]);
+        assertEquals("/college/interviews", state4.get("redirectUrl"));
+
+        // 5. Delete
+        Map<String, String> deleteParams = new HashMap<>();
+        deleteParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        deleteParams.put("action", "delete");
+        deleteParams.put("id", "1");
+        Map<String, Object> state5 = new HashMap<>();
+        doPostMethod.invoke(servlet, createMockRequest(session, deleteParams, new HashMap<>(), state5), createMockResponse(state5));
+        assertTrue(deleted[0]);
+        assertEquals("/college/interviews", state5.get("redirectUrl"));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doPost allows ADMIN role to manage interviews")
+    void testInterviewServletPostAdminAllowed() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doPostMethod = InterviewServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final boolean[] created = {false};
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Application getApplicationById(Long id) {
+                return createTestApplication(id, 55L, 2L, LocalDate.now(), "SHORTLISTED");
+            }
+        });
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public boolean hasActiveInterview(Long applicationId) {
+                return false;
+            }
+            @Override
+            public boolean createInterview(Interview in) {
+                created[0] = true;
+                return true;
+            }
+        });
+
+        Map<String, Object> adminAttrs = new HashMap<>();
+        adminAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        adminAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        adminAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_ADMIN);
+        HttpSession session = createMockSession(adminAttrs);
+
+        Map<String, String> createParams = new HashMap<>();
+        createParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        createParams.put("action", "create");
+        createParams.put("applicationId", "10");
+        createParams.put("interviewDate", LocalDate.now().plusDays(2).toString());
+        createParams.put("interviewTime", "10:00");
+        createParams.put("mode", "ONLINE");
+
+        Map<String, Object> state = new HashMap<>();
+        doPostMethod.invoke(servlet, createMockRequest(session, createParams, new HashMap<>(), state), createMockResponse(state));
+        assertTrue(created[0]);
+        assertEquals("/college/interviews", state.get("redirectUrl"));
+    }
+
+    @Test
+    @DisplayName("InterviewServlet doGet student without profile redirects to /jobs with error")
+    void testInterviewServletStudentWithoutProfileRedirects() throws Exception {
+        InterviewServlet servlet = new InterviewServlet();
+        Method doGetMethod = InterviewServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return null; // Profile missing
+            }
+        });
+
+        Map<String, Object> studentAttrs = new HashMap<>();
+        studentAttrs.put(LoginServlet.SESSION_USER_ID, 102L);
+        studentAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(studentAttrs);
+
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, new HashMap<>(), new HashMap<>(), state);
+        HttpServletResponse resp = createMockResponse(state);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/college/jobs", state.get("redirectUrl"));
+        assertEquals("No student profile found for your account. Please complete your registration.", session.getAttribute("errorMessage"));
     }
 
     // =====================================================

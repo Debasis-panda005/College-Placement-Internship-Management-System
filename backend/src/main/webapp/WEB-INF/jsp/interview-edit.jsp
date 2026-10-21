@@ -141,7 +141,7 @@
 
     <c:if test="${not empty errorMessage}">
         <div class="alert-error">
-            ${errorMessage}
+            <c:out value="${errorMessage}"/>
         </div>
     </c:if>
 
