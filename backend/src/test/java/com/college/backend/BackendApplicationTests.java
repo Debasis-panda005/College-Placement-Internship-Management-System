@@ -12,6 +12,8 @@ import com.college.backend.entity.User;
 import com.college.backend.exception.DAOException;
 import com.college.backend.exception.DuplicateRecordException;
 import com.college.backend.servlet.JobServlet;
+import com.college.backend.servlet.LoginServlet;
+import com.college.backend.servlet.LogoutServlet;
 import com.college.backend.servlet.RegisterServlet;
 import com.college.backend.util.CsrfUtil;
 import com.college.backend.util.PasswordHashService;
@@ -1473,6 +1475,362 @@ class BackendApplicationTests {
     }
 
     // =====================================================
+    // 29. LOGIN & LOGOUT SERVLET AND SESSION HANDLING TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("LoginServlet doGet generates CSRF token, forwards flash messages, and displays login.jsp")
+    void testLoginServletGetRendersFormAndGeneratesCsrfToken() throws Exception {
+        LoginServlet servlet = new LoginServlet();
+        Method doGetMethod = LoginServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put("successMessage", "Account created successfully! Please sign in.");
+        sessionAttrs.put("errorMessage", "Session expired.");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, new HashMap<>(), requestAttrs, requestState);
+        HttpServletResponse response = createMockResponse(new HashMap<>());
+
+        doGetMethod.invoke(servlet, request, response);
+
+        // Verify CSRF token was generated in session
+        assertNotNull(sessionAttrs.get(CsrfUtil.CSRF_TOKEN_SESSION_ATTR), "CSRF token must be created in session");
+
+        // Verify flash messages transferred from session to request and cleaned up from session
+        assertEquals("Account created successfully! Please sign in.", requestAttrs.get("successMessage"));
+        assertNull(sessionAttrs.get("successMessage"), "Flash success message must be consumed from session");
+        assertEquals("Session expired.", requestAttrs.get("errorMessage"));
+        assertNull(sessionAttrs.get("errorMessage"), "Flash error message must be consumed from session");
+
+        // Verify forwarded to login.jsp
+        assertEquals("/WEB-INF/jsp/login.jsp", requestState.get("dispatchedPath"));
+    }
+
+    @Test
+    @DisplayName("LoginServlet doPost rejects missing or invalid CSRF token with 403 Forbidden")
+    void testLoginServletPostRejectsMissingOrInvalidCsrfToken() throws Exception {
+        LoginServlet servlet = new LoginServlet();
+        final boolean[] daoInvoked = new boolean[]{false};
+        servlet.setUserDAO(new UserDAO() {
+            @Override
+            public User findByEmail(String email) {
+                daoInvoked[0] = true;
+                return null;
+            }
+        });
+
+        Method doPostMethod = LoginServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        // 1. Missing CSRF token
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "session-secret-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> paramsWithoutCsrf = new HashMap<>();
+        paramsWithoutCsrf.put("email", "student@college.edu");
+        paramsWithoutCsrf.put("password", "SecretPassword123!");
+
+        Map<String, Object> responseState1 = new HashMap<>();
+        HttpServletRequest request1 = createMockRequest(session, paramsWithoutCsrf, new HashMap<>(), new HashMap<>());
+        HttpServletResponse response1 = createMockResponse(responseState1);
+
+        doPostMethod.invoke(servlet, request1, response1);
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, responseState1.get("errorCode"));
+        assertFalse(daoInvoked[0], "UserDAO must not be queried when CSRF check fails");
+
+        // 2. Mismatched CSRF token
+        Map<String, String> paramsWithBadCsrf = new HashMap<>();
+        paramsWithBadCsrf.put(CsrfUtil.CSRF_TOKEN_PARAM, "tampered-token");
+        paramsWithBadCsrf.put("email", "student@college.edu");
+        paramsWithBadCsrf.put("password", "SecretPassword123!");
+
+        Map<String, Object> responseState2 = new HashMap<>();
+        HttpServletRequest request2 = createMockRequest(session, paramsWithBadCsrf, new HashMap<>(), new HashMap<>());
+        HttpServletResponse response2 = createMockResponse(responseState2);
+
+        doPostMethod.invoke(servlet, request2, response2);
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, responseState2.get("errorCode"));
+        assertFalse(daoInvoked[0], "UserDAO must not be queried when CSRF token is invalid");
+    }
+
+    @Test
+    @DisplayName("LoginServlet doPost validates required email and password fields without leaking password")
+    void testLoginServletPostMissingEmailOrPassword() throws Exception {
+        LoginServlet servlet = new LoginServlet();
+        Method doPostMethod = LoginServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        // Case 1: Missing email
+        Map<String, String> paramsMissingEmail = new HashMap<>();
+        paramsMissingEmail.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsMissingEmail.put("password", "SecretPassword123!");
+
+        Map<String, Object> requestAttrs1 = new HashMap<>();
+        Map<String, Object> requestState1 = new HashMap<>();
+        HttpServletRequest request1 = createMockRequest(session, paramsMissingEmail, requestAttrs1, requestState1);
+
+        doPostMethod.invoke(servlet, request1, createMockResponse(new HashMap<>()));
+        assertEquals("Email and password are required.", requestAttrs1.get("errorMessage"));
+        assertNull(requestAttrs1.get("password"), "Password must never be attached to request attributes");
+        assertEquals("/WEB-INF/jsp/login.jsp", requestState1.get("dispatchedPath"));
+
+        // Case 2: Missing password
+        Map<String, String> paramsMissingPass = new HashMap<>();
+        paramsMissingPass.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsMissingPass.put("email", "student@college.edu");
+
+        Map<String, Object> requestAttrs2 = new HashMap<>();
+        Map<String, Object> requestState2 = new HashMap<>();
+        HttpServletRequest request2 = createMockRequest(session, paramsMissingPass, requestAttrs2, requestState2);
+
+        doPostMethod.invoke(servlet, request2, createMockResponse(new HashMap<>()));
+        assertEquals("Email and password are required.", requestAttrs2.get("errorMessage"));
+        assertEquals("student@college.edu", requestAttrs2.get("email"), "Email input should be preserved for redisplay");
+        assertNull(requestAttrs2.get("password"), "Password must never be attached to request attributes");
+        assertEquals("/WEB-INF/jsp/login.jsp", requestState2.get("dispatchedPath"));
+    }
+
+    @Test
+    @DisplayName("LoginServlet doPost returns identical generic error for non-existent user and wrong password")
+    void testLoginServletPostInvalidCredentialsGenericErrorMessage() throws Exception {
+        LoginServlet servlet = new LoginServlet();
+        String correctHash = PasswordHashService.hashPassword("CorrectPassword123!");
+        User existingUser = new User(10L, "John Doe", "john@college.edu", correctHash, User.ROLE_STUDENT, LocalDateTime.now());
+
+        servlet.setUserDAO(new UserDAO() {
+            @Override
+            public User findByEmail(String email) {
+                if ("john@college.edu".equalsIgnoreCase(email)) {
+                    return existingUser;
+                }
+                return null;
+            }
+        });
+
+        Method doPostMethod = LoginServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        // Case A: User does not exist
+        Map<String, String> paramsNonExistent = new HashMap<>();
+        paramsNonExistent.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsNonExistent.put("email", "nonexistent@college.edu");
+        paramsNonExistent.put("password", "AnyPassword123!");
+
+        Map<String, Object> requestAttrsA = new HashMap<>();
+        Map<String, Object> requestStateA = new HashMap<>();
+        HttpServletRequest requestA = createMockRequest(session, paramsNonExistent, requestAttrsA, requestStateA);
+        doPostMethod.invoke(servlet, requestA, createMockResponse(new HashMap<>()));
+
+        String errorA = (String) requestAttrsA.get("errorMessage");
+        assertEquals("Invalid email or password.", errorA);
+        assertNull(requestAttrsA.get("password"));
+
+        // Case B: User exists but wrong password
+        Map<String, String> paramsWrongPass = new HashMap<>();
+        paramsWrongPass.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsWrongPass.put("email", "john@college.edu");
+        paramsWrongPass.put("password", "WrongPassword123!");
+
+        Map<String, Object> requestAttrsB = new HashMap<>();
+        Map<String, Object> requestStateB = new HashMap<>();
+        HttpServletRequest requestB = createMockRequest(session, paramsWrongPass, requestAttrsB, requestStateB);
+        doPostMethod.invoke(servlet, requestB, createMockResponse(new HashMap<>()));
+
+        String errorB = (String) requestAttrsB.get("errorMessage");
+        assertEquals("Invalid email or password.", errorB);
+        assertNull(requestAttrsB.get("password"));
+
+        // Verify generic error parity to prevent enumeration
+        assertEquals(errorA, errorB, "Error message must be identical for non-existent user and bad password to prevent account enumeration");
+    }
+
+    @Test
+    @DisplayName("LoginServlet doPost authenticates user, protects against session fixation, binds role from DB, and redirects to jobs")
+    void testLoginServletPostSuccessfulLoginSessionFixationProtectionAndRoleBinding() throws Exception {
+        LoginServlet servlet = new LoginServlet();
+        String rawPassword = "CorrectP@ssword2026!";
+        String passwordHash = PasswordHashService.hashPassword(rawPassword);
+        User dbUser = new User(42L, "Jane Student", "jane@college.edu", passwordHash, User.ROLE_STUDENT, LocalDateTime.now());
+
+        servlet.setUserDAO(new UserDAO() {
+            @Override
+            public User findByEmail(String email) {
+                if ("jane@college.edu".equalsIgnoreCase(email)) {
+                    return dbUser;
+                }
+                return null;
+            }
+        });
+
+        Method doPostMethod = LoginServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> oldSessionAttrs = new HashMap<>();
+        oldSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "pre-auth-csrf-token");
+        oldSessionAttrs.put("anonymousCartOrData", "untrusted");
+        HttpSession oldSession = createMockSession(oldSessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "pre-auth-csrf-token");
+        params.put("email", "  jane@college.edu  "); // Email with whitespace
+        params.put("password", rawPassword);
+        params.put("role", "ADMIN"); // Attacker attempting privilege escalation via request parameter
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(oldSession, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        // 1. Session fixation protection: verify old session was invalidated
+        assertEquals(Boolean.TRUE, oldSessionAttrs.get("invalidated"), "Old session must be invalidated upon successful login");
+
+        // 2. Fresh session creation and identity/role binding
+        @SuppressWarnings("unchecked")
+        Map<String, Object> newSessionAttrs = (Map<String, Object>) requestState.get("newSessionAttrs");
+        assertNotNull(newSessionAttrs, "A fresh session must be established post-authentication");
+        assertEquals(42L, newSessionAttrs.get(LoginServlet.SESSION_USER_ID));
+        assertEquals("jane@college.edu", newSessionAttrs.get(LoginServlet.SESSION_USER_EMAIL));
+        assertEquals("Jane Student", newSessionAttrs.get(LoginServlet.SESSION_USER_NAME));
+
+        // 3. Strict DB role binding: must ignore attacker-supplied 'ADMIN' parameter
+        assertEquals(User.ROLE_STUDENT, newSessionAttrs.get(LoginServlet.SESSION_USER_ROLE),
+                "User role must be bound strictly from the database entity, not request parameters");
+
+        // 4. Fresh CSRF token for the authenticated session
+        String newCsrfToken = (String) newSessionAttrs.get(CsrfUtil.CSRF_TOKEN_SESSION_ATTR);
+        assertNotNull(newCsrfToken, "New session must have an active CSRF token");
+        assertNotEquals("pre-auth-csrf-token", newCsrfToken, "Authenticated session must not reuse pre-auth CSRF token");
+
+        // 5. Redirect to jobs dashboard
+        assertEquals("/college/jobs", responseState.get("redirectUrl"), "Successful login must redirect to /jobs");
+    }
+
+    @Test
+    @DisplayName("LoginServlet doPost shields internal database errors from user")
+    void testLoginServletPostDatabaseErrorShielding() throws Exception {
+        LoginServlet servlet = new LoginServlet();
+        servlet.setUserDAO(new UserDAO() {
+            @Override
+            public User findByEmail(String email) {
+                throw new DAOException("Communications link failure: Connection refused: connect to mysql:3306");
+            }
+        });
+
+        Method doPostMethod = LoginServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("email", "student@college.edu");
+        params.put("password", "AnyPassword123!");
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        HttpServletResponse response = createMockResponse(new HashMap<>());
+
+        doPostMethod.invoke(servlet, request, response);
+
+        String errorMessage = (String) requestAttrs.get("errorMessage");
+        assertEquals("A database error occurred. Please try again later.", errorMessage);
+        assertFalse(errorMessage.contains("Communications link failure"), "Internal database details must not leak");
+        assertFalse(errorMessage.contains("3306"), "Port details must not leak");
+        assertEquals("/WEB-INF/jsp/login.jsp", requestState.get("dispatchedPath"));
+    }
+
+    @Test
+    @DisplayName("LogoutServlet enforces POST-only logout with CSRF, invalidates session, and rejects GET with 405")
+    void testLogoutServletEnforcesPostWithCsrfAndRejectsGetWith405() throws Exception {
+        LogoutServlet servlet = new LogoutServlet();
+        Method doGetMethod = LogoutServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+        Method doPostMethod = LogoutServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        // 1. POST logout with valid CSRF token
+        Map<String, Object> oldSessionAttrs1 = new HashMap<>();
+        oldSessionAttrs1.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "auth-csrf-token");
+        oldSessionAttrs1.put(LoginServlet.SESSION_USER_ID, 100L);
+        HttpSession session1 = createMockSession(oldSessionAttrs1);
+
+        Map<String, String> validPostParams = new HashMap<>();
+        validPostParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "auth-csrf-token");
+
+        Map<String, Object> requestState1 = new HashMap<>();
+        HttpServletRequest request1 = createMockRequest(session1, validPostParams, new HashMap<>(), requestState1);
+        Map<String, Object> responseState1 = new HashMap<>();
+        HttpServletResponse response1 = createMockResponse(responseState1);
+
+        doPostMethod.invoke(servlet, request1, response1);
+
+        assertEquals(Boolean.TRUE, oldSessionAttrs1.get("invalidated"), "POST logout must invalidate old session");
+        assertEquals("/college/login", responseState1.get("redirectUrl"), "Must redirect to /login");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> newSessionAttrs1 = (Map<String, Object>) requestState1.get("newSessionAttrs");
+        assertNotNull(newSessionAttrs1, "New clean session must be created for flash notification");
+        assertEquals("You have been logged out successfully.", newSessionAttrs1.get("successMessage"));
+        assertNull(newSessionAttrs1.get(LoginServlet.SESSION_USER_ID), "User credentials must not be present in new session");
+
+        // 2. POST logout with invalid/missing CSRF token should be rejected with 403
+        Map<String, Object> oldSessionAttrs2 = new HashMap<>();
+        oldSessionAttrs2.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "auth-csrf-token");
+        HttpSession session2 = createMockSession(oldSessionAttrs2);
+
+        Map<String, String> invalidPostParams = new HashMap<>();
+        invalidPostParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "forged-csrf-token");
+
+        Map<String, Object> responseState2 = new HashMap<>();
+        HttpServletRequest request2 = createMockRequest(session2, invalidPostParams, new HashMap<>(), new HashMap<>());
+        HttpServletResponse response2 = createMockResponse(responseState2);
+
+        doPostMethod.invoke(servlet, request2, response2);
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, responseState2.get("errorCode"), "POST logout without valid CSRF must return 403");
+        assertNull(oldSessionAttrs2.get("invalidated"), "Session must NOT be invalidated when CSRF check fails");
+
+        // 3. GET logout must return HTTP 405 Method Not Allowed and NOT invalidate the session
+        Map<String, Object> oldSessionAttrs3 = new HashMap<>();
+        oldSessionAttrs3.put(LoginServlet.SESSION_USER_ID, 200L);
+        oldSessionAttrs3.put("preservedKey", "preservedValue");
+        HttpSession session3 = createMockSession(oldSessionAttrs3);
+
+        Map<String, Object> responseState3 = new HashMap<>();
+        HttpServletRequest request3 = createMockRequest(session3, new HashMap<>(), new HashMap<>(), new HashMap<>());
+        HttpServletResponse response3 = createMockResponse(responseState3);
+
+        doGetMethod.invoke(servlet, request3, response3);
+
+        assertEquals(HttpServletResponse.SC_METHOD_NOT_ALLOWED, responseState3.get("errorCode"),
+                "GET /logout must return HTTP 405 Method Not Allowed");
+        assertNull(oldSessionAttrs3.get("invalidated"),
+                "GET /logout must NOT invalidate the existing session");
+        assertEquals("preservedValue", oldSessionAttrs3.get("preservedKey"),
+                "Session attributes must remain intact upon rejected GET request");
+        assertNull(responseState3.get("redirectUrl"),
+                "GET /logout must not redirect when rejecting with 405");
+    }
+
+    // =====================================================
     // TEST HELPERS
     // =====================================================
 
@@ -1545,6 +1903,9 @@ class BackendApplicationTests {
                         return null;
                     } else if ("removeAttribute".equals(name)) {
                         return attributes.remove(args[0]);
+                    } else if ("invalidate".equals(name)) {
+                        attributes.put("invalidated", true);
+                        return null;
                     }
                     return null;
                 }
@@ -1557,6 +1918,8 @@ class BackendApplicationTests {
 
     private HttpServletRequest createMockRequest(HttpSession session, Map<String, String> params,
                                                  Map<String, Object> attributes, Map<String, Object> state) {
+        final HttpSession[] sessionHolder = new HttpSession[]{session};
+
         jakarta.servlet.RequestDispatcher mockDispatcher = (jakarta.servlet.RequestDispatcher) Proxy.newProxyInstance(
                 jakarta.servlet.RequestDispatcher.class.getClassLoader(),
                 new Class<?>[]{jakarta.servlet.RequestDispatcher.class},
@@ -1577,7 +1940,34 @@ class BackendApplicationTests {
                 (proxy, method, args) -> {
                     String name = method.getName();
                     if ("getSession".equals(name)) {
-                        return session;
+                        boolean create = true;
+                        if (args != null && args.length == 1) {
+                            create = (Boolean) args[0];
+                        }
+                        HttpSession curr = sessionHolder[0];
+                        boolean isInvalidated = false;
+                        if (curr != null) {
+                            try {
+                                Object inv = curr.getAttribute("invalidated");
+                                if (Boolean.TRUE.equals(inv)) {
+                                    isInvalidated = true;
+                                }
+                            } catch (Exception ignored) {
+                            }
+                        }
+                        if (curr == null || isInvalidated) {
+                            if (create) {
+                                Map<String, Object> newSessionAttrs = new HashMap<>();
+                                if (state != null) {
+                                    state.put("newSessionAttrs", newSessionAttrs);
+                                }
+                                sessionHolder[0] = createMockSession(newSessionAttrs);
+                                return sessionHolder[0];
+                            } else {
+                                return null;
+                            }
+                        }
+                        return curr;
                     } else if ("getParameter".equals(name)) {
                         return params != null ? params.get(args[0]) : null;
                     } else if ("setAttribute".equals(name)) {
