@@ -22,6 +22,26 @@ import java.sql.Statement;
  */
 public class StudentDAO {
 
+    private final UserDAO userDAO;
+
+    public StudentDAO() {
+        this(new UserDAO());
+    }
+
+    public StudentDAO(UserDAO userDAO) {
+        this.userDAO = userDAO != null ? userDAO : new UserDAO();
+    }
+
+    /**
+     * Obtains a database connection. Protected to allow test overrides.
+     *
+     * @return active Connection
+     * @throws SQLException on connection failure
+     */
+    protected Connection getConnection() throws SQLException {
+        return DBConnection.getConnection();
+    }
+
     /**
      * Finds a student profile by its primary key ID.
      *
@@ -289,6 +309,125 @@ public class StudentDAO {
         }
 
         return false;
+    }
+
+    /**
+     * Registers a new student atomically using a single JDBC transaction.
+     * Inserts the User account, obtains the generated user ID, binds it to the Student profile,
+     * and inserts the Student profile. Commits only when both succeed; rolls back on any failure.
+     *
+     * @param user User account to create
+     * @param student Student profile to create
+     * @return true if both records were successfully created and committed
+     * @throws IllegalArgumentException on null input or validation failure
+     * @throws DuplicateRecordException if email or roll number already exists
+     * @throws DAOException on database connectivity or query execution failure
+     */
+    public boolean registerStudent(User user, Student student) {
+        if (user == null) {
+            throw new IllegalArgumentException("User entity cannot be null.");
+        }
+        if (student == null) {
+            throw new IllegalArgumentException("Student profile cannot be null.");
+        }
+
+        Connection connection = null;
+        boolean originalAutoCommit = true;
+
+        try {
+            connection = getConnection();
+            originalAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+
+            boolean success = registerStudent(connection, user, student);
+            if (success) {
+                connection.commit();
+                return true;
+            } else {
+                connection.rollback();
+                return false;
+            }
+
+        } catch (Exception e) {
+            if (connection != null) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackEx) {
+                    e.addSuppressed(rollbackEx);
+                }
+            }
+
+            if (e instanceof DuplicateRecordException) {
+                throw (DuplicateRecordException) e;
+            }
+            if (e instanceof IllegalArgumentException) {
+                throw (IllegalArgumentException) e;
+            }
+            if (e instanceof DAOException) {
+                throw (DAOException) e;
+            }
+            if (e instanceof SQLException) {
+                SQLException sqlEx = (SQLException) e;
+                if (sqlEx.getErrorCode() == 1062) {
+                    throw new DuplicateRecordException("Duplicate entry during student registration: " + sqlEx.getMessage(), sqlEx);
+                }
+                throw new DAOException("Database error during student registration: " + sqlEx.getMessage(), sqlEx);
+            }
+            throw new DAOException("Unexpected error during student registration: " + e.getMessage(), e);
+
+        } finally {
+            if (connection != null) {
+                try {
+                    if (!connection.isClosed()) {
+                        try {
+                            connection.setAutoCommit(originalAutoCommit);
+                        } catch (SQLException ignored) {
+                        }
+                        connection.close();
+                    }
+                } catch (SQLException closeEx) {
+                    // Suppress or log close failure
+                }
+            }
+        }
+    }
+
+    /**
+     * Executes the student registration steps using an existing database connection within an active transaction.
+     *
+     * @param connection active database connection
+     * @param user User account to create
+     * @param student Student profile to create
+     * @return true if both inserts succeed
+     * @throws SQLException on database failure
+     * @throws IllegalArgumentException on invalid input
+     * @throws DuplicateRecordException if duplicate record detected
+     */
+    public boolean registerStudent(Connection connection, User user, Student student) throws SQLException {
+        if (connection == null) {
+            throw new IllegalArgumentException("Database connection cannot be null.");
+        }
+        if (user == null) {
+            throw new IllegalArgumentException("User entity cannot be null.");
+        }
+        if (student == null) {
+            throw new IllegalArgumentException("Student profile cannot be null.");
+        }
+
+        // 1. Force the public registration flow to use User.ROLE_STUDENT (prevents privilege escalation)
+        user.setRole(User.ROLE_STUDENT);
+
+        // 2. Insert the user first and retrieve its generated ID
+        boolean userCreated = userDAO.createUser(connection, user);
+        if (!userCreated || user.getId() == null) {
+            throw new DAOException("Failed to create user record during student registration.");
+        }
+
+        // 3. Assign the generated user ID to the Student object
+        student.setUserId(user.getId());
+
+        // 4. Insert the student profile using the same connection
+        return createStudent(connection, student);
     }
 
     /**

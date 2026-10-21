@@ -12,6 +12,7 @@ import com.college.backend.entity.User;
 import com.college.backend.exception.DAOException;
 import com.college.backend.exception.DuplicateRecordException;
 import com.college.backend.servlet.JobServlet;
+import com.college.backend.servlet.RegisterServlet;
 import com.college.backend.util.CsrfUtil;
 import com.college.backend.util.PasswordHashService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -881,8 +883,654 @@ class BackendApplicationTests {
     }
 
     // =====================================================
+    // 27. TRANSACTIONAL STUDENT REGISTRATION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("registerStudent rejects null parameters with IllegalArgumentException")
+    void testRegisterStudentNullGuards() {
+        StudentDAO studentDAO = new StudentDAO();
+        User validUser = new User("Valid User", "valid@college.edu", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", User.ROLE_STUDENT);
+        Student validStudent = new Student(1L, "CSE2026-001", "Computer Science", new BigDecimal("8.50"), 2026, "9876543210", null, null);
+        Map<String, Object> connState = new HashMap<>();
+        Connection mockConn = createMockConnection(connState);
+
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.registerStudent(null, validStudent),
+                "registerStudent(null, student) must throw IllegalArgumentException");
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.registerStudent(validUser, null),
+                "registerStudent(user, null) must throw IllegalArgumentException");
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.registerStudent(null, validUser, validStudent),
+                "registerStudent(null, user, student) must throw IllegalArgumentException");
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.registerStudent(mockConn, null, validStudent),
+                "registerStudent(connection, null, student) must throw IllegalArgumentException");
+        assertThrows(IllegalArgumentException.class, () -> studentDAO.registerStudent(mockConn, validUser, null),
+                "registerStudent(connection, user, null) must throw IllegalArgumentException");
+    }
+
+    @Test
+    @DisplayName("registerStudent enforces User.ROLE_STUDENT and links user ID to student profile")
+    void testRegisterStudentRoleEnforcement() throws SQLException {
+        Map<String, Object> connState = new HashMap<>();
+        Connection mockConn = createMockConnection(connState);
+
+        UserDAO mockUserDao = new UserDAO() {
+            @Override
+            public boolean createUser(Connection connection, User user) {
+                assertEquals(User.ROLE_STUDENT, user.getRole(), "User role must be forced to STUDENT before insert");
+                user.setId(77L);
+                return true;
+            }
+        };
+
+        StudentDAO studentDAO = new StudentDAO(mockUserDao) {
+            @Override
+            public boolean createStudent(Connection connection, Student student) {
+                assertEquals(77L, student.getUserId(), "Student user_id must match generated user ID");
+                student.setId(101L);
+                return true;
+            }
+        };
+
+        User userWithAdminRole = new User("Admin Attempt", "admin_attempt@college.edu", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", User.ROLE_ADMIN);
+        Student student = new Student(null, "CSE2026-002", "Information Technology", new BigDecimal("9.10"), 2026, "9876543211", null, null);
+
+        boolean result = studentDAO.registerStudent(mockConn, userWithAdminRole, student);
+
+        assertTrue(result, "registerStudent should succeed with mock DAOs");
+        assertEquals(User.ROLE_STUDENT, userWithAdminRole.getRole(), "User role must be overridden to STUDENT");
+        assertEquals(77L, student.getUserId(), "Student must be associated with the newly created user ID");
+        assertEquals(101L, student.getId(), "Student must receive generated profile ID");
+    }
+
+    @Test
+    @DisplayName("registerStudent atomic transaction commits on success, disables autoCommit, and closes connection")
+    void testRegisterStudentTransactionCommitSuccess() {
+        Map<String, Object> connState = new HashMap<>();
+        Connection mockConn = createMockConnection(connState);
+
+        UserDAO mockUserDao = new UserDAO() {
+            @Override
+            public boolean createUser(Connection connection, User user) {
+                user.setId(10L);
+                return true;
+            }
+        };
+
+        StudentDAO studentDAO = new StudentDAO(mockUserDao) {
+            @Override
+            protected Connection getConnection() {
+                return mockConn;
+            }
+
+            @Override
+            public boolean createStudent(Connection connection, Student student) {
+                student.setId(20L);
+                return true;
+            }
+        };
+
+        User user = new User("Student User", "student@college.edu", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", User.ROLE_STUDENT);
+        Student student = new Student(null, "CSE2026-003", "Computer Science", new BigDecimal("8.75"), 2026, "9876543212", null, null);
+
+        boolean registered = studentDAO.registerStudent(user, student);
+
+        assertTrue(registered, "registerStudent must return true on successful commit");
+        assertEquals(Boolean.TRUE, connState.get("setAutoCommitCalled"), "setAutoCommit must be called");
+        assertEquals(1, connState.get("commitCount"), "commit() must be called exactly once");
+        assertNull(connState.get("rollbackCount"), "rollback() must not be called on success");
+        assertEquals(1, connState.get("closeCount"), "connection.close() must be called in finally");
+        assertEquals(Boolean.TRUE, connState.get("isClosed"), "connection must be closed");
+        assertEquals(10L, student.getUserId(), "Student entity must receive generated user ID");
+        assertEquals(20L, student.getId(), "Student entity must receive generated student profile ID");
+    }
+
+    @Test
+    @DisplayName("registerStudent rolls back transaction when user creation fails or detects duplicate email")
+    void testRegisterStudentTransactionRollbackOnUserCreationFailure() {
+        Map<String, Object> connState = new HashMap<>();
+        Connection mockConn = createMockConnection(connState);
+
+        UserDAO mockUserDao = new UserDAO() {
+            @Override
+            public boolean createUser(Connection connection, User user) {
+                throw new DuplicateRecordException("Duplicate email 'student@college.edu'");
+            }
+        };
+
+        StudentDAO studentDAO = new StudentDAO(mockUserDao) {
+            @Override
+            protected Connection getConnection() {
+                return mockConn;
+            }
+        };
+
+        User user = new User("Student User", "student@college.edu", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", User.ROLE_STUDENT);
+        Student student = new Student(null, "CSE2026-004", "Computer Science", new BigDecimal("8.20"), 2026, "9876543213", null, null);
+
+        DuplicateRecordException thrown = assertThrows(DuplicateRecordException.class,
+                () -> studentDAO.registerStudent(user, student),
+                "Duplicate email must propagate DuplicateRecordException");
+
+        assertTrue(thrown.getMessage().contains("Duplicate email"));
+        assertNull(connState.get("commitCount"), "commit() must not be called when user creation fails");
+        assertEquals(1, connState.get("rollbackCount"), "rollback() must be called when user creation fails");
+        assertEquals(1, connState.get("closeCount"), "connection must be closed in finally block");
+    }
+
+    @Test
+    @DisplayName("registerStudent rolls back transaction when student creation fails with duplicate roll number")
+    void testRegisterStudentTransactionRollbackOnStudentCreationFailure() {
+        Map<String, Object> connState = new HashMap<>();
+        Connection mockConn = createMockConnection(connState);
+
+        UserDAO mockUserDao = new UserDAO() {
+            @Override
+            public boolean createUser(Connection connection, User user) {
+                user.setId(50L);
+                return true;
+            }
+        };
+
+        StudentDAO studentDAO = new StudentDAO(mockUserDao) {
+            @Override
+            protected Connection getConnection() {
+                return mockConn;
+            }
+
+            @Override
+            public boolean createStudent(Connection connection, Student student) {
+                throw new DuplicateRecordException("Roll number 'CSE2026-005' already registered");
+            }
+        };
+
+        User user = new User("Student Two", "student2@college.edu", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", User.ROLE_STUDENT);
+        Student student = new Student(null, "CSE2026-005", "Mechanical", new BigDecimal("7.90"), 2026, "9876543214", null, null);
+
+        DuplicateRecordException thrown = assertThrows(DuplicateRecordException.class,
+                () -> studentDAO.registerStudent(user, student),
+                "Duplicate roll number must propagate DuplicateRecordException");
+
+        assertTrue(thrown.getMessage().contains("already registered"));
+        assertNull(connState.get("commitCount"), "commit() must not be called when student creation fails");
+        assertEquals(1, connState.get("rollbackCount"), "rollback() must be called when student creation fails");
+        assertEquals(1, connState.get("closeCount"), "connection must be closed in finally block");
+    }
+
+    @Test
+    @DisplayName("registerStudent preserves primary exception and attaches suppressed exception when rollback fails")
+    void testRegisterStudentTransactionRollbackSuppressesRollbackException() {
+        Map<String, Object> connState = new HashMap<>();
+        connState.put("throwOnRollback", true);
+        Connection mockConn = createMockConnection(connState);
+
+        UserDAO mockUserDao = new UserDAO() {
+            @Override
+            public boolean createUser(Connection connection, User user) {
+                user.setId(60L);
+                return true;
+            }
+        };
+
+        StudentDAO studentDAO = new StudentDAO(mockUserDao) {
+            @Override
+            protected Connection getConnection() {
+                return mockConn;
+            }
+
+            @Override
+            public boolean createStudent(Connection connection, Student student) {
+                throw new DAOException("Primary student insert failure");
+            }
+        };
+
+        User user = new User("Student Three", "student3@college.edu", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", User.ROLE_STUDENT);
+        Student student = new Student(null, "CSE2026-006", "Electrical", new BigDecimal("8.00"), 2026, "9876543215", null, null);
+
+        DAOException thrown = assertThrows(DAOException.class,
+                () -> studentDAO.registerStudent(user, student),
+                "Primary exception must be thrown even if rollback fails");
+
+        assertEquals("Primary student insert failure", thrown.getMessage());
+        assertEquals(1, thrown.getSuppressed().length, "Rollback exception must be added as suppressed exception");
+        assertTrue(thrown.getSuppressed()[0] instanceof SQLException, "Suppressed exception must be SQLException");
+        assertEquals("Simulated rollback failure", thrown.getSuppressed()[0].getMessage());
+        assertEquals(1, connState.get("closeCount"), "connection must be closed even when rollback throws");
+    }
+
+    @Test
+    @DisplayName("registerStudent translates raw SQLException to DAOException or DuplicateRecordException")
+    void testRegisterStudentSQLExceptionMapping() {
+        Map<String, Object> connState = new HashMap<>();
+        Connection mockConn = createMockConnection(connState);
+
+        UserDAO mockUserDao = new UserDAO() {
+            @Override
+            public boolean createUser(Connection connection, User user) {
+                user.setId(70L);
+                return true;
+            }
+        };
+
+        // Case 1: MySQL error 1062 translates to DuplicateRecordException
+        StudentDAO studentDAO1062 = new StudentDAO(mockUserDao) {
+            @Override
+            protected Connection getConnection() {
+                return mockConn;
+            }
+
+            @Override
+            public boolean createStudent(Connection connection, Student student) throws SQLException {
+                throw new SQLException("Duplicate entry 'test' for key 'PRIMARY'", "23000", 1062);
+            }
+        };
+
+        User user1 = new User("Student Four", "student4@college.edu", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", User.ROLE_STUDENT);
+        Student student1 = new Student(null, "CSE2026-007", "Civil", new BigDecimal("7.50"), 2026, "9876543216", null, null);
+
+        DuplicateRecordException dupEx = assertThrows(DuplicateRecordException.class,
+                () -> studentDAO1062.registerStudent(user1, student1));
+        assertTrue(dupEx.getMessage().contains("Duplicate entry"));
+
+        // Case 2: General SQLException translates to DAOException
+        StudentDAO studentDAOGeneral = new StudentDAO(mockUserDao) {
+            @Override
+            protected Connection getConnection() {
+                return mockConn;
+            }
+
+            @Override
+            public boolean createStudent(Connection connection, Student student) throws SQLException {
+                throw new SQLException("Communications link failure", "08S01", 0);
+            }
+        };
+
+        User user2 = new User("Student Five", "student5@college.edu", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", User.ROLE_STUDENT);
+        Student student2 = new Student(null, "CSE2026-008", "Civil", new BigDecimal("7.60"), 2026, "9876543217", null, null);
+
+        DAOException daoEx = assertThrows(DAOException.class,
+                () -> studentDAOGeneral.registerStudent(user2, student2));
+        assertTrue(daoEx.getMessage().contains("Database error during student registration"));
+    }
+
+    // =====================================================
+    // 28. STUDENT REGISTRATION SERVLET TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("RegisterServlet doGet generates CSRF token and forwards to register.jsp")
+    void testRegisterServletGetRendersFormAndGeneratesCsrfToken() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+        Method doGetMethod = RegisterServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        HttpSession session = createMockSession(sessionAttrs);
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, new HashMap<>(), requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doGetMethod.invoke(servlet, request, response);
+
+        assertNotNull(sessionAttrs.get(CsrfUtil.CSRF_TOKEN_SESSION_ATTR), "doGet must ensure CSRF token in session");
+        assertEquals("/WEB-INF/jsp/register.jsp", requestState.get("dispatchedPath"));
+        assertEquals(Boolean.TRUE, requestState.get("forwarded"));
+    }
+
+    @Test
+    @DisplayName("RegisterServlet doPost rejects missing or tampered CSRF token with HTTP 403 Forbidden")
+    void testRegisterServletPostRejectsMissingOrInvalidCsrfToken() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+        Method doPostMethod = RegisterServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "secret-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        // 1. Missing CSRF token
+        Map<String, String> missingParams = new HashMap<>();
+        missingParams.put("name", "John");
+        HttpServletRequest missingRequest = createMockRequest(session, missingParams, new HashMap<>(), new HashMap<>());
+        Map<String, Object> missingResponseState = new HashMap<>();
+        HttpServletResponse missingResponse = createMockResponse(missingResponseState);
+
+        doPostMethod.invoke(servlet, missingRequest, missingResponse);
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, missingResponseState.get("errorCode"), "Missing CSRF token must return 403");
+
+        // 2. Tampered CSRF token
+        Map<String, String> tamperedParams = new HashMap<>();
+        tamperedParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "tampered-token");
+        HttpServletRequest tamperedRequest = createMockRequest(session, tamperedParams, new HashMap<>(), new HashMap<>());
+        Map<String, Object> tamperedResponseState = new HashMap<>();
+        HttpServletResponse tamperedResponse = createMockResponse(tamperedResponseState);
+
+        doPostMethod.invoke(servlet, tamperedRequest, tamperedResponse);
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, tamperedResponseState.get("errorCode"), "Invalid CSRF token must return 403");
+    }
+
+    @Test
+    @DisplayName("RegisterServlet doPost rejects missing required fields and forwards with error message")
+    void testRegisterServletPostMissingRequiredFields() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+        Method doPostMethod = RegisterServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "token-123");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "token-123");
+        params.put("name", "John Doe");
+        // Missing email, password, etc.
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("All required fields must be filled.", requestAttrs.get("errorMessage"));
+        assertEquals("/WEB-INF/jsp/register.jsp", requestState.get("dispatchedPath"));
+        assertEquals(Boolean.TRUE, requestState.get("forwarded"));
+        assertNull(requestAttrs.get("password"), "Password must never be stored in request attributes");
+        assertNull(requestAttrs.get("confirmPassword"), "Confirm password must never be stored in request attributes");
+    }
+
+    @Test
+    @DisplayName("RegisterServlet doPost rejects invalid email format")
+    void testRegisterServletPostInvalidEmailFormat() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+        Method doPostMethod = RegisterServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = createValidRegistrationParams();
+        params.put("email", "invalid-email-address");
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("Please provide a valid email address.", requestAttrs.get("errorMessage"));
+        assertEquals("invalid-email-address", requestAttrs.get("email"), "Safe email value should be preserved");
+        assertNull(requestAttrs.get("password"));
+    }
+
+    @Test
+    @DisplayName("RegisterServlet doPost validates password length and confirmation match")
+    void testRegisterServletPostPasswordValidationFailures() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+        Method doPostMethod = RegisterServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        // 1. Password too short (< 6 chars)
+        Map<String, String> shortPassParams = createValidRegistrationParams();
+        shortPassParams.put("password", "12345");
+        shortPassParams.put("confirmPassword", "12345");
+
+        Map<String, Object> requestAttrs1 = new HashMap<>();
+        HttpServletRequest request1 = createMockRequest(session, shortPassParams, requestAttrs1, new HashMap<>());
+        doPostMethod.invoke(servlet, request1, createMockResponse(new HashMap<>()));
+        assertTrue(((String) requestAttrs1.get("errorMessage")).contains("Password must be at least 6 characters"));
+        assertNull(requestAttrs1.get("password"));
+
+        // 2. Passwords mismatch
+        Map<String, String> mismatchParams = createValidRegistrationParams();
+        mismatchParams.put("password", "SecurePass1");
+        mismatchParams.put("confirmPassword", "SecurePass2");
+
+        Map<String, Object> requestAttrs2 = new HashMap<>();
+        HttpServletRequest request2 = createMockRequest(session, mismatchParams, requestAttrs2, new HashMap<>());
+        doPostMethod.invoke(servlet, request2, createMockResponse(new HashMap<>()));
+        assertEquals("Passwords do not match.", requestAttrs2.get("errorMessage"));
+        assertNull(requestAttrs2.get("password"));
+        assertNull(requestAttrs2.get("confirmPassword"));
+    }
+
+    @Test
+    @DisplayName("RegisterServlet doPost validates CGPA and graduation year numeric bounds")
+    void testRegisterServletPostNumericValidationFailures() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+        Method doPostMethod = RegisterServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        // 1. Invalid CGPA (> 10.00)
+        Map<String, String> badCgpaParams = createValidRegistrationParams();
+        badCgpaParams.put("cgpa", "11.50");
+
+        Map<String, Object> requestAttrs1 = new HashMap<>();
+        HttpServletRequest request1 = createMockRequest(session, badCgpaParams, requestAttrs1, new HashMap<>());
+        doPostMethod.invoke(servlet, request1, createMockResponse(new HashMap<>()));
+        assertTrue(((String) requestAttrs1.get("errorMessage")).contains("CGPA"));
+
+        // 2. Invalid Graduation Year (< 2000)
+        Map<String, String> badYearParams = createValidRegistrationParams();
+        badYearParams.put("graduationYear", "1999");
+
+        Map<String, Object> requestAttrs2 = new HashMap<>();
+        HttpServletRequest request2 = createMockRequest(session, badYearParams, requestAttrs2, new HashMap<>());
+        doPostMethod.invoke(servlet, request2, createMockResponse(new HashMap<>()));
+        assertTrue(((String) requestAttrs2.get("errorMessage")).contains("Graduation year"));
+    }
+
+    @Test
+    @DisplayName("RegisterServlet doPost hashes password, enforces STUDENT role, delegates to StudentDAO, and redirects to /login")
+    void testRegisterServletPostSuccessfulRegistrationDelegatesToDaoAndRedirects() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+
+        User[] capturedUser = new User[1];
+        Student[] capturedStudent = new Student[1];
+
+        StudentDAO mockStudentDao = new StudentDAO() {
+            @Override
+            public boolean registerStudent(User user, Student student) {
+                capturedUser[0] = user;
+                capturedStudent[0] = student;
+                user.setId(99L);
+                student.setId(199L);
+                return true;
+            }
+        };
+        servlet.setStudentDAO(mockStudentDao);
+
+        Method doPostMethod = RegisterServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = createValidRegistrationParams();
+        params.put("password", "MySecretP@ss1");
+        params.put("confirmPassword", "MySecretP@ss1");
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        // Verify delegation to StudentDAO
+        assertNotNull(capturedUser[0], "StudentDAO.registerStudent must be invoked with User");
+        assertNotNull(capturedStudent[0], "StudentDAO.registerStudent must be invoked with Student");
+
+        // Verify STUDENT role enforcement
+        assertEquals(User.ROLE_STUDENT, capturedUser[0].getRole(), "User role must be set to STUDENT");
+
+        // Verify password hashing with BCrypt
+        assertTrue(PasswordHashService.isBCryptHash(capturedUser[0].getPasswordHash()), "User password must be a valid BCrypt hash");
+        assertTrue(PasswordHashService.verifyPassword("MySecretP@ss1", capturedUser[0].getPasswordHash()), "Hash must verify against plain password");
+        assertNotEquals("MySecretP@ss1", capturedUser[0].getPasswordHash(), "Plain password must not be stored in entity");
+
+        // Verify student properties
+        assertEquals("CS2026-001", capturedStudent[0].getRollNumber());
+        assertEquals("Computer Science", capturedStudent[0].getDepartment());
+        assertEquals(new BigDecimal("8.75"), capturedStudent[0].getCgpa());
+        assertEquals(Integer.valueOf(2026), capturedStudent[0].getGraduationYear());
+
+        // Verify Post/Redirect/Get to /login with success message in session
+        assertEquals("/college/login", responseState.get("redirectUrl"), "Must redirect to /login");
+        assertTrue(((String) sessionAttrs.get("successMessage")).contains("successful"));
+        assertNull(requestAttrs.get("password"), "Password must not be in request");
+    }
+
+    @Test
+    @DisplayName("RegisterServlet doPost catches DuplicateRecordException and presents user-friendly message")
+    void testRegisterServletPostDuplicateRecordHandling() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+
+        // 1. Duplicate email
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public boolean registerStudent(User user, Student student) {
+                throw new DuplicateRecordException("User with email 'student@college.edu' already exists.");
+            }
+        });
+
+        Method doPostMethod = RegisterServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = createValidRegistrationParams();
+        Map<String, Object> requestAttrs1 = new HashMap<>();
+        Map<String, Object> requestState1 = new HashMap<>();
+        HttpServletRequest request1 = createMockRequest(session, params, requestAttrs1, requestState1);
+
+        doPostMethod.invoke(servlet, request1, createMockResponse(new HashMap<>()));
+        assertEquals("An account with this email address already exists.", requestAttrs1.get("errorMessage"));
+        assertEquals("/WEB-INF/jsp/register.jsp", requestState1.get("dispatchedPath"));
+        assertEquals("CS2026-001", requestAttrs1.get("rollNumber"), "Safe fields must be preserved");
+
+        // 2. Duplicate roll number
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public boolean registerStudent(User user, Student student) {
+                throw new DuplicateRecordException("Student profile already exists with roll number 'CS2026-001'.");
+            }
+        });
+
+        Map<String, Object> requestAttrs2 = new HashMap<>();
+        HttpServletRequest request2 = createMockRequest(session, params, requestAttrs2, new HashMap<>());
+        doPostMethod.invoke(servlet, request2, createMockResponse(new HashMap<>()));
+        assertEquals("A student profile with this roll number is already registered.", requestAttrs2.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("RegisterServlet doPost shields internal database errors from leaking to user")
+    void testRegisterServletPostDatabaseExceptionProducesSafeErrorResponse() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public boolean registerStudent(User user, Student student) {
+                throw new DAOException("Internal SQL syntax error: table 'users' access denied for root@localhost");
+            }
+        });
+
+        Method doPostMethod = RegisterServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = createValidRegistrationParams();
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+
+        doPostMethod.invoke(servlet, request, createMockResponse(new HashMap<>()));
+
+        String errorMessage = (String) requestAttrs.get("errorMessage");
+        assertEquals("A database error occurred while creating your account. Please try again later.", errorMessage);
+        assertFalse(errorMessage.contains("SQL"), "Internal SQL details must not leak to the user");
+        assertFalse(errorMessage.contains("root@localhost"), "Internal credentials must not leak to the user");
+        assertEquals("/WEB-INF/jsp/register.jsp", requestState.get("dispatchedPath"));
+    }
+
+    // =====================================================
     // TEST HELPERS
     // =====================================================
+
+    private Map<String, String> createValidRegistrationParams() {
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("name", "Alice Wonder");
+        params.put("email", "alice@college.edu");
+        params.put("password", "ValidPassword123!");
+        params.put("confirmPassword", "ValidPassword123!");
+        params.put("rollNumber", "CS2026-001");
+        params.put("department", "Computer Science");
+        params.put("cgpa", "8.75");
+        params.put("graduationYear", "2026");
+        params.put("phone", "9876543210");
+        params.put("skills", "Java, Spring, SQL");
+        params.put("resumeUrl", "https://example.com/resume.pdf");
+        return params;
+    }
+
+    private Connection createMockConnection(Map<String, Object> state) {
+        return (Connection) Proxy.newProxyInstance(
+                Connection.class.getClassLoader(),
+                new Class<?>[]{Connection.class},
+                (proxy, method, args) -> {
+                    String name = method.getName();
+                    if ("setAutoCommit".equals(name)) {
+                        state.put("autoCommit", args[0]);
+                        state.put("setAutoCommitCalled", true);
+                        return null;
+                    } else if ("getAutoCommit".equals(name)) {
+                        return state.getOrDefault("autoCommit", true);
+                    } else if ("commit".equals(name)) {
+                        if (Boolean.TRUE.equals(state.get("throwOnCommit"))) {
+                            throw new SQLException("Simulated commit failure");
+                        }
+                        int count = (int) state.getOrDefault("commitCount", 0);
+                        state.put("commitCount", count + 1);
+                        return null;
+                    } else if ("rollback".equals(name)) {
+                        if (Boolean.TRUE.equals(state.get("throwOnRollback"))) {
+                            throw new SQLException("Simulated rollback failure");
+                        }
+                        int count = (int) state.getOrDefault("rollbackCount", 0);
+                        state.put("rollbackCount", count + 1);
+                        return null;
+                    } else if ("isClosed".equals(name)) {
+                        return state.getOrDefault("isClosed", false);
+                    } else if ("close".equals(name)) {
+                        state.put("isClosed", true);
+                        int count = (int) state.getOrDefault("closeCount", 0);
+                        state.put("closeCount", count + 1);
+                        return null;
+                    }
+                    return null;
+                }
+        );
+    }
 
     private HttpSession createMockSession(Map<String, Object> attributes) {
         return (HttpSession) Proxy.newProxyInstance(
@@ -904,6 +1552,25 @@ class BackendApplicationTests {
     }
 
     private HttpServletRequest createMockRequest(HttpSession session, Map<String, String> params) {
+        return createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+    }
+
+    private HttpServletRequest createMockRequest(HttpSession session, Map<String, String> params,
+                                                 Map<String, Object> attributes, Map<String, Object> state) {
+        jakarta.servlet.RequestDispatcher mockDispatcher = (jakarta.servlet.RequestDispatcher) Proxy.newProxyInstance(
+                jakarta.servlet.RequestDispatcher.class.getClassLoader(),
+                new Class<?>[]{jakarta.servlet.RequestDispatcher.class},
+                (proxy, method, args) -> {
+                    if ("forward".equals(method.getName())) {
+                        if (state != null) {
+                            state.put("forwarded", true);
+                        }
+                        return null;
+                    }
+                    return null;
+                }
+        );
+
         return (HttpServletRequest) Proxy.newProxyInstance(
                 HttpServletRequest.class.getClassLoader(),
                 new Class<?>[]{HttpServletRequest.class},
@@ -913,6 +1580,22 @@ class BackendApplicationTests {
                         return session;
                     } else if ("getParameter".equals(name)) {
                         return params != null ? params.get(args[0]) : null;
+                    } else if ("setAttribute".equals(name)) {
+                        if (attributes != null) {
+                            attributes.put((String) args[0], args[1]);
+                        }
+                        return null;
+                    } else if ("getAttribute".equals(name)) {
+                        return attributes != null ? attributes.get(args[0]) : null;
+                    } else if ("removeAttribute".equals(name)) {
+                        return attributes != null ? attributes.remove(args[0]) : null;
+                    } else if ("getRequestDispatcher".equals(name)) {
+                        if (state != null) {
+                            state.put("dispatchedPath", args[0]);
+                        }
+                        return mockDispatcher;
+                    } else if ("getContextPath".equals(name)) {
+                        return "/college";
                     }
                     return null;
                 }
