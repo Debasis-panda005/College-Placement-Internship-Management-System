@@ -190,6 +190,24 @@
         </div>
 
         <div class="form-group">
+            <label for="deadline">Application Deadline</label>
+            <input type="date" id="deadline" name="deadline" class="form-control"
+                   value="<c:out value='${job.deadline}'/>">
+        </div>
+
+        <div class="form-group">
+            <label for="minCgpa">Minimum CGPA (0.00 – 10.00)</label>
+            <input type="number" step="0.01" min="0.00" max="10.00" id="minCgpa" name="minCgpa" class="form-control"
+                   value="<c:out value='${job.minCgpa}'/>" placeholder="e.g. 7.50 (leave blank for none)">
+        </div>
+
+        <div class="form-group">
+            <label for="eligibleDepartments">Eligible Departments</label>
+            <input type="text" id="eligibleDepartments" name="eligibleDepartments" class="form-control"
+                   value="<c:out value='${job.eligibleDepartments}'/>" placeholder="e.g. CSE,ECE (or blank / ALL for unrestricted)">
+        </div>
+
+        <div class="form-group">
             <label for="status">Status *</label>
             <select id="status" name="status" class="form-control" required>
                 <option value="Active" ${job.status == 'Active' ? 'selected' : ''}>Active</option>
@@ -217,6 +235,16 @@
             alert("Please fill in all required fields (Title, Company, Location, Job Type).");
             return false;
         }
+
+        var minCgpaInput = document.getElementById("minCgpa").value.trim();
+        if (minCgpaInput !== "") {
+            var cgpa = parseFloat(minCgpaInput);
+            if (isNaN(cgpa) || cgpa < 0.00 || cgpa > 10.00) {
+                alert("Minimum CGPA must be a number between 0.00 and 10.00.");
+                return false;
+            }
+        }
+
         return true;
     }
 </script>

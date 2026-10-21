@@ -259,7 +259,13 @@
 
     <c:if test="${not empty errorMessage}">
         <div class="alert-error">
-            ${errorMessage}
+            <c:out value="${errorMessage}"/>
+        </div>
+    </c:if>
+
+    <c:if test="${not empty successMessage}">
+        <div class="alert-success" style="background-color: #d1e7dd; color: #0f5132; padding: 12px 16px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #badbcc;">
+            <c:out value="${successMessage}"/>
         </div>
     </c:if>
 
@@ -307,10 +313,19 @@
                    name="csrfToken"
                    value="${sessionScope.csrfToken}">
 
-            <input type="number"
-                   name="studentId"
-                   placeholder="Student ID"
-                   required>
+            <c:choose>
+                <c:when test="${sessionScope.userRole == 'STUDENT'}">
+                    <span style="display: inline-block; padding: 10px; font-size: 13px; color: #495057;">
+                        Applying as logged-in student (ID server-resolved)
+                    </span>
+                </c:when>
+                <c:otherwise>
+                    <input type="number"
+                           name="studentId"
+                           placeholder="Student ID"
+                           ${sessionScope.userRole != 'STUDENT' ? 'required' : ''}>
+                </c:otherwise>
+            </c:choose>
 
             <input type="number"
                    name="jobId"
@@ -318,8 +333,7 @@
                    required>
 
             <input type="date"
-                   name="applicationDate"
-                   required>
+                   name="applicationDate">
 
             <button type="submit">
                 Apply
@@ -462,84 +476,86 @@
                                 History
                             </a>
 
-                            <c:if test="${application.status == 'APPLIED'}">
+                            <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                                <c:if test="${application.status == 'APPLIED'}">
+
+                                    <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="shortlist">
+                                        <input type="hidden" name="id" value="${application.id}">
+                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                        <button type="submit" class="action-button shortlist-btn">Shortlist</button>
+                                    </form>
+
+                                    <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="reject">
+                                        <input type="hidden" name="id" value="${application.id}">
+                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                        <button type="submit" class="action-button reject-btn"
+                                                onclick="return confirm('Are you sure you want to reject this application?');">
+                                            Reject
+                                        </button>
+                                    </form>
+
+                                </c:if>
+
+
+                                <c:if test="${application.status == 'SHORTLISTED'}">
+
+                                    <c:choose>
+                                        <c:when test="${completedAppIds.contains(application.id)}">
+
+                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                                <input type="hidden" name="action" value="select">
+                                                <input type="hidden" name="id" value="${application.id}">
+                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                <button type="submit" class="action-button select-btn">Select</button>
+                                            </form>
+
+                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                                <input type="hidden" name="action" value="reject">
+                                                <input type="hidden" name="id" value="${application.id}">
+                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                <button type="submit" class="action-button reject-btn"
+                                                        onclick="return confirm('Are you sure you want to reject this application?');">
+                                                    Reject
+                                                </button>
+                                            </form>
+
+                                        </c:when>
+
+                                        <c:otherwise>
+
+                                            <a class="action-button interview-btn"
+                                               href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
+                                                Schedule Interview
+                                            </a>
+
+                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                                <input type="hidden" name="action" value="reject">
+                                                <input type="hidden" name="id" value="${application.id}">
+                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                <button type="submit" class="action-button reject-btn"
+                                                        onclick="return confirm('Are you sure you want to reject this application?');">
+                                                    Reject
+                                                </button>
+                                            </form>
+
+                                        </c:otherwise>
+                                    </c:choose>
+
+                                </c:if>
+
 
                                 <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                    <input type="hidden" name="action" value="shortlist">
+                                    <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="id" value="${application.id}">
                                     <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                    <button type="submit" class="action-button shortlist-btn">Shortlist</button>
-                                </form>
-
-                                <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                    <input type="hidden" name="action" value="reject">
-                                    <input type="hidden" name="id" value="${application.id}">
-                                    <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                    <button type="submit" class="action-button reject-btn"
-                                            onclick="return confirm('Are you sure you want to reject this application?');">
-                                        Reject
+                                    <button type="submit" class="action-button delete-btn"
+                                            onclick="return confirm('Are you sure you want to delete this application?');">
+                                        Delete
                                     </button>
                                 </form>
-
                             </c:if>
-
-
-                            <c:if test="${application.status == 'SHORTLISTED'}">
-
-                                <c:choose>
-                                    <c:when test="${completedAppIds.contains(application.id)}">
-
-                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                            <input type="hidden" name="action" value="select">
-                                            <input type="hidden" name="id" value="${application.id}">
-                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                            <button type="submit" class="action-button select-btn">Select</button>
-                                        </form>
-
-                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                            <input type="hidden" name="action" value="reject">
-                                            <input type="hidden" name="id" value="${application.id}">
-                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                            <button type="submit" class="action-button reject-btn"
-                                                    onclick="return confirm('Are you sure you want to reject this application?');">
-                                                Reject
-                                            </button>
-                                        </form>
-
-                                    </c:when>
-
-                                    <c:otherwise>
-
-                                        <a class="action-button interview-btn"
-                                           href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
-                                            Schedule Interview
-                                        </a>
-
-                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                            <input type="hidden" name="action" value="reject">
-                                            <input type="hidden" name="id" value="${application.id}">
-                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                            <button type="submit" class="action-button reject-btn"
-                                                    onclick="return confirm('Are you sure you want to reject this application?');">
-                                                Reject
-                                            </button>
-                                        </form>
-
-                                    </c:otherwise>
-                                </c:choose>
-
-                            </c:if>
-
-
-                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                <input type="hidden" name="action" value="delete">
-                                <input type="hidden" name="id" value="${application.id}">
-                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                <button type="submit" class="action-button delete-btn"
-                                        onclick="return confirm('Are you sure you want to delete this application?');">
-                                    Delete
-                                </button>
-                            </form>
 
                         </td>
 

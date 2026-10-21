@@ -1,5 +1,8 @@
 package com.college.backend;
 
+import com.college.backend.dao.ApplicationDAO;
+import com.college.backend.dao.ApplicationStatusHistoryDAO;
+import com.college.backend.dao.InterviewDAO;
 import com.college.backend.dao.JobDAO;
 import com.college.backend.dao.StudentDAO;
 import com.college.backend.dao.UserDAO;
@@ -11,6 +14,7 @@ import com.college.backend.entity.Student;
 import com.college.backend.entity.User;
 import com.college.backend.exception.DAOException;
 import com.college.backend.exception.DuplicateRecordException;
+import com.college.backend.servlet.ApplicationServlet;
 import com.college.backend.servlet.JobServlet;
 import com.college.backend.servlet.LoginServlet;
 import com.college.backend.servlet.LogoutServlet;
@@ -27,11 +31,14 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -1831,8 +1838,2275 @@ class BackendApplicationTests {
     }
 
     // =====================================================
+    // 30. PHASE 4: APPLICATION SUBMISSION, ELIGIBILITY & DUPLICATE PREVENTION TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("Job entity eligibility helper methods: isClosed, isOpen, isDeadlinePassed, isCgpaEligible, isDepartmentEligible")
+    void testJobEntityEligibilityHelperMethods() {
+        Job job = new Job();
+
+        // 1. Status checks
+        job.setStatus("OPEN");
+        assertFalse(job.isClosed());
+        assertTrue(job.isOpen());
+
+        job.setStatus("ACTIVE");
+        assertFalse(job.isClosed());
+        assertTrue(job.isOpen());
+
+        job.setStatus("CLOSED");
+        assertTrue(job.isClosed());
+        assertFalse(job.isOpen());
+
+        job.setStatus("INACTIVE");
+        assertTrue(job.isClosed());
+        assertFalse(job.isOpen());
+
+        job.setStatus(null);
+        assertFalse(job.isClosed());
+        assertTrue(job.isOpen());
+
+        // 2. Deadline checks
+        LocalDate today = LocalDate.of(2026, 10, 21);
+        job.setDeadline(null);
+        assertFalse(job.isDeadlinePassed(today));
+
+        job.setDeadline(today.minusDays(1));
+        assertTrue(job.isDeadlinePassed(today));
+
+        job.setDeadline(today);
+        assertFalse(job.isDeadlinePassed(today));
+
+        job.setDeadline(today.plusDays(1));
+        assertFalse(job.isDeadlinePassed(today));
+
+        // 3. CGPA eligibility checks
+        job.setMinCgpa(null);
+        assertTrue(job.isCgpaEligible(null));
+        assertTrue(job.isCgpaEligible(BigDecimal.ZERO));
+
+        job.setMinCgpa(new BigDecimal("7.50"));
+        assertFalse(job.isCgpaEligible(null));
+        assertFalse(job.isCgpaEligible(new BigDecimal("7.49")));
+        assertTrue(job.isCgpaEligible(new BigDecimal("7.50")));
+        assertTrue(job.isCgpaEligible(new BigDecimal("8.00")));
+
+        // 4. Department eligibility checks
+        job.setEligibleDepartments(null);
+        assertTrue(job.isDepartmentEligible("Computer Science"));
+        assertTrue(job.isDepartmentEligible(null));
+
+        job.setEligibleDepartments("   ");
+        assertTrue(job.isDepartmentEligible("Computer Science"));
+
+        job.setEligibleDepartments("Computer Science, Information Technology, Electronics");
+        assertFalse(job.isDepartmentEligible(null));
+        assertFalse(job.isDepartmentEligible(""));
+        assertTrue(job.isDepartmentEligible("Computer Science"));
+        assertTrue(job.isDepartmentEligible("computer science"));
+        assertTrue(job.isDepartmentEligible("  Information Technology  "));
+        assertTrue(job.isDepartmentEligible("ELECTRONICS"));
+        assertFalse(job.isDepartmentEligible("Mechanical Engineering"));
+        assertFalse(job.isDepartmentEligible("Civil"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects unauthenticated requests and redirects to /login")
+    void testApplicationSubmissionRequiresAuthentication() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        // No SESSION_USER_ID
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "100");
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/login", responseState.get("redirectUrl"));
+        assertEquals("You must log in to apply.", requestAttrs.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost succeeds for authenticated student meeting all eligibility criteria")
+    void testApplicationSubmissionSucceedsForAuthenticatedStudent() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        Job job = new Job(200L, "Software Engineer", "Acme Corp", "Remote", "Full-Time Software Engineer",
+                "120000", "FULL_TIME", "OPEN", LocalDate.now().plusDays(7), new BigDecimal("7.00"), "Computer Science, IT");
+
+        final Application[] createdHolder = new Application[1];
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                if (Long.valueOf(101L).equals(userId)) return student;
+                return null;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                if (Long.valueOf(200L).equals(id)) return job;
+                return null;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+                return false;
+            }
+            @Override
+            public boolean createApplication(Application application) {
+                createdHolder[0] = application;
+                return true;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertNotNull(createdHolder[0]);
+        assertEquals(501L, createdHolder[0].getStudentId());
+        assertEquals(200L, createdHolder[0].getJobId());
+        assertEquals("APPLIED", createdHolder[0].getStatus());
+        assertEquals("Application submitted successfully!", sessionAttrs.get("successMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost ignores client-supplied studentId for student role preventing identity spoofing")
+    void testApplicationSubmissionIgnoresClientSuppliedStudentIdForStudent() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student authenticatedStudent = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        Job job = new Job(200L, "Software Engineer", "Acme Corp", "Remote", "Full-Time",
+                "120000", "FULL_TIME", "OPEN", LocalDate.now().plusDays(7), new BigDecimal("7.00"), "Computer Science");
+
+        final Application[] createdHolder = new Application[1];
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                if (Long.valueOf(101L).equals(userId)) return authenticatedStudent;
+                return null;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+                return false;
+            }
+            @Override
+            public boolean createApplication(Application application) {
+                createdHolder[0] = application;
+                return true;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+        params.put("studentId", "999"); // Attacker attempting identity spoofing
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertNotNull(createdHolder[0]);
+        assertEquals(501L, createdHolder[0].getStudentId(),
+                "Application must strictly bind to the authenticated student's profile ID (501) and ignore submitted studentId (999)");
+        assertNotEquals(999L, createdHolder[0].getStudentId());
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects submission when authenticated user has no student profile")
+    void testApplicationSubmissionRejectsAccountWithoutStudentProfile() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return null; // Profile does not exist
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 102L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("No student profile found for your account. Please complete your registration.", sessionAttrs.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects submission with missing or invalid CSRF token")
+    void testApplicationSubmissionRejectsInvalidOrMissingCsrf() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "legitimate-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "forged-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, responseState.get("errorCode"));
+        assertEquals("Invalid or missing CSRF token.", responseState.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects submission when job does not exist")
+    void testApplicationSubmissionRejectsNonexistentJob() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return null; // Job does not exist
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "999");
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("Job not found.", sessionAttrs.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects submission when job status is CLOSED or INACTIVE")
+    void testApplicationSubmissionRejectsClosedJob() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+        Job closedJob = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "CLOSED");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return closedJob;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("Applications are closed for this job.", sessionAttrs.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects submission when application deadline has passed")
+    void testApplicationSubmissionRejectsExpiredDeadline() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+        Job expiredJob = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "OPEN",
+                LocalDate.now().minusDays(1), new BigDecimal("7.00"), "Computer Science");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return expiredJob;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("The application deadline has passed.", sessionAttrs.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost accepts submission on the day of application deadline")
+    void testApplicationSubmissionAcceptsValidDeadline() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+        Job todayJob = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "OPEN",
+                LocalDate.now(), new BigDecimal("7.00"), "Computer Science");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return todayJob;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+                return false;
+            }
+            @Override
+            public boolean createApplication(Application application) {
+                return true;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("Application submitted successfully!", sessionAttrs.get("successMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects submission when student CGPA is below job minimum")
+    void testApplicationSubmissionRejectsBelowMinCgpa() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("6.80"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+        Job job = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "OPEN",
+                LocalDate.now().plusDays(5), new BigDecimal("7.00"), "Computer Science");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("Your CGPA does not meet the minimum requirement.", sessionAttrs.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost accepts submission when student CGPA exactly meets job minimum")
+    void testApplicationSubmissionAcceptsMeetingMinCgpa() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("7.00"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+        Job job = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "OPEN",
+                LocalDate.now().plusDays(5), new BigDecimal("7.00"), "Computer Science");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+                return false;
+            }
+            @Override
+            public boolean createApplication(Application application) {
+                return true;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("Application submitted successfully!", sessionAttrs.get("successMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects submission when student department is not in eligible departments")
+    void testApplicationSubmissionRejectsIneligibleDepartment() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "ME2026-001", "Mechanical Engineering", new BigDecimal("8.50"),
+                2026, "9876543210", "CAD, SolidWorks", "https://example.com/resume.pdf");
+        Job job = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "OPEN",
+                LocalDate.now().plusDays(5), new BigDecimal("7.00"), "Computer Science, Information Technology");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("Your department is not eligible.", sessionAttrs.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost accepts submission when student department matches eligible department case-insensitively")
+    void testApplicationSubmissionAcceptsEligibleDepartment() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "IT2026-001", "Information Technology", new BigDecimal("8.50"),
+                2026, "9876543210", "Networks, Java", "https://example.com/resume.pdf");
+        Job job = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "OPEN",
+                LocalDate.now().plusDays(5), new BigDecimal("7.00"), "Computer Science, INFORMATION TECHNOLOGY");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+                return false;
+            }
+            @Override
+            public boolean createApplication(Application application) {
+                return true;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("Application submitted successfully!", sessionAttrs.get("successMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects malformed or missing job ID")
+    void testApplicationSubmissionRejectsMalformedJobId() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        // Case A: Missing jobId
+        Map<String, String> paramsMissing = new HashMap<>();
+        paramsMissing.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsMissing.put("action", "apply");
+
+        Map<String, Object> responseStateA = new HashMap<>();
+        HttpServletRequest requestA = createMockRequest(session, paramsMissing, new HashMap<>(), new HashMap<>());
+        HttpServletResponse responseA = createMockResponse(responseStateA);
+
+        doPostMethod.invoke(servlet, requestA, responseA);
+        assertEquals("/college/applications", responseStateA.get("redirectUrl"));
+        assertEquals("Job ID is required.", sessionAttrs.get("errorMessage"));
+
+        // Case B: Non-numeric jobId
+        Map<String, String> paramsNonNumeric = new HashMap<>();
+        paramsNonNumeric.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsNonNumeric.put("action", "apply");
+        paramsNonNumeric.put("jobId", "abc");
+
+        Map<String, Object> responseStateB = new HashMap<>();
+        HttpServletRequest requestB = createMockRequest(session, paramsNonNumeric, new HashMap<>(), new HashMap<>());
+        HttpServletResponse responseB = createMockResponse(responseStateB);
+
+        doPostMethod.invoke(servlet, requestB, responseB);
+        assertEquals("/college/applications", responseStateB.get("redirectUrl"));
+        assertEquals("Job not found.", sessionAttrs.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects duplicate application via application pre-check")
+    void testApplicationSubmissionRejectsDuplicateApplicationViaPreCheck() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+        Job job = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "OPEN",
+                LocalDate.now().plusDays(5), new BigDecimal("7.00"), "Computer Science");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+        final boolean[] createCalled = new boolean[]{false};
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+                return true; // Already applied!
+            }
+            @Override
+            public boolean createApplication(Application application) {
+                createCalled[0] = true;
+                return true;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("You have already applied for this job.", sessionAttrs.get("errorMessage"));
+        assertFalse(createCalled[0], "createApplication should never be invoked when pre-check finds existing application");
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost handles race condition duplicate key exception gracefully")
+    void testApplicationSubmissionHandlesDatabaseDuplicateKeyExceptionGracefully() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+        Job job = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "OPEN",
+                LocalDate.now().plusDays(5), new BigDecimal("7.00"), "Computer Science");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+                return false; // Concurrent check passes
+            }
+            @Override
+            public boolean createApplication(Application application) {
+                // Concurrent insert causes unique constraint violation
+                throw new DuplicateRecordException("Application already exists for student ID 501 and job ID 200.");
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("You have already applied for this job.", sessionAttrs.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationDAO createApplication catches MySQL 1062, rolls back transaction, and throws DuplicateRecordException")
+    void testApplicationDAOThrowsDuplicateRecordExceptionOnSqlError1062() {
+        Map<String, Object> connState = new HashMap<>();
+        connState.put("throwOnExecuteUpdate", new SQLException("Duplicate entry '501-200' for key 'uq_applications_student_job'", "23000", 1062));
+
+        ApplicationDAO testDao = new ApplicationDAO() {
+            @Override
+            protected Connection getConnection() {
+                return createMockConnection(connState);
+            }
+        };
+
+        Application app = new Application(501L, 200L, LocalDate.now(), "APPLIED");
+        DuplicateRecordException ex = assertThrows(DuplicateRecordException.class, () -> testDao.createApplication(app));
+        assertTrue(ex.getMessage().contains("Application already exists"));
+        assertEquals(1, (int) connState.getOrDefault("rollbackCount", 0), "Transaction must be rolled back on duplicate key error");
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost shields internal database errors during application creation")
+    void testApplicationSubmissionHandlesDatabaseExceptionShielding() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+        Job job = new Job(200L, "Dev", "Co", "Loc", "Desc", "1000", "FT", "OPEN",
+                LocalDate.now().plusDays(5), new BigDecimal("7.00"), "Computer Science");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+                return false;
+            }
+            @Override
+            public boolean createApplication(Application application) {
+                throw new DAOException("Communication link failure: Connection refused to mysql://127.0.0.1:3306");
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "apply");
+        params.put("jobId", "200");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        String error = (String) sessionAttrs.get("errorMessage");
+        assertEquals("A database error occurred while creating your application. Please try again later.", error);
+        assertFalse(error.contains("Communication link failure"), "Internal database error must not leak");
+        assertFalse(error.contains("3306"), "Port details must not leak");
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost allows coordinator to submit application on behalf of a student")
+    void testCoordinatorCanCreateApplicationForSpecifiedStudent() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Student student = new Student(701L, 202L, "EE2026-009", "Electrical Engineering", new BigDecimal("8.20"),
+                2026, "9876543210", "Circuits, C++", "https://example.com/resume.pdf");
+        Job job = new Job(200L, "Firmware Engineer", "Hardware Co", "Onsite", "Desc", "95000", "FULL_TIME", "OPEN",
+                LocalDate.now().plusDays(10), new BigDecimal("7.50"), "Electrical Engineering");
+
+        final Application[] createdHolder = new Application[1];
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findById(Long id) {
+                if (Long.valueOf(701L).equals(id)) return student;
+                return null;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+                return false;
+            }
+            @Override
+            public boolean createApplication(Application application) {
+                createdHolder[0] = application;
+                return true;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "create");
+        params.put("jobId", "200");
+        params.put("studentId", "701");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertNotNull(createdHolder[0]);
+        assertEquals(701L, createdHolder[0].getStudentId(), "Coordinator can apply on behalf of student ID 701");
+        assertEquals("Application submitted successfully!", sessionAttrs.get("successMessage"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects coordinator submission when specified student ID does not exist")
+    void testCoordinatorApplicationRejectsNonExistentStudent() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findById(Long id) {
+                return null; // Student not found
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        params.put("action", "create");
+        params.put("jobId", "200");
+        params.put("studentId", "999");
+
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertEquals("/college/applications", responseState.get("redirectUrl"));
+        assertEquals("Student not found with ID: 999", sessionAttrs.get("errorMessage"));
+    }
+
+    // =====================================================
+    // 31. ROLE-BASED ACCESS CONTROL AND AUTHORIZATION TESTS (PHASE 5)
+    // =====================================================
+
+    @Test
+    @DisplayName("ApplicationServlet doGet unauthenticated redirects to /login for applications and shortlist")
+    void testApplicationServletGetUnauthenticatedRedirectsToLogin() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doGetMethod = ApplicationServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        // Case A: /applications unauthenticated
+        Map<String, Object> stateA = new HashMap<>();
+        stateA.put("servletPath", "/applications");
+        HttpServletRequest requestA = createMockRequest(null, new HashMap<>(), new HashMap<>(), stateA);
+        Map<String, Object> responseStateA = new HashMap<>();
+        HttpServletResponse responseA = createMockResponse(responseStateA);
+
+        doGetMethod.invoke(servlet, requestA, responseA);
+
+        assertEquals("/college/login", responseStateA.get("redirectUrl"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> newSessionAttrsA = (Map<String, Object>) stateA.get("newSessionAttrs");
+        assertNotNull(newSessionAttrsA);
+        assertEquals("You must log in to view applications.", newSessionAttrsA.get("errorMessage"));
+
+        // Case B: /shortlist unauthenticated
+        Map<String, Object> stateB = new HashMap<>();
+        stateB.put("servletPath", "/shortlist");
+        HttpServletRequest requestB = createMockRequest(null, new HashMap<>(), new HashMap<>(), stateB);
+        Map<String, Object> responseStateB = new HashMap<>();
+        HttpServletResponse responseB = createMockResponse(responseStateB);
+
+        doGetMethod.invoke(servlet, requestB, responseB);
+
+        assertEquals("/college/login", responseStateB.get("redirectUrl"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doGet scopes student view strictly to own applications, ignoring query tampering")
+    void testApplicationServletGetStudentViewsOnlyOwnApplications() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doGetMethod = ApplicationServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                if (Long.valueOf(101L).equals(userId)) return student;
+                return null;
+            }
+        });
+
+        final List<Long> searchedStudentIds = new ArrayList<>();
+        List<Application> ownApplications = new ArrayList<>();
+        Application app1 = createTestApplication(1L, 501L, 200L, LocalDate.now(), "APPLIED");
+        ownApplications.add(app1);
+
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public List<Application> searchApplications(Long studentId, Long jobId, String status) {
+                searchedStudentIds.add(studentId);
+                return ownApplications;
+            }
+        });
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public List<Long> getCompletedApplicationIds() {
+                return new ArrayList<>();
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("studentId", "999"); // Attempted parameter tampering
+
+        Map<String, Object> attributes = new HashMap<>();
+        Map<String, Object> state = new HashMap<>();
+        state.put("servletPath", "/applications");
+        HttpServletRequest request = createMockRequest(session, params, attributes, state);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doGetMethod.invoke(servlet, request, response);
+
+        assertFalse(searchedStudentIds.isEmpty());
+        for (Long searchedId : searchedStudentIds) {
+            assertEquals(501L, searchedId, "searchApplications must be forced to student's own ID");
+        }
+        assertEquals(ownApplications, attributes.get("applications"));
+        assertEquals("501", attributes.get("selectedStudentId"));
+        assertEquals("/WEB-INF/jsp/applications.jsp", state.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(state.get("forwarded")));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> stats = (Map<String, Integer>) attributes.get("applicationStats");
+        assertNotNull(stats);
+        assertEquals(1, stats.get("TOTAL"));
+        assertEquals(1, stats.get("APPLIED"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doGet shortlist filters out other students' applications for student role")
+    void testApplicationServletGetStudentShortlistViewScopedToOwnApplications() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doGetMethod = ApplicationServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                if (Long.valueOf(101L).equals(userId)) return student;
+                return null;
+            }
+        });
+
+        List<Application> allShortlisted = new ArrayList<>();
+        allShortlisted.add(createTestApplication(1L, 501L, 200L, LocalDate.now(), "SHORTLISTED")); // own
+        allShortlisted.add(createTestApplication(2L, 999L, 200L, LocalDate.now(), "SHORTLISTED")); // another student
+
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public List<Application> getShortlistedApplications() {
+                return allShortlisted;
+            }
+        });
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public List<Interview> getAllInterviews() {
+                return new ArrayList<>();
+            }
+            @Override
+            public Map<Long, Boolean> getRescheduledApplicationsMap() {
+                return new HashMap<>();
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, Object> attributes = new HashMap<>();
+        Map<String, Object> state = new HashMap<>();
+        state.put("servletPath", "/shortlist");
+        HttpServletRequest request = createMockRequest(session, new HashMap<>(), attributes, state);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doGetMethod.invoke(servlet, request, response);
+
+        @SuppressWarnings("unchecked")
+        List<Application> filteredShortlist = (List<Application>) attributes.get("applications");
+        assertNotNull(filteredShortlist);
+        assertEquals(1, filteredShortlist.size(), "Student should only see their own shortlisted applications");
+        assertEquals(501L, filteredShortlist.get(0).getStudentId());
+        assertEquals("/WEB-INF/jsp/shortlist.jsp", state.get("dispatchedPath"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doGet allows coordinator to view institutional listings and arbitrary student filters")
+    void testApplicationServletGetCoordinatorViewsInstitutionalApplications() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doGetMethod = ApplicationServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        final Long[] searchStudentIdHolder = new Long[1];
+        final boolean[] getAllCalled = new boolean[]{false};
+
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public List<Application> getAllApplications() {
+                getAllCalled[0] = true;
+                return new ArrayList<>();
+            }
+            @Override
+            public List<Application> searchApplications(Long studentId, Long jobId, String status) {
+                searchStudentIdHolder[0] = studentId;
+                return new ArrayList<>();
+            }
+            @Override
+            public Map<String, Integer> getApplicationStatistics() {
+                Map<String, Integer> stats = new HashMap<>();
+                stats.put("TOTAL", 42);
+                return stats;
+            }
+        });
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public List<Long> getCompletedApplicationIds() {
+                return new ArrayList<>();
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        // Case A: Coordinator without filter
+        Map<String, Object> attrsA = new HashMap<>();
+        Map<String, Object> stateA = new HashMap<>();
+        stateA.put("servletPath", "/applications");
+        HttpServletRequest requestA = createMockRequest(session, new HashMap<>(), attrsA, stateA);
+        Map<String, Object> responseStateA = new HashMap<>();
+        HttpServletResponse responseA = createMockResponse(responseStateA);
+
+        doGetMethod.invoke(servlet, requestA, responseA);
+        assertTrue(getAllCalled[0], "getAllApplications should be called when no filter is provided");
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> statsA = (Map<String, Integer>) attrsA.get("applicationStats");
+        assertEquals(42, statsA.get("TOTAL"));
+
+        // Case B: Coordinator filtering for student 888
+        Map<String, String> paramsB = new HashMap<>();
+        paramsB.put("studentId", "888");
+        Map<String, Object> attrsB = new HashMap<>();
+        Map<String, Object> stateB = new HashMap<>();
+        stateB.put("servletPath", "/applications");
+        HttpServletRequest requestB = createMockRequest(session, paramsB, attrsB, stateB);
+        Map<String, Object> responseStateB = new HashMap<>();
+        HttpServletResponse responseB = createMockResponse(responseStateB);
+
+        doGetMethod.invoke(servlet, requestB, responseB);
+        assertEquals(888L, searchStudentIdHolder[0], "Coordinator filter for student 888 must be respected");
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doGet details rejects student attempting to view another student's application (IDOR)")
+    void testApplicationServletGetDetailsRejectsIdorForAnotherStudent() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doGetMethod = ApplicationServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+
+        // Application 10 belongs to student 999
+        Application otherApp = createTestApplication(10L, 999L, 200L, LocalDate.now(), "APPLIED");
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Application getApplicationById(Long id) {
+                return otherApp;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("action", "details");
+        params.put("id", "10");
+
+        Map<String, Object> state = new HashMap<>();
+        state.put("servletPath", "/applications");
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), state);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doGetMethod.invoke(servlet, request, response);
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, responseState.get("errorCode"));
+        assertNull(state.get("forwarded"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doGet details allows student owner and coordinator to view application details")
+    void testApplicationServletGetDetailsAllowedForOwnerAndCoordinator() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doGetMethod = ApplicationServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+
+        Application app = createTestApplication(10L, 501L, 200L, LocalDate.now(), "APPLIED");
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Application getApplicationById(Long id) {
+                return app;
+            }
+        });
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public Interview getInterviewByApplicationId(Long applicationId) {
+                return null;
+            }
+        });
+
+        // Case A: Student owner viewing own application details
+        Map<String, Object> sessionAttrsA = new HashMap<>();
+        sessionAttrsA.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrsA.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession sessionA = createMockSession(sessionAttrsA);
+
+        Map<String, String> paramsA = new HashMap<>();
+        paramsA.put("action", "details");
+        paramsA.put("id", "10");
+
+        Map<String, Object> stateA = new HashMap<>();
+        stateA.put("servletPath", "/applications");
+        HttpServletRequest requestA = createMockRequest(sessionA, paramsA, new HashMap<>(), stateA);
+        Map<String, Object> responseStateA = new HashMap<>();
+        HttpServletResponse responseA = createMockResponse(responseStateA);
+
+        doGetMethod.invoke(servlet, requestA, responseA);
+        assertEquals("/WEB-INF/jsp/application-details.jsp", stateA.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(stateA.get("forwarded")));
+
+        // Case B: Coordinator viewing the same application
+        Map<String, Object> sessionAttrsB = new HashMap<>();
+        sessionAttrsB.put(LoginServlet.SESSION_USER_ID, 301L);
+        sessionAttrsB.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession sessionB = createMockSession(sessionAttrsB);
+
+        Map<String, Object> stateB = new HashMap<>();
+        stateB.put("servletPath", "/applications");
+        HttpServletRequest requestB = createMockRequest(sessionB, paramsA, new HashMap<>(), stateB);
+        Map<String, Object> responseStateB = new HashMap<>();
+        HttpServletResponse responseB = createMockResponse(responseStateB);
+
+        doGetMethod.invoke(servlet, requestB, responseB);
+        assertEquals("/WEB-INF/jsp/application-details.jsp", stateB.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(stateB.get("forwarded")));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doGet history rejects student viewing another student's history (IDOR)")
+    void testApplicationServletGetHistoryRejectsIdorForAnotherStudent() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doGetMethod = ApplicationServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+
+        Application otherApp = createTestApplication(10L, 999L, 200L, LocalDate.now(), "APPLIED");
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Application getApplicationById(Long id) {
+                return otherApp;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("action", "history");
+        params.put("id", "10");
+
+        Map<String, Object> state = new HashMap<>();
+        state.put("servletPath", "/applications");
+        HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), state);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doGetMethod.invoke(servlet, request, response);
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, responseState.get("errorCode"));
+        assertNull(state.get("forwarded"));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doGet history allows student owner and coordinator to view history")
+    void testApplicationServletGetHistoryAllowedForOwnerAndCoordinator() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doGetMethod = ApplicationServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Student student = new Student(501L, 101L, "CS2026-001", "Computer Science", new BigDecimal("8.50"),
+                2026, "9876543210", "Java, SQL", "https://example.com/resume.pdf");
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public Student findByUserId(Long userId) {
+                return student;
+            }
+        });
+
+        Application app = createTestApplication(10L, 501L, 200L, LocalDate.now(), "APPLIED");
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Application getApplicationById(Long id) {
+                return app;
+            }
+        });
+        servlet.setStatusHistoryDAO(new ApplicationStatusHistoryDAO() {
+            @Override
+            public List<ApplicationStatusHistory> getHistoryByApplicationId(Long applicationId) {
+                return new ArrayList<>();
+            }
+        });
+
+        // Case A: Student owner viewing history
+        Map<String, Object> sessionAttrsA = new HashMap<>();
+        sessionAttrsA.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrsA.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession sessionA = createMockSession(sessionAttrsA);
+
+        Map<String, String> paramsA = new HashMap<>();
+        paramsA.put("action", "history");
+        paramsA.put("id", "10");
+
+        Map<String, Object> stateA = new HashMap<>();
+        stateA.put("servletPath", "/applications");
+        HttpServletRequest requestA = createMockRequest(sessionA, paramsA, new HashMap<>(), stateA);
+        Map<String, Object> responseStateA = new HashMap<>();
+        HttpServletResponse responseA = createMockResponse(responseStateA);
+
+        doGetMethod.invoke(servlet, requestA, responseA);
+        assertEquals("/WEB-INF/jsp/application-history.jsp", stateA.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(stateA.get("forwarded")));
+
+        // Case B: Coordinator viewing history
+        Map<String, Object> sessionAttrsB = new HashMap<>();
+        sessionAttrsB.put(LoginServlet.SESSION_USER_ID, 301L);
+        sessionAttrsB.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession sessionB = createMockSession(sessionAttrsB);
+
+        Map<String, Object> stateB = new HashMap<>();
+        stateB.put("servletPath", "/applications");
+        HttpServletRequest requestB = createMockRequest(sessionB, paramsA, new HashMap<>(), stateB);
+        Map<String, Object> responseStateB = new HashMap<>();
+        HttpServletResponse responseB = createMockResponse(responseStateB);
+
+        doGetMethod.invoke(servlet, requestB, responseB);
+        assertEquals("/WEB-INF/jsp/application-history.jsp", stateB.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(stateB.get("forwarded")));
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects students attempting shortlist, reject, select, or delete")
+    void testApplicationServletPostStatusTransitionsRejectStudent() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        String[] mutatingActions = new String[]{"shortlist", "reject", "select", "delete"};
+
+        for (String action : mutatingActions) {
+            Map<String, Object> sessionAttrs = new HashMap<>();
+            sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+            sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+            sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+            HttpSession session = createMockSession(sessionAttrs);
+
+            Map<String, String> params = new HashMap<>();
+            params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+            params.put("action", action);
+            params.put("id", "10");
+
+            HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+            Map<String, Object> responseState = new HashMap<>();
+            HttpServletResponse response = createMockResponse(responseState);
+
+            doPostMethod.invoke(servlet, request, response);
+
+            assertEquals(HttpServletResponse.SC_FORBIDDEN, responseState.get("errorCode"),
+                    "Student attempting '" + action + "' must receive 403 Forbidden");
+        }
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost rejects unauthenticated users attempting shortlist, reject, select, or delete")
+    void testApplicationServletPostStatusTransitionsRejectUnauthenticated() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        String[] mutatingActions = new String[]{"shortlist", "reject", "select", "delete"};
+
+        for (String action : mutatingActions) {
+            Map<String, Object> sessionAttrs = new HashMap<>();
+            sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+            HttpSession session = createMockSession(sessionAttrs);
+
+            Map<String, String> params = new HashMap<>();
+            params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+            params.put("action", action);
+            params.put("id", "10");
+
+            HttpServletRequest request = createMockRequest(session, params, new HashMap<>(), new HashMap<>());
+            Map<String, Object> responseState = new HashMap<>();
+            HttpServletResponse response = createMockResponse(responseState);
+
+            doPostMethod.invoke(servlet, request, response);
+
+            assertEquals(HttpServletResponse.SC_FORBIDDEN, responseState.get("errorCode"),
+                    "Unauthenticated user attempting '" + action + "' must receive 403 Forbidden");
+        }
+    }
+
+    @Test
+    @DisplayName("ApplicationServlet doPost allows coordinator to shortlist, reject, select, and delete")
+    void testApplicationServletPostStatusTransitionsAllowedForCoordinator() throws Exception {
+        ApplicationServlet servlet = new ApplicationServlet();
+        Method doPostMethod = ApplicationServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final boolean[] shortlistCalled = new boolean[]{false};
+        final boolean[] rejectCalled = new boolean[]{false};
+        final boolean[] selectCalled = new boolean[]{false};
+        final boolean[] deleteCalled = new boolean[]{false};
+
+        Application appliedApp = createTestApplication(10L, 501L, 200L, LocalDate.now(), "APPLIED");
+        Application shortlistedApp = createTestApplication(20L, 501L, 200L, LocalDate.now(), "SHORTLISTED");
+
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Application getApplicationById(Long id) {
+                if (Long.valueOf(10L).equals(id)) return appliedApp;
+                if (Long.valueOf(20L).equals(id)) return shortlistedApp;
+                return null;
+            }
+            @Override
+            public boolean shortlistApplication(Long id) {
+                shortlistCalled[0] = true;
+                return true;
+            }
+            @Override
+            public boolean rejectApplication(Long id) {
+                rejectCalled[0] = true;
+                return true;
+            }
+            @Override
+            public boolean selectApplication(Long id) {
+                selectCalled[0] = true;
+                return true;
+            }
+            @Override
+            public boolean deleteApplication(Long id) {
+                deleteCalled[0] = true;
+                return true;
+            }
+        });
+
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public boolean isInterviewCompletedForApplication(Long applicationId) {
+                return true;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        // Case A: Shortlist
+        Map<String, String> paramsA = new HashMap<>();
+        paramsA.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsA.put("action", "shortlist");
+        paramsA.put("id", "10");
+        Map<String, Object> responseStateA = new HashMap<>();
+        HttpServletRequest requestA = createMockRequest(session, paramsA, new HashMap<>(), new HashMap<>());
+        HttpServletResponse responseA = createMockResponse(responseStateA);
+        doPostMethod.invoke(servlet, requestA, responseA);
+        assertTrue(shortlistCalled[0], "Coordinator must be allowed to shortlist application");
+        assertEquals("/college/applications", responseStateA.get("redirectUrl"));
+
+        // Case B: Reject
+        Map<String, String> paramsB = new HashMap<>();
+        paramsB.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsB.put("action", "reject");
+        paramsB.put("id", "10");
+        Map<String, Object> responseStateB = new HashMap<>();
+        HttpServletRequest requestB = createMockRequest(session, paramsB, new HashMap<>(), new HashMap<>());
+        HttpServletResponse responseB = createMockResponse(responseStateB);
+        doPostMethod.invoke(servlet, requestB, responseB);
+        assertTrue(rejectCalled[0], "Coordinator must be allowed to reject application");
+
+        // Case C: Select
+        Map<String, String> paramsC = new HashMap<>();
+        paramsC.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsC.put("action", "select");
+        paramsC.put("id", "20");
+        Map<String, Object> responseStateC = new HashMap<>();
+        HttpServletRequest requestC = createMockRequest(session, paramsC, new HashMap<>(), new HashMap<>());
+        HttpServletResponse responseC = createMockResponse(responseStateC);
+        doPostMethod.invoke(servlet, requestC, responseC);
+        assertTrue(selectCalled[0], "Coordinator must be allowed to select shortlisted candidate");
+
+        // Case D: Delete
+        Map<String, String> paramsD = new HashMap<>();
+        paramsD.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        paramsD.put("action", "delete");
+        paramsD.put("id", "10");
+        Map<String, Object> responseStateD = new HashMap<>();
+        HttpServletRequest requestD = createMockRequest(session, paramsD, new HashMap<>(), new HashMap<>());
+        HttpServletResponse responseD = createMockResponse(responseStateD);
+        doPostMethod.invoke(servlet, requestD, responseD);
+        assertTrue(deleteCalled[0], "Coordinator must be allowed to delete application");
+    }
+
+    @Test
+    @DisplayName("JobServlet doGet enforces coordinator/admin authorization on 'new' and 'edit' forms")
+    void testJobServletGetFormNavigationRequiresCoordinatorOrAdmin() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doGetMethod = JobServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Job job = new Job(1L, "Software Engineer", "Acme", "Remote", "Desc", "100000", "FULL_TIME", "Active");
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+
+        // 1. Unauthenticated -> redirects to /login
+        Map<String, String> newParams = new HashMap<>();
+        newParams.put("action", "new");
+        Map<String, Object> state1 = new HashMap<>();
+        HttpServletRequest req1 = createMockRequest(null, newParams, new HashMap<>(), state1);
+        Map<String, Object> respState1 = new HashMap<>();
+        doGetMethod.invoke(servlet, req1, createMockResponse(respState1));
+        assertEquals("/college/login", respState1.get("redirectUrl"));
+
+        // 2. Student accessing action=new -> 403 Forbidden
+        Map<String, Object> studentSessionAttrs = new HashMap<>();
+        studentSessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        studentSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession studentSession = createMockSession(studentSessionAttrs);
+
+        Map<String, Object> respState2 = new HashMap<>();
+        HttpServletRequest req2 = createMockRequest(studentSession, newParams, new HashMap<>(), new HashMap<>());
+        doGetMethod.invoke(servlet, req2, createMockResponse(respState2));
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, respState2.get("errorCode"));
+
+        // 3. Coordinator accessing action=new -> forwards to /WEB-INF/jsp/job-add.jsp
+        Map<String, Object> coordSessionAttrs = new HashMap<>();
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordSessionAttrs);
+
+        Map<String, Object> state3 = new HashMap<>();
+        HttpServletRequest req3 = createMockRequest(coordSession, newParams, new HashMap<>(), state3);
+        Map<String, Object> respState3 = new HashMap<>();
+        doGetMethod.invoke(servlet, req3, createMockResponse(respState3));
+        assertEquals("/WEB-INF/jsp/job-add.jsp", state3.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(state3.get("forwarded")));
+
+        // 4. Student accessing action=edit -> 403 Forbidden
+        Map<String, String> editParams = new HashMap<>();
+        editParams.put("action", "edit");
+        editParams.put("id", "1");
+        Map<String, Object> respState4 = new HashMap<>();
+        HttpServletRequest req4 = createMockRequest(studentSession, editParams, new HashMap<>(), new HashMap<>());
+        doGetMethod.invoke(servlet, req4, createMockResponse(respState4));
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, respState4.get("errorCode"));
+
+        // 5. Coordinator accessing action=edit -> forwards to /WEB-INF/jsp/job-edit.jsp
+        Map<String, Object> state5 = new HashMap<>();
+        HttpServletRequest req5 = createMockRequest(coordSession, editParams, new HashMap<>(), state5);
+        Map<String, Object> respState5 = new HashMap<>();
+        doGetMethod.invoke(servlet, req5, createMockResponse(respState5));
+        assertEquals("/WEB-INF/jsp/job-edit.jsp", state5.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(state5.get("forwarded")));
+    }
+
+    @Test
+    @DisplayName("JobServlet doGet allows unauthenticated and student users to browse jobs and view details")
+    void testJobServletGetPublicBrowsingAllowed() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doGetMethod = JobServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Job job = new Job(1L, "Software Engineer", "Acme", "Remote", "Desc", "100000", "FULL_TIME", "Active");
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public List<Job> getAllJobs() {
+                List<Job> list = new ArrayList<>();
+                list.add(job);
+                return list;
+            }
+            @Override
+            public Job getJobById(Long id) {
+                return job;
+            }
+        });
+
+        // Case A: Unauthenticated user accesses /jobs listing
+        Map<String, Object> stateA = new HashMap<>();
+        HttpServletRequest reqA = createMockRequest(null, new HashMap<>(), new HashMap<>(), stateA);
+        Map<String, Object> respStateA = new HashMap<>();
+        doGetMethod.invoke(servlet, reqA, createMockResponse(respStateA));
+        assertEquals("/WEB-INF/jsp/jobs.jsp", stateA.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(stateA.get("forwarded")));
+
+        // Case B: Unauthenticated user views job details
+        Map<String, String> viewParams = new HashMap<>();
+        viewParams.put("action", "view");
+        viewParams.put("id", "1");
+        Map<String, Object> stateB = new HashMap<>();
+        HttpServletRequest reqB = createMockRequest(null, viewParams, new HashMap<>(), stateB);
+        Map<String, Object> respStateB = new HashMap<>();
+        doGetMethod.invoke(servlet, reqB, createMockResponse(respStateB));
+        assertEquals("/WEB-INF/jsp/job-details.jsp", stateB.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(stateB.get("forwarded")));
+
+        // Case C: Student user views job details
+        Map<String, Object> studentSessionAttrs = new HashMap<>();
+        studentSessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        studentSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession studentSession = createMockSession(studentSessionAttrs);
+
+        Map<String, Object> stateC = new HashMap<>();
+        HttpServletRequest reqC = createMockRequest(studentSession, viewParams, new HashMap<>(), stateC);
+        Map<String, Object> respStateC = new HashMap<>();
+        doGetMethod.invoke(servlet, reqC, createMockResponse(respStateC));
+        assertEquals("/WEB-INF/jsp/job-details.jsp", stateC.get("dispatchedPath"));
+        assertTrue(Boolean.TRUE.equals(stateC.get("forwarded")));
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost rejects student and unauthenticated users on create, update, and delete")
+    void testJobServletPostMutatingActionsRejectNonCoordinators() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        String[] actions = new String[]{"create", "update", "delete"};
+
+        for (String action : actions) {
+            // Case A: Student user with valid CSRF
+            Map<String, Object> studentSessionAttrs = new HashMap<>();
+            studentSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+            studentSessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+            studentSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+            HttpSession studentSession = createMockSession(studentSessionAttrs);
+
+            Map<String, String> params = new HashMap<>();
+            params.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+            params.put("action", action);
+            params.put("id", "1");
+
+            Map<String, Object> respStateStudent = new HashMap<>();
+            HttpServletRequest reqStudent = createMockRequest(studentSession, params, new HashMap<>(), new HashMap<>());
+            doPostMethod.invoke(servlet, reqStudent, createMockResponse(respStateStudent));
+            assertEquals(HttpServletResponse.SC_FORBIDDEN, respStateStudent.get("errorCode"),
+                    "Student executing job " + action + " must receive 403 Forbidden");
+
+            // Case B: Unauthenticated user with CSRF in session
+            Map<String, Object> anonSessionAttrs = new HashMap<>();
+            anonSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+            HttpSession anonSession = createMockSession(anonSessionAttrs);
+
+            Map<String, Object> respStateAnon = new HashMap<>();
+            HttpServletRequest reqAnon = createMockRequest(anonSession, params, new HashMap<>(), new HashMap<>());
+            doPostMethod.invoke(servlet, reqAnon, createMockResponse(respStateAnon));
+            assertEquals(HttpServletResponse.SC_FORBIDDEN, respStateAnon.get("errorCode"),
+                    "Unauthenticated user executing job " + action + " must receive 403 Forbidden");
+        }
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost enforces CSRF validation before role checks")
+    void testJobServletPostRequiresCsrfToken() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        Map<String, Object> coordSessionAttrs = new HashMap<>();
+        coordSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "server-token");
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordSessionAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("action", "delete");
+        params.put("id", "1");
+        // Missing CSRF param
+
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(coordSession, params, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, request, createMockResponse(respState));
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, respState.get("errorCode"));
+        assertEquals("Invalid or missing CSRF token.", respState.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost allows coordinator to create, update, and delete jobs")
+    void testJobServletPostMutatingActionsAllowedForCoordinator() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final boolean[] addCalled = new boolean[]{false};
+        final boolean[] updateCalled = new boolean[]{false};
+        final boolean[] deleteCalled = new boolean[]{false};
+
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean addJob(Job job) {
+                addCalled[0] = true;
+                return true;
+            }
+            @Override
+            public boolean updateJob(Job job) {
+                updateCalled[0] = true;
+                return true;
+            }
+            @Override
+            public boolean deleteJob(Long id) {
+                deleteCalled[0] = true;
+                return true;
+            }
+        });
+
+        Map<String, Object> coordSessionAttrs = new HashMap<>();
+        coordSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordSessionAttrs);
+
+        // 1. Create Job
+        Map<String, String> createParams = new HashMap<>();
+        createParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        createParams.put("action", "create");
+        createParams.put("title", "Backend Engineer");
+        createParams.put("company", "TechCorp");
+        createParams.put("location", "Bangalore");
+        createParams.put("jobType", "FULL_TIME");
+
+        Map<String, Object> respState1 = new HashMap<>();
+        HttpServletRequest req1 = createMockRequest(coordSession, createParams, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, req1, createMockResponse(respState1));
+        assertTrue(addCalled[0]);
+        assertEquals("/college/jobs", respState1.get("redirectUrl"));
+
+        // 2. Update Job
+        Map<String, String> updateParams = new HashMap<>();
+        updateParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        updateParams.put("action", "update");
+        updateParams.put("id", "5");
+        updateParams.put("title", "Senior Engineer");
+        updateParams.put("company", "TechCorp");
+        updateParams.put("location", "Bangalore");
+        updateParams.put("jobType", "FULL_TIME");
+
+        Map<String, Object> respState2 = new HashMap<>();
+        HttpServletRequest req2 = createMockRequest(coordSession, updateParams, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, req2, createMockResponse(respState2));
+        assertTrue(updateCalled[0]);
+        assertEquals("/college/jobs", respState2.get("redirectUrl"));
+
+        // 3. Delete Job
+        Map<String, String> deleteParams = new HashMap<>();
+        deleteParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        deleteParams.put("action", "delete");
+        deleteParams.put("id", "5");
+
+        Map<String, Object> respState3 = new HashMap<>();
+        HttpServletRequest req3 = createMockRequest(coordSession, deleteParams, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, req3, createMockResponse(respState3));
+        assertTrue(deleteCalled[0]);
+        assertEquals("/college/jobs", respState3.get("redirectUrl"));
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost creates job with valid eligibility criteria (deadline, min CGPA, eligible departments)")
+    void testJobServletPostCreateJobWithEligibilityCriteria() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final Job[] capturedJob = new Job[1];
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean addJob(Job job) {
+                capturedJob[0] = job;
+                return true;
+            }
+        });
+
+        Map<String, Object> coordSessionAttrs = new HashMap<>();
+        coordSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordSessionAttrs);
+
+        Map<String, String> createParams = new HashMap<>();
+        createParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        createParams.put("action", "create");
+        createParams.put("title", "Software Engineer");
+        createParams.put("company", "Google");
+        createParams.put("location", "Bangalore");
+        createParams.put("description", "Join our backend infrastructure team");
+        createParams.put("salary", "25 LPA");
+        createParams.put("jobType", "Full Time");
+        createParams.put("status", "Active");
+        createParams.put("deadline", "2026-12-31");
+        createParams.put("minCgpa", "7.50");
+        createParams.put("eligibleDepartments", "CSE,ECE");
+
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletRequest req = createMockRequest(coordSession, createParams, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, req, createMockResponse(respState));
+
+        assertNotNull(capturedJob[0], "JobDAO.addJob should be called");
+        assertEquals("Software Engineer", capturedJob[0].getTitle());
+        assertEquals("Google", capturedJob[0].getCompany());
+        assertEquals(LocalDate.of(2026, 12, 31), capturedJob[0].getDeadline());
+        assertEquals(new BigDecimal("7.50"), capturedJob[0].getMinCgpa());
+        assertEquals("CSE,ECE", capturedJob[0].getEligibleDepartments());
+        assertEquals("/college/jobs", respState.get("redirectUrl"));
+        assertEquals("Job created successfully.", coordSessionAttrs.get("successMessage"));
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost create validates deadline date format and CGPA range server-side")
+    void testJobServletPostCreateValidationFailures() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean addJob(Job job) {
+                fail("addJob must not be called when validation fails");
+                return false;
+            }
+        });
+
+        Map<String, Object> coordSessionAttrs = new HashMap<>();
+        coordSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordSessionAttrs);
+
+        // Case 1: Invalid deadline format (e.g. DD-MM-YYYY instead of YYYY-MM-DD)
+        Map<String, String> badDeadlineParams = new HashMap<>();
+        badDeadlineParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        badDeadlineParams.put("action", "create");
+        badDeadlineParams.put("title", "Dev");
+        badDeadlineParams.put("company", "Corp");
+        badDeadlineParams.put("location", "City");
+        badDeadlineParams.put("jobType", "Full Time");
+        badDeadlineParams.put("deadline", "31-12-2026");
+
+        Map<String, Object> attrs1 = new HashMap<>();
+        Map<String, Object> state1 = new HashMap<>();
+        HttpServletRequest req1 = createMockRequest(coordSession, badDeadlineParams, attrs1, state1);
+        doPostMethod.invoke(servlet, req1, createMockResponse(new HashMap<>()));
+        assertEquals("/WEB-INF/jsp/job-add.jsp", state1.get("dispatchedPath"));
+        assertEquals("Invalid Application Deadline format. Please use YYYY-MM-DD.", attrs1.get("errorMessage"));
+        Job retainedJob1 = (Job) attrs1.get("job");
+        assertNotNull(retainedJob1);
+        assertEquals("Dev", retainedJob1.getTitle());
+
+        // Case 2: Negative CGPA (< 0.00)
+        Map<String, String> negCgpaParams = new HashMap<>(badDeadlineParams);
+        negCgpaParams.put("deadline", "2026-12-31");
+        negCgpaParams.put("minCgpa", "-1.50");
+
+        Map<String, Object> attrs2 = new HashMap<>();
+        Map<String, Object> state2 = new HashMap<>();
+        HttpServletRequest req2 = createMockRequest(coordSession, negCgpaParams, attrs2, state2);
+        doPostMethod.invoke(servlet, req2, createMockResponse(new HashMap<>()));
+        assertEquals("/WEB-INF/jsp/job-add.jsp", state2.get("dispatchedPath"));
+        assertEquals("Minimum CGPA must be a valid number between 0.00 and 10.00.", attrs2.get("errorMessage"));
+
+        // Case 3: CGPA > 10.00
+        Map<String, String> highCgpaParams = new HashMap<>(badDeadlineParams);
+        highCgpaParams.put("deadline", "2026-12-31");
+        highCgpaParams.put("minCgpa", "10.01");
+
+        Map<String, Object> attrs3 = new HashMap<>();
+        Map<String, Object> state3 = new HashMap<>();
+        HttpServletRequest req3 = createMockRequest(coordSession, highCgpaParams, attrs3, state3);
+        doPostMethod.invoke(servlet, req3, createMockResponse(new HashMap<>()));
+        assertEquals("/WEB-INF/jsp/job-add.jsp", state3.get("dispatchedPath"));
+        assertEquals("Minimum CGPA must be a valid number between 0.00 and 10.00.", attrs3.get("errorMessage"));
+
+        // Case 4: Non-numeric CGPA
+        Map<String, String> nonNumCgpaParams = new HashMap<>(badDeadlineParams);
+        nonNumCgpaParams.put("deadline", "2026-12-31");
+        nonNumCgpaParams.put("minCgpa", "abc");
+
+        Map<String, Object> attrs4 = new HashMap<>();
+        Map<String, Object> state4 = new HashMap<>();
+        HttpServletRequest req4 = createMockRequest(coordSession, nonNumCgpaParams, attrs4, state4);
+        doPostMethod.invoke(servlet, req4, createMockResponse(new HashMap<>()));
+        assertEquals("/WEB-INF/jsp/job-add.jsp", state4.get("dispatchedPath"));
+        assertEquals("Minimum CGPA must be a valid number between 0.00 and 10.00.", attrs4.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost updates job with valid eligibility criteria (deadline, min CGPA, eligible departments)")
+    void testJobServletPostUpdateJobWithEligibilityCriteria() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final Job[] capturedJob = new Job[1];
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean updateJob(Job job) {
+                capturedJob[0] = job;
+                return true;
+            }
+        });
+
+        Map<String, Object> coordSessionAttrs = new HashMap<>();
+        coordSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordSessionAttrs);
+
+        Map<String, String> updateParams = new HashMap<>();
+        updateParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        updateParams.put("action", "update");
+        updateParams.put("id", "12");
+        updateParams.put("title", "Senior Backend Engineer");
+        updateParams.put("company", "Microsoft");
+        updateParams.put("location", "Hyderabad");
+        updateParams.put("jobType", "Full Time");
+        updateParams.put("status", "Active");
+        updateParams.put("deadline", "2026-11-20");
+        updateParams.put("minCgpa", "8.25");
+        updateParams.put("eligibleDepartments", "CSE,IT");
+
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletRequest req = createMockRequest(coordSession, updateParams, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, req, createMockResponse(respState));
+
+        assertNotNull(capturedJob[0], "JobDAO.updateJob should be called");
+        assertEquals(12L, capturedJob[0].getId());
+        assertEquals("Senior Backend Engineer", capturedJob[0].getTitle());
+        assertEquals("Microsoft", capturedJob[0].getCompany());
+        assertEquals(LocalDate.of(2026, 11, 20), capturedJob[0].getDeadline());
+        assertEquals(new BigDecimal("8.25"), capturedJob[0].getMinCgpa());
+        assertEquals("CSE,IT", capturedJob[0].getEligibleDepartments());
+        assertEquals("/college/jobs", respState.get("redirectUrl"));
+        assertEquals("Job updated successfully.", coordSessionAttrs.get("successMessage"));
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost update validates deadline date format and CGPA range server-side")
+    void testJobServletPostUpdateValidationFailures() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean updateJob(Job job) {
+                fail("updateJob must not be called when validation fails");
+                return false;
+            }
+        });
+
+        Map<String, Object> coordSessionAttrs = new HashMap<>();
+        coordSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        coordSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordSessionAttrs);
+
+        // Case 1: Invalid deadline format
+        Map<String, String> badDeadlineParams = new HashMap<>();
+        badDeadlineParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "valid-token");
+        badDeadlineParams.put("action", "update");
+        badDeadlineParams.put("id", "12");
+        badDeadlineParams.put("title", "Dev");
+        badDeadlineParams.put("company", "Corp");
+        badDeadlineParams.put("location", "City");
+        badDeadlineParams.put("jobType", "Full Time");
+        badDeadlineParams.put("deadline", "2026/12/31");
+
+        Map<String, Object> attrs1 = new HashMap<>();
+        Map<String, Object> state1 = new HashMap<>();
+        HttpServletRequest req1 = createMockRequest(coordSession, badDeadlineParams, attrs1, state1);
+        doPostMethod.invoke(servlet, req1, createMockResponse(new HashMap<>()));
+        assertEquals("/WEB-INF/jsp/job-edit.jsp", state1.get("dispatchedPath"));
+        assertEquals("Invalid Application Deadline format. Please use YYYY-MM-DD.", attrs1.get("errorMessage"));
+
+        // Case 2: CGPA > 10.00
+        Map<String, String> highCgpaParams = new HashMap<>(badDeadlineParams);
+        highCgpaParams.put("deadline", "2026-12-31");
+        highCgpaParams.put("minCgpa", "11.00");
+
+        Map<String, Object> attrs2 = new HashMap<>();
+        Map<String, Object> state2 = new HashMap<>();
+        HttpServletRequest req2 = createMockRequest(coordSession, highCgpaParams, attrs2, state2);
+        doPostMethod.invoke(servlet, req2, createMockResponse(new HashMap<>()));
+        assertEquals("/WEB-INF/jsp/job-edit.jsp", state2.get("dispatchedPath"));
+        assertEquals("Minimum CGPA must be a valid number between 0.00 and 10.00.", attrs2.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("JobDAO addJob and updateJob correctly map eligibility columns")
+    void testJobDAOEligibilityColumnsMapping() {
+        Map<Integer, Object> boundParams = new HashMap<>();
+
+        Connection mockConnection = (Connection) Proxy.newProxyInstance(
+                Connection.class.getClassLoader(),
+                new Class<?>[]{Connection.class},
+                (proxy, method, args) -> {
+                    String methodName = method.getName();
+                    if ("prepareStatement".equals(methodName)) {
+                        return (PreparedStatement) Proxy.newProxyInstance(
+                                PreparedStatement.class.getClassLoader(),
+                                new Class<?>[]{PreparedStatement.class},
+                                (stmtProxy, stmtMethod, stmtArgs) -> {
+                                    String stmtMethodName = stmtMethod.getName();
+                                    if (stmtMethodName.startsWith("set") && stmtArgs != null && stmtArgs.length >= 2) {
+                                        boundParams.put((Integer) stmtArgs[0], stmtArgs[1]);
+                                        return null;
+                                    } else if ("executeUpdate".equals(stmtMethodName)) {
+                                        return 1;
+                                    } else if ("getGeneratedKeys".equals(stmtMethodName)) {
+                                        return Proxy.newProxyInstance(
+                                                java.sql.ResultSet.class.getClassLoader(),
+                                                new Class<?>[]{java.sql.ResultSet.class},
+                                                (rsProxy, rsMethod, rsArgs) -> {
+                                                    if ("next".equals(rsMethod.getName())) return true;
+                                                    if ("getLong".equals(rsMethod.getName())) return 99L;
+                                                    return null;
+                                                }
+                                        );
+                                    }
+                                    return null;
+                                }
+                        );
+                    } else if ("close".equals(methodName)) {
+                        return null;
+                    }
+                    return null;
+                }
+        );
+
+        JobDAO testDao = new JobDAO() {
+            @Override
+            protected Connection getConnection() {
+                return mockConnection;
+            }
+        };
+
+        // Test addJob
+        Job newJob = new Job("Test Role", "Acme", "Remote", "Desc", "50k", "Full Time", "Active",
+                LocalDate.of(2026, 12, 1), new BigDecimal("7.00"), "CSE,ECE");
+        boolean added = testDao.addJob(newJob);
+        assertTrue(added);
+        assertEquals(99L, newJob.getId());
+        assertEquals(java.sql.Date.valueOf(LocalDate.of(2026, 12, 1)), boundParams.get(8));
+        assertEquals(new BigDecimal("7.00"), boundParams.get(9));
+        assertEquals("CSE,ECE", boundParams.get(10));
+
+        // Test updateJob
+        boundParams.clear();
+        newJob.setEligibleDepartments("CSE");
+        boolean updated = testDao.updateJob(newJob);
+        assertTrue(updated);
+        assertEquals(java.sql.Date.valueOf(LocalDate.of(2026, 12, 1)), boundParams.get(8));
+        assertEquals(new BigDecimal("7.00"), boundParams.get(9));
+        assertEquals("CSE", boundParams.get(10));
+        assertEquals(99L, boundParams.get(11));
+    }
+
+    @Test
+    @DisplayName("ApplicationDAO createApplication throws DAOException (not DuplicateRecordException) for non-1062 integrity errors")
+    void testApplicationDAOThrowsDAOExceptionOnOtherIntegrityErrors() {
+        Map<String, Object> connState = new HashMap<>();
+        // Error code 1452: ER_NO_REFERENCED_ROW_2 (Foreign key constraint fails)
+        connState.put("throwOnExecuteUpdate", new SQLException("Cannot add or update a child row: a foreign key constraint fails", "23000", 1452));
+
+        ApplicationDAO testDao = new ApplicationDAO() {
+            @Override
+            protected Connection getConnection() {
+                return createMockConnection(connState);
+            }
+        };
+
+        Application app = new Application(501L, 200L, LocalDate.now(), "APPLIED");
+        DAOException ex = assertThrows(DAOException.class, () -> testDao.createApplication(app));
+        assertFalse(ex instanceof DuplicateRecordException, "Non-1062 integrity error must not be classified as DuplicateRecordException");
+        assertEquals("Database error occurred while creating application.", ex.getMessage(), "Generic DAOException must shield internal details");
+        assertEquals(1, (int) connState.getOrDefault("rollbackCount", 0), "Transaction must be rolled back on integrity error");
+    }
+
+    // =====================================================
     // TEST HELPERS
     // =====================================================
+
+    private Application createTestApplication(Long id, Long studentId, Long jobId, LocalDate date, String status) {
+        Application app = new Application(studentId, jobId, date, status);
+        app.setId(id);
+        return app;
+    }
 
     private Map<String, String> createValidRegistrationParams() {
         Map<String, String> params = new HashMap<>();
@@ -1884,6 +4158,21 @@ class BackendApplicationTests {
                         int count = (int) state.getOrDefault("closeCount", 0);
                         state.put("closeCount", count + 1);
                         return null;
+                    } else if ("prepareStatement".equals(name)) {
+                        SQLException toThrow = (SQLException) state.get("throwOnExecuteUpdate");
+                        return Proxy.newProxyInstance(
+                                PreparedStatement.class.getClassLoader(),
+                                new Class<?>[]{PreparedStatement.class},
+                                (stmtProxy, stmtMethod, stmtArgs) -> {
+                                    if ("executeUpdate".equals(stmtMethod.getName())) {
+                                        if (toThrow != null) {
+                                            throw toThrow;
+                                        }
+                                        return 1;
+                                    }
+                                    return null;
+                                }
+                        );
                     }
                     return null;
                 }
@@ -1986,6 +4275,8 @@ class BackendApplicationTests {
                         return mockDispatcher;
                     } else if ("getContextPath".equals(name)) {
                         return "/college";
+                    } else if ("getServletPath".equals(name)) {
+                        return state != null && state.containsKey("servletPath") ? state.get("servletPath") : "/applications";
                     }
                     return null;
                 }

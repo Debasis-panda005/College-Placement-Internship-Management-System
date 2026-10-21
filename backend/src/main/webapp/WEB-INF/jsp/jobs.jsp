@@ -242,11 +242,13 @@
         </div>
     </c:if>
 
-    <div class="toolbar">
-        <a href="${pageContext.request.contextPath}/jobs?action=new" class="btn-add">
-            + Add Job / Internship
-        </a>
-    </div>
+    <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+        <div class="toolbar">
+            <a href="${pageContext.request.contextPath}/jobs?action=new" class="btn-add">
+                + Add Job / Internship
+            </a>
+        </div>
+    </c:if>
 
     <!-- SEARCH & FILTER BAR -->
     <div class="filters-container">
@@ -342,18 +344,20 @@
                             </td>
                             <td class="actions-cell">
                                 <a href="${pageContext.request.contextPath}/jobs?action=view&id=${job.id}" class="action-link">View</a>
-                                <span>|</span>
-                                <a href="${pageContext.request.contextPath}/jobs?action=edit&id=${job.id}" class="action-link">Edit</a>
-                                <span>|</span>
-                                <form action="${pageContext.request.contextPath}/jobs" method="post" class="inline-form">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="id" value="${job.id}">
-                                    <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                    <button type="submit" class="btn-delete"
-                                            onclick="return confirm('Are you sure you want to delete this job?');">
-                                        Delete
-                                    </button>
-                                </form>
+                                <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                                    <span>|</span>
+                                    <a href="${pageContext.request.contextPath}/jobs?action=edit&id=${job.id}" class="action-link">Edit</a>
+                                    <span>|</span>
+                                    <form action="${pageContext.request.contextPath}/jobs" method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="${job.id}">
+                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                        <button type="submit" class="btn-delete"
+                                                onclick="return confirm('Are you sure you want to delete this job?');">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </c:if>
                             </td>
                         </tr>
                     </c:forEach>

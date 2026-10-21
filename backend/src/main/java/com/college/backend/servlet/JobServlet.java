@@ -2,14 +2,19 @@ package com.college.backend.servlet;
 
 import com.college.backend.dao.JobDAO;
 import com.college.backend.entity.Job;
+import com.college.backend.entity.User;
 import com.college.backend.util.CsrfUtil;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @WebServlet({"/jobs", "/jobs/*"})
@@ -62,6 +67,19 @@ public class JobServlet extends HttpServlet {
 
         // 1. ADD JOB FORM
         if ("new".equals(action)) {
+            HttpSession session = request.getSession(false);
+            Long sessionUserId = session != null ? (Long) session.getAttribute(LoginServlet.SESSION_USER_ID) : null;
+            if (sessionUserId == null) {
+                HttpSession newSession = request.getSession(true);
+                CsrfUtil.getOrCreateToken(newSession);
+                newSession.setAttribute("errorMessage", "You must log in to add jobs.");
+                response.sendRedirect(request.getContextPath() + "/login");
+                return;
+            }
+            if (!isCoordinatorOrAdmin(request)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied: Only coordinators and administrators can create jobs.");
+                return;
+            }
             request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
                     .forward(request, response);
             return;
@@ -69,6 +87,19 @@ public class JobServlet extends HttpServlet {
 
         // 2. EDIT JOB FORM
         if ("edit".equals(action)) {
+            HttpSession session = request.getSession(false);
+            Long sessionUserId = session != null ? (Long) session.getAttribute(LoginServlet.SESSION_USER_ID) : null;
+            if (sessionUserId == null) {
+                HttpSession newSession = request.getSession(true);
+                CsrfUtil.getOrCreateToken(newSession);
+                newSession.setAttribute("errorMessage", "You must log in to edit jobs.");
+                response.sendRedirect(request.getContextPath() + "/login");
+                return;
+            }
+            if (!isCoordinatorOrAdmin(request)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied: Only coordinators and administrators can edit jobs.");
+                return;
+            }
             Long id = parseId(request.getParameter("id"));
             if (id == null) {
                 request.getSession().setAttribute("errorMessage", "Invalid job ID provided.");
@@ -157,6 +188,14 @@ public class JobServlet extends HttpServlet {
 
         String action = request.getParameter("action");
 
+        // Enforce coordinator/admin authorization for mutating job actions
+        if ("create".equals(action) || "update".equals(action) || "delete".equals(action)) {
+            if (!isCoordinatorOrAdmin(request)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied: Only coordinators and administrators can manage jobs.");
+                return;
+            }
+        }
+
         // 1. CREATE JOB
         if ("create".equals(action)) {
             String title = trimToNull(request.getParameter("title"));
@@ -166,17 +205,60 @@ public class JobServlet extends HttpServlet {
             String salary = trimToNull(request.getParameter("salary"));
             String jobType = trimToNull(request.getParameter("jobType"));
             String status = trimToNull(request.getParameter("status"));
+            String deadlineParam = trimToNull(request.getParameter("deadline"));
+            String minCgpaParam = trimToNull(request.getParameter("minCgpa"));
+            String eligibleDepartments = trimToNull(request.getParameter("eligibleDepartments"));
+
+            LocalDate deadline = null;
+            if (deadlineParam != null) {
+                try {
+                    deadline = LocalDate.parse(deadlineParam);
+                } catch (DateTimeParseException e) {
+                    Job job = new Job(title, company, location, description, salary, jobType,
+                            status != null ? status : "Active", null, null, eligibleDepartments);
+                    request.setAttribute("errorMessage", "Invalid Application Deadline format. Please use YYYY-MM-DD.");
+                    request.setAttribute("job", job);
+                    request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
+                            .forward(request, response);
+                    return;
+                }
+            }
+
+            BigDecimal minCgpa = null;
+            if (minCgpaParam != null) {
+                try {
+                    minCgpa = new BigDecimal(minCgpaParam);
+                    if (minCgpa.compareTo(BigDecimal.ZERO) < 0 || minCgpa.compareTo(new BigDecimal("10.00")) > 0) {
+                        Job job = new Job(title, company, location, description, salary, jobType,
+                                status != null ? status : "Active", deadline, null, eligibleDepartments);
+                        request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
+                        request.setAttribute("job", job);
+                        request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
+                                .forward(request, response);
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    Job job = new Job(title, company, location, description, salary, jobType,
+                            status != null ? status : "Active", deadline, null, eligibleDepartments);
+                    request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
+                    request.setAttribute("job", job);
+                    request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
+                            .forward(request, response);
+                    return;
+                }
+            }
 
             if (title == null || company == null || location == null || jobType == null) {
                 request.setAttribute("errorMessage", "Title, Company, Location, and Job Type are required.");
-                request.setAttribute("job", new Job(title, company, location, description, salary, jobType, status));
+                request.setAttribute("job", new Job(title, company, location, description, salary, jobType,
+                        status != null ? status : "Active", deadline, minCgpa, eligibleDepartments));
                 request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
                         .forward(request, response);
                 return;
             }
 
             Job job = new Job(title, company, location, description, salary, jobType,
-                    status != null ? status : "Active");
+                    status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
 
             boolean created = jobDAO.addJob(job);
             if (created) {
@@ -207,9 +289,52 @@ public class JobServlet extends HttpServlet {
             String salary = trimToNull(request.getParameter("salary"));
             String jobType = trimToNull(request.getParameter("jobType"));
             String status = trimToNull(request.getParameter("status"));
+            String deadlineParam = trimToNull(request.getParameter("deadline"));
+            String minCgpaParam = trimToNull(request.getParameter("minCgpa"));
+            String eligibleDepartments = trimToNull(request.getParameter("eligibleDepartments"));
+
+            LocalDate deadline = null;
+            if (deadlineParam != null) {
+                try {
+                    deadline = LocalDate.parse(deadlineParam);
+                } catch (DateTimeParseException e) {
+                    Job job = new Job(id, title, company, location, description, salary, jobType,
+                            status != null ? status : "Active", null, null, eligibleDepartments);
+                    request.setAttribute("errorMessage", "Invalid Application Deadline format. Please use YYYY-MM-DD.");
+                    request.setAttribute("job", job);
+                    request.getRequestDispatcher("/WEB-INF/jsp/job-edit.jsp")
+                            .forward(request, response);
+                    return;
+                }
+            }
+
+            BigDecimal minCgpa = null;
+            if (minCgpaParam != null) {
+                try {
+                    minCgpa = new BigDecimal(minCgpaParam);
+                    if (minCgpa.compareTo(BigDecimal.ZERO) < 0 || minCgpa.compareTo(new BigDecimal("10.00")) > 0) {
+                        Job job = new Job(id, title, company, location, description, salary, jobType,
+                                status != null ? status : "Active", deadline, null, eligibleDepartments);
+                        request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
+                        request.setAttribute("job", job);
+                        request.getRequestDispatcher("/WEB-INF/jsp/job-edit.jsp")
+                                .forward(request, response);
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    Job job = new Job(id, title, company, location, description, salary, jobType,
+                            status != null ? status : "Active", deadline, null, eligibleDepartments);
+                    request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
+                    request.setAttribute("job", job);
+                    request.getRequestDispatcher("/WEB-INF/jsp/job-edit.jsp")
+                            .forward(request, response);
+                    return;
+                }
+            }
 
             if (title == null || company == null || location == null || jobType == null) {
-                Job job = new Job(id, title, company, location, description, salary, jobType, status);
+                Job job = new Job(id, title, company, location, description, salary, jobType,
+                        status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
                 request.setAttribute("errorMessage", "Title, Company, Location, and Job Type are required.");
                 request.setAttribute("job", job);
                 request.getRequestDispatcher("/WEB-INF/jsp/job-edit.jsp")
@@ -218,7 +343,7 @@ public class JobServlet extends HttpServlet {
             }
 
             Job job = new Job(id, title, company, location, description, salary, jobType,
-                    status != null ? status : "Active");
+                    status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
 
             boolean updated = jobDAO.updateJob(job);
             if (updated) {
@@ -259,6 +384,16 @@ public class JobServlet extends HttpServlet {
     // =====================================================
     // HELPERS
     // =====================================================
+
+    private boolean isCoordinatorOrAdmin(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return false;
+        }
+        Long userId = (Long) session.getAttribute(LoginServlet.SESSION_USER_ID);
+        String role = (String) session.getAttribute(LoginServlet.SESSION_USER_ROLE);
+        return userId != null && (User.ROLE_COORDINATOR.equals(role) || User.ROLE_ADMIN.equals(role));
+    }
 
     private Long parseId(String idParam) {
         if (idParam == null || idParam.trim().isEmpty()) {
