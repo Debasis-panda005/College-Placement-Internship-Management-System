@@ -32,6 +32,8 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -1837,6 +1839,92 @@ class BackendApplicationTests {
                 "Session attributes must remain intact upon rejected GET request");
         assertNull(responseState3.get("redirectUrl"),
                 "GET /logout must not redirect when rejecting with 405");
+    }
+
+    @Test
+    @DisplayName("All navigation JSPs include POST-only logout form with CSRF token for authenticated users only")
+    void testNavigationJSPsIncludeLogoutFormWithCsrfForAuthenticatedUsersOnly() throws Exception {
+        Path jspDir = Path.of("src/main/webapp/WEB-INF/jsp");
+        if (!Files.exists(jspDir)) {
+            jspDir = Path.of("backend/src/main/webapp/WEB-INF/jsp");
+        }
+        assertTrue(Files.exists(jspDir), "JSP directory must exist at: " + jspDir.toAbsolutePath());
+
+        String[] navJspFiles = new String[]{
+                "jobs.jsp",
+                "applications.jsp",
+                "shortlist.jsp",
+                "interviews.jsp",
+                "job-details.jsp",
+                "job-add.jsp",
+                "job-edit.jsp",
+                "application-details.jsp",
+                "application-history.jsp",
+                "interview-edit.jsp"
+        };
+
+        for (String jspName : navJspFiles) {
+            Path jspPath = jspDir.resolve(jspName);
+            assertTrue(Files.exists(jspPath), "JSP file must exist: " + jspName);
+            String content = Files.readString(jspPath);
+
+            // 1. Must be conditioned on authenticated user ID (visible to authenticated, hidden for unauthenticated)
+            assertTrue(content.contains("not empty sessionScope.userId"),
+                    jspName + " must gate logout visibility with not empty sessionScope.userId");
+
+            // 2. Must submit POST to /logout
+            assertTrue(content.contains("action=\"${pageContext.request.contextPath}/logout\""),
+                    jspName + " must contain a form targeting ${pageContext.request.contextPath}/logout");
+            assertTrue(content.contains("method=\"post\""),
+                    jspName + " must use method=\"post\" for logout");
+
+            // 3. Must include valid CSRF token parameter
+            assertTrue(content.contains("name=\"csrfToken\"") && content.contains("value=\"${sessionScope.csrfToken}\""),
+                    jspName + " must pass CSRF token in logout form");
+
+            // 4. Must provide a visible Logout submit button
+            assertTrue(content.contains("type=\"submit\"") && content.contains("Logout"),
+                    jspName + " must contain a submit button with 'Logout'");
+
+            // 5. Must NOT provide logout as a GET link
+            assertFalse(content.contains("<a href=\"${pageContext.request.contextPath}/logout\""),
+                    jspName + " must never implement logout as an insecure GET link");
+        }
+    }
+
+    @Test
+    @DisplayName("Logout button visibility condition evaluates true for all authenticated roles and false for unauthenticated users")
+    void testLogoutButtonVisibilityByAuthenticationRole() {
+        // Authenticated Student
+        Map<String, Object> studentAttrs = new HashMap<>();
+        studentAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        studentAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession studentSession = createMockSession(studentAttrs);
+        assertNotNull(studentSession.getAttribute(LoginServlet.SESSION_USER_ID),
+                "Student session has userId, making logout visible");
+
+        // Authenticated Coordinator
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordAttrs);
+        assertNotNull(coordSession.getAttribute(LoginServlet.SESSION_USER_ID),
+                "Coordinator session has userId, making logout visible");
+
+        // Authenticated Admin
+        Map<String, Object> adminAttrs = new HashMap<>();
+        adminAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        adminAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_ADMIN);
+        HttpSession adminSession = createMockSession(adminAttrs);
+        assertNotNull(adminSession.getAttribute(LoginServlet.SESSION_USER_ID),
+                "Administrator session has userId, making logout visible");
+
+        // Unauthenticated session (e.g. visiting public /jobs where CsrfUtil creates token but no user is logged in)
+        Map<String, Object> anonAttrs = new HashMap<>();
+        anonAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "anonymous-csrf-token");
+        HttpSession anonSession = createMockSession(anonAttrs);
+        assertNull(anonSession.getAttribute(LoginServlet.SESSION_USER_ID),
+                "Unauthenticated session has no userId, keeping logout hidden");
     }
 
     // =====================================================
@@ -3777,6 +3865,165 @@ class BackendApplicationTests {
         doPostMethod.invoke(servlet, req3, createMockResponse(respState3));
         assertTrue(deleteCalled[0]);
         assertEquals("/college/jobs", respState3.get("redirectUrl"));
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost allows administrator to create job using mocked JobDAO")
+    void testJobServletPostCreateAllowedForAdmin() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final boolean[] addCalled = new boolean[]{false};
+        final Job[] capturedJob = new Job[1];
+
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean addJob(Job job) {
+                addCalled[0] = true;
+                capturedJob[0] = job;
+                return true;
+            }
+        });
+
+        Map<String, Object> adminSessionAttrs = new HashMap<>();
+        adminSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "admin-token");
+        adminSessionAttrs.put(LoginServlet.SESSION_USER_ID, 901L);
+        adminSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_ADMIN);
+        HttpSession adminSession = createMockSession(adminSessionAttrs);
+
+        Map<String, String> createParams = new HashMap<>();
+        createParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "admin-token");
+        createParams.put("action", "create");
+        createParams.put("title", "Lead Systems Architect");
+        createParams.put("company", "Global Enterprise");
+        createParams.put("location", "Hyderabad");
+        createParams.put("jobType", "FULL_TIME");
+
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletRequest req = createMockRequest(adminSession, createParams, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, req, createMockResponse(respState));
+
+        assertTrue(addCalled[0], "JobDAO.addJob must be called when an administrator creates a job");
+        assertNotNull(capturedJob[0], "Job instance should be passed to JobDAO.addJob");
+        assertEquals("Lead Systems Architect", capturedJob[0].getTitle());
+        assertEquals("/college/jobs", respState.get("redirectUrl"));
+        assertEquals("Job created successfully.", adminSessionAttrs.get("successMessage"));
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost rejects student job creation and never calls JobDAO.addJob")
+    void testJobServletPostCreateRejectedForStudent() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final boolean[] addCalled = new boolean[]{false};
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean addJob(Job job) {
+                addCalled[0] = true;
+                fail("JobDAO.addJob() must never be called for a student user");
+                return false;
+            }
+        });
+
+        Map<String, Object> studentSessionAttrs = new HashMap<>();
+        studentSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "student-token");
+        studentSessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        studentSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession studentSession = createMockSession(studentSessionAttrs);
+
+        Map<String, String> createParams = new HashMap<>();
+        createParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "student-token");
+        createParams.put("action", "create");
+        createParams.put("title", "Unauthorized Student Job");
+        createParams.put("company", "Student Corp");
+        createParams.put("location", "Remote");
+        createParams.put("jobType", "FULL_TIME");
+
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletRequest req = createMockRequest(studentSession, createParams, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, req, createMockResponse(respState));
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, respState.get("errorCode"),
+                "Student attempting job creation must receive 403 Forbidden");
+        assertFalse(addCalled[0], "JobDAO.addJob() must never be called when student attempts creation");
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost rejects unauthenticated POST with no session and never calls JobDAO.addJob")
+    void testJobServletPostCreateRejectedForUnauthenticatedNoSession() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final boolean[] addCalled = new boolean[]{false};
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean addJob(Job job) {
+                addCalled[0] = true;
+                fail("JobDAO.addJob() must never be called for an unauthenticated request");
+                return false;
+            }
+        });
+
+        Map<String, String> createParams = new HashMap<>();
+        createParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "arbitrary-token");
+        createParams.put("action", "create");
+        createParams.put("title", "Unauthenticated Job");
+        createParams.put("company", "Ghost Corp");
+        createParams.put("location", "Remote");
+        createParams.put("jobType", "FULL_TIME");
+
+        Map<String, Object> respState = new HashMap<>();
+        // No session provided (null session)
+        HttpServletRequest req = createMockRequest(null, createParams, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, req, createMockResponse(respState));
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, respState.get("errorCode"),
+                "Unauthenticated POST request with no session must receive 403 Forbidden");
+        assertFalse(addCalled[0], "JobDAO.addJob() must never be called for unauthenticated request");
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost rejects unsupported role job creation and never calls JobDAO.addJob")
+    void testJobServletPostCreateRejectedForUnsupportedRole() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final boolean[] addCalled = new boolean[]{false};
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean addJob(Job job) {
+                addCalled[0] = true;
+                fail("JobDAO.addJob() must never be called for an unsupported role");
+                return false;
+            }
+        });
+
+        Map<String, Object> recruiterSessionAttrs = new HashMap<>();
+        recruiterSessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "recruiter-token");
+        recruiterSessionAttrs.put(LoginServlet.SESSION_USER_ID, 701L);
+        recruiterSessionAttrs.put(LoginServlet.SESSION_USER_ROLE, "RECRUITER");
+        HttpSession recruiterSession = createMockSession(recruiterSessionAttrs);
+
+        Map<String, String> createParams = new HashMap<>();
+        createParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "recruiter-token");
+        createParams.put("action", "create");
+        createParams.put("title", "Recruiter Job");
+        createParams.put("company", "Agency Corp");
+        createParams.put("location", "Mumbai");
+        createParams.put("jobType", "FULL_TIME");
+
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletRequest req = createMockRequest(recruiterSession, createParams, new HashMap<>(), new HashMap<>());
+        doPostMethod.invoke(servlet, req, createMockResponse(respState));
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, respState.get("errorCode"),
+                "User with unsupported role attempting job creation must receive 403 Forbidden");
+        assertFalse(addCalled[0], "JobDAO.addJob() must never be called for unsupported role");
     }
 
     @Test

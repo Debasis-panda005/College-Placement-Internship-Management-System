@@ -52,6 +52,28 @@
             font-weight: bold;
         }
 
+        .nav-links form {
+            display: inline;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-links .btn-logout {
+            background: none;
+            border: none;
+            color: #dc3545;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 0;
+            margin: 0 12px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .nav-links .btn-logout:hover {
+            text-decoration: underline;
+        }
+
         .section-card {
             background-color: #f8f9fa;
             border: 1px solid #e9ecef;
@@ -294,6 +316,13 @@
         <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
         <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
         <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
+        <c:if test="${not empty sessionScope.userId}">
+            |
+            <form action="${pageContext.request.contextPath}/logout" method="post" style="display: inline; margin: 0; padding: 0;">
+                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </c:if>
     </div>
 
     <h1>Application History</h1>
