@@ -22,6 +22,7 @@ import com.college.backend.servlet.LogoutServlet;
 import com.college.backend.servlet.RegisterServlet;
 import com.college.backend.util.AuthUtil;
 import com.college.backend.util.CsrfUtil;
+import com.college.backend.util.DBConnection;
 import com.college.backend.util.PasswordHashService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -1925,6 +1926,94 @@ class BackendApplicationTests {
         HttpSession anonSession = createMockSession(anonAttrs);
         assertNull(anonSession.getAttribute(LoginServlet.SESSION_USER_ID),
                 "Unauthenticated session has no userId, keeping logout hidden");
+    }
+
+    @Test
+    @DisplayName("DBConnection rejects connection attempt when password is not configured and provides sanitized error")
+    void testDBConnectionRejectsUnconfiguredPassword() {
+        String prevPassword = System.getProperty("db.password");
+        try {
+            // Explicitly set empty system property to simulate unconfigured password
+            System.setProperty("db.password", "");
+            SQLException thrown = assertThrows(SQLException.class, DBConnection::getConnection);
+            assertTrue(thrown.getMessage().contains("Database password is not configured"),
+                    "Error message must clearly inform the user that DB password is not configured");
+            assertTrue(thrown.getMessage().contains("DB_PASSWORD"),
+                    "Error message should mention the DB_PASSWORD environment variable");
+        } finally {
+            if (prevPassword != null) {
+                System.setProperty("db.password", prevPassword);
+            } else {
+                System.clearProperty("db.password");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("DBConnection configuration getters support system properties and default to college_placement")
+    void testDBConnectionConfigurationProperties() {
+        String prevUrl = System.getProperty("db.url");
+        String prevUser = System.getProperty("db.user");
+        String prevPassword = System.getProperty("db.password");
+
+        try {
+            System.clearProperty("db.url");
+            System.clearProperty("db.user");
+            System.clearProperty("db.password");
+
+            // Default target database must be college_placement (the active schema)
+            assertTrue(DBConnection.DEFAULT_URL.contains("college_placement"),
+                    "Default URL must target the active college_placement schema");
+            assertFalse(DBConnection.DEFAULT_URL.contains("college_placement_db"),
+                    "Default URL must not target the obsolete college_placement_db");
+
+            // Overrides via system properties
+            System.setProperty("db.url", "jdbc:mysql://localhost:3306/custom_db");
+            System.setProperty("db.user", "custom_user");
+            System.setProperty("db.password", "secret_pass");
+
+            assertEquals("jdbc:mysql://localhost:3306/custom_db", DBConnection.getUrl());
+            assertEquals("custom_user", DBConnection.getUser());
+            assertEquals("secret_pass", DBConnection.getPassword());
+        } finally {
+            if (prevUrl != null) System.setProperty("db.url", prevUrl); else System.clearProperty("db.url");
+            if (prevUser != null) System.setProperty("db.user", prevUser); else System.clearProperty("db.user");
+            if (prevPassword != null) System.setProperty("db.password", prevPassword); else System.clearProperty("db.password");
+        }
+    }
+
+    @Test
+    @DisplayName("shortlist.jsp properly escapes error and success messages using c:out")
+    void testShortlistJspEscapesMessagesWithCOut() throws Exception {
+        Path jspPath = Path.of("src/main/webapp/WEB-INF/jsp/shortlist.jsp");
+        if (!Files.exists(jspPath)) {
+            jspPath = Path.of("backend/src/main/webapp/WEB-INF/jsp/shortlist.jsp");
+        }
+        assertTrue(Files.exists(jspPath), "shortlist.jsp must exist");
+        String content = Files.readString(jspPath);
+
+        assertTrue(content.contains("<c:out value=\"${errorMessage}\"/>"),
+                "shortlist.jsp must escape errorMessage using c:out");
+        assertTrue(content.contains("<c:out value=\"${successMessage}\"/>"),
+                "shortlist.jsp must escape successMessage using c:out");
+    }
+
+    @Test
+    @DisplayName("application.properties spring.datasource.url targets reconciled college_placement schema")
+    void testApplicationPropertiesTargetsReconciledSchema() throws Exception {
+        Path propPath = Path.of("src/main/resources/application.properties");
+        if (!Files.exists(propPath)) {
+            propPath = Path.of("backend/src/main/resources/application.properties");
+        }
+        assertTrue(Files.exists(propPath), "application.properties must exist");
+        String content = Files.readString(propPath);
+
+        assertTrue(content.contains("spring.datasource.url=jdbc:mysql://localhost:3306/college_placement"),
+                "application.properties must target the active college_placement schema");
+        assertFalse(content.contains("college_placement_db"),
+                "application.properties must not reference the obsolete college_placement_db");
+        assertTrue(content.contains("spring.datasource.password=${DB_PASSWORD}"),
+                "application.properties must preserve safe environment variable password binding");
     }
 
     // =====================================================

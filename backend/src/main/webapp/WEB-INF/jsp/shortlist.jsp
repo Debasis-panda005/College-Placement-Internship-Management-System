@@ -229,13 +229,13 @@
 
     <c:if test="${not empty errorMessage}">
         <div class="alert-error">
-            ${errorMessage}
+            <c:out value="${errorMessage}"/>
         </div>
     </c:if>
 
     <c:if test="${not empty successMessage}">
         <div class="alert-success">
-            ${successMessage}
+            <c:out value="${successMessage}"/>
         </div>
     </c:if>
 

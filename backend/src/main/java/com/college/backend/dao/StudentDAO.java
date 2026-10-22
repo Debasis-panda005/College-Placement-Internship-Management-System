@@ -188,9 +188,7 @@ public class StudentDAO {
      * @throws DAOException on database connectivity or query failure
      */
     public boolean createStudent(Student student) {
-        if (student == null) {
-            throw new IllegalArgumentException("Student profile cannot be null.");
-        }
+        validateStudentFields(student);
 
         try (Connection connection = DBConnection.getConnection()) {
             return createStudent(connection, student);
@@ -203,22 +201,11 @@ public class StudentDAO {
     }
 
     /**
-     * Creates a student profile using an active database Connection.
-     * Enables transactional composition with User creation during registration.
-     *
-     * @param connection active database connection
-     * @param student student profile to create
-     * @return true if successfully inserted
-     * @throws IllegalArgumentException on invalid input or non-STUDENT user role
-     * @throws DuplicateRecordException if roll number or user association is already registered
-     * @throws SQLException on database error (permits caller transaction rollback)
+     * Validates student entity fields before database operations.
      */
-    public boolean createStudent(Connection connection, Student student) throws SQLException {
+    private void validateStudentFields(Student student) {
         if (student == null) {
             throw new IllegalArgumentException("Student profile cannot be null.");
-        }
-        if (connection == null) {
-            throw new IllegalArgumentException("Database connection cannot be null.");
         }
 
         if (student.getUserId() == null) {
@@ -238,6 +225,24 @@ public class StudentDAO {
         if (!Student.isValidGraduationYear(student.getGraduationYear())) {
             throw new IllegalArgumentException("Invalid graduation year: " + student.getGraduationYear() + ". Year must be between 2000 and 2100.");
         }
+    }
+
+    /**
+     * Creates a student profile using an active database Connection.
+     * Enables transactional composition with User creation during registration.
+     *
+     * @param connection active database connection
+     * @param student student profile to create
+     * @return true if successfully inserted
+     * @throws IllegalArgumentException on invalid input or non-STUDENT user role
+     * @throws DuplicateRecordException if roll number or user association is already registered
+     * @throws SQLException on database error (permits caller transaction rollback)
+     */
+    public boolean createStudent(Connection connection, Student student) throws SQLException {
+        if (connection == null) {
+            throw new IllegalArgumentException("Database connection cannot be null.");
+        }
+        validateStudentFields(student);
 
         // Invariant Verification: The associated user must exist and have role = 'STUDENT'
         String checkUserSql = "SELECT role FROM users WHERE id = ?";

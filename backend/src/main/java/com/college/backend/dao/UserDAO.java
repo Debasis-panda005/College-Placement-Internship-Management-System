@@ -135,9 +135,7 @@ public class UserDAO {
      * @throws DAOException on database connectivity or query failure
      */
     public boolean createUser(User user) {
-        if (user == null) {
-            throw new IllegalArgumentException("User entity cannot be null.");
-        }
+        validateUser(user);
 
         try (Connection connection = DBConnection.getConnection()) {
             return createUser(connection, user);
@@ -150,22 +148,11 @@ public class UserDAO {
     }
 
     /**
-     * Inserts a new user using an existing Connection.
-     * Enables transactional atomicity when creating User and Student records together.
-     *
-     * @param connection active database connection
-     * @param user the User to create
-     * @return true if successfully inserted
-     * @throws IllegalArgumentException on invalid input
-     * @throws DuplicateRecordException if the email already exists
-     * @throws SQLException on database error (permits caller transaction rollback)
+     * Validates user entity fields before database operations.
      */
-    public boolean createUser(Connection connection, User user) throws SQLException {
+    private void validateUser(User user) {
         if (user == null) {
             throw new IllegalArgumentException("User entity cannot be null.");
-        }
-        if (connection == null) {
-            throw new IllegalArgumentException("Database connection cannot be null.");
         }
 
         String normalizedEmail = User.normalizeEmail(user.getEmail());
@@ -190,10 +177,28 @@ public class UserDAO {
         } else if (!User.isValidRole(role)) {
             throw new IllegalArgumentException("Unsupported user role: " + role);
         }
+    }
+
+    /**
+     * Inserts a new user using an existing Connection.
+     * Enables transactional atomicity when creating User and Student records together.
+     *
+     * @param connection active database connection
+     * @param user the User to create
+     * @return true if successfully inserted
+     * @throws IllegalArgumentException on invalid input
+     * @throws DuplicateRecordException if the email already exists
+     * @throws SQLException on database error (permits caller transaction rollback)
+     */
+    public boolean createUser(Connection connection, User user) throws SQLException {
+        if (connection == null) {
+            throw new IllegalArgumentException("Database connection cannot be null.");
+        }
+        validateUser(user);
 
         // Pre-check for duplicate email within the active connection
-        if (existsByEmail(connection, normalizedEmail)) {
-            throw new DuplicateRecordException("User with email '" + normalizedEmail + "' already exists.");
+        if (existsByEmail(connection, user.getEmail())) {
+            throw new DuplicateRecordException("User with email '" + user.getEmail() + "' already exists.");
         }
 
         String sql = "INSERT INTO users (name, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)";
@@ -201,7 +206,7 @@ public class UserDAO {
         try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             statement.setString(1, user.getName());
-            statement.setString(2, normalizedEmail);
+            statement.setString(2, user.getEmail());
             statement.setString(3, user.getPasswordHash());
             statement.setString(4, user.getRole());
 
@@ -220,7 +225,7 @@ public class UserDAO {
 
         } catch (SQLException e) {
             if (e.getErrorCode() == 1062) {
-                throw new DuplicateRecordException("User with email '" + normalizedEmail + "' already exists.", e);
+                throw new DuplicateRecordException("User with email '" + user.getEmail() + "' already exists.", e);
             }
             throw e;
         }
