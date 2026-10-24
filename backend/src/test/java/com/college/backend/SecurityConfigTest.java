@@ -3,40 +3,36 @@ package com.college.backend;
 
 import com.college.backend.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.lang.reflect.Method;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-
+@SpringBootTest
+@AutoConfigureMockMvc
 class SecurityConfigTest {
 
-    @Test
-    void securityConfigurationClassCanBeCreated() {
-        SecurityConfig config = new SecurityConfig();
+    @Autowired
+    private MockMvc mockMvc;
 
-        assertNotNull(config);
+    @Test
+    void registrationEndpointIsPublic() throws Exception {
+        mockMvc.perform(get("/api/auth/register"))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
-    void securityConfigurationDeclaresFilterChainMethod() throws Exception {
-        Method method = SecurityConfig.class.getMethod(
-                "securityFilterChain",
-                HttpSecurity.class
-        );
-
-        assertEquals(SecurityFilterChain.class, method.getReturnType());
+    void loginEndpointIsPublic() throws Exception {
+        mockMvc.perform(get("/api/auth/login"))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
-    void securityConfigurationUsesBeanAnnotation() throws Exception {
-        Method method = SecurityConfig.class.getMethod(
-                "securityFilterChain",
-                HttpSecurity.class
-        );
-
-        assertNotNull(method.getAnnotation(org.springframework.context.annotation.Bean.class));
+    void otherEndpointsRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/protected-test"))
+                .andExpect(status().isUnauthorized());
     }
 }
