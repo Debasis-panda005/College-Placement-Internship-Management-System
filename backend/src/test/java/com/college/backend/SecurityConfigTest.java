@@ -114,4 +114,56 @@ class SecurityConfigTest {
         mockMvc.perform(get("/api/protected-test"))
                 .andExpect(status().isUnauthorized());
     }
+
+
+    @Test
+    void duplicateRegistrationReturnsBadRequest() throws Exception {
+        String email = "duplicate-" + System.nanoTime() + "@example.com";
+
+        String requestBody = """
+                {
+                    "name": "Test Student",
+                    "email": "%s",
+                    "password": "Password123",
+                    "role": "STUDENT"
+                }
+                """.formatted(email);
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void successfulLoginReturnsSafeUserDetails() throws Exception {
+        String email = "success-" + System.nanoTime() + "@example.com";
+
+        String requestBody = """
+                {
+                    "name": "Test Student",
+                    "email": "%s",
+                    "password": "Password123",
+                    "role": "STUDENT"
+                }
+                """.formatted(email);
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .param("email", email)
+                        .param("password", "Password123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.role").value("STUDENT"))
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
 }
