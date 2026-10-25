@@ -94,6 +94,18 @@
 <div class="container">
 
     <h1>Available Jobs & Internships</h1>
+    <div style="text-align: left; margin: 15px 0;">
+    <a href="${pageContext.request.contextPath}/admin/dashboard"
+       style="display: inline-block;
+              background-color: #1976d2;
+              color: white;
+              padding: 10px 18px;
+              text-decoration: none;
+              border-radius: 5px;
+              font-weight: bold;">
+        Back to Dashboard
+    </a>
+</div>
 
     <a href="add-job.jsp" class="add-button">
         + Add Job / Internship
@@ -409,7 +421,7 @@
 
                 </div>
 
-            </td>$env:CATALINA_HOME="D:\apache-tomcat-11.0.24"
+            </td>
 
         </tr>
 

@@ -1,11 +1,14 @@
- <%-- College Placement & Internship Management System --%>
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8" %>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | College Placement & Internship Management System</title>
+
+    <title>Admin Dashboard | College Placement &amp; Internship Management System</title>
 
     <style>
         * {
@@ -19,7 +22,6 @@
             color: #1f2937;
         }
 
-        /* Existing navbar theme */
         .navbar {
             background: #1f2937;
             color: #ffffff;
@@ -68,7 +70,6 @@
             font-weight: 700;
         }
 
-        /* Statistics cards */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -76,13 +77,18 @@
             margin-bottom: 35px;
         }
 
-        .stat-card {
+        .stat-card,
+        .module-card {
             background: #ffffff;
             border: 1px solid #e5e7eb;
             border-radius: 10px;
-            padding: 25px;
             box-shadow: 0 2px 8px rgba(31, 41, 55, 0.04);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            transition: transform 0.2s ease,
+                        box-shadow 0.2s ease;
+        }
+
+        .stat-card {
+            padding: 25px;
         }
 
         .stat-card:hover,
@@ -120,7 +126,6 @@
             text-decoration: underline;
         }
 
-        /* Management module cards */
         .modules-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -133,11 +138,6 @@
             align-items: flex-start;
             min-height: 185px;
             padding: 24px;
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(31, 41, 55, 0.04);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .module-number {
@@ -222,110 +222,130 @@
 
 <body>
 
-    <header class="navbar">
-        <div class="navbar-inner">
-            College Placement &amp; Internship Management System
+<header class="navbar">
+    <div class="navbar-inner">
+        College Placement &amp; Internship Management System
+    </div>
+</header>
+
+<main class="container">
+
+    <section class="page-header">
+        <div>
+            <h1>Admin Dashboard</h1>
+            <p>
+                Manage placement activities, job opportunities
+                and student applications.
+            </p>
         </div>
-    </header>
+    </section>
 
-    <main class="container">
+    <section aria-labelledby="overview-heading">
+        <h2 class="section-heading" id="overview-heading">
+            Overview
+        </h2>
 
-        <section class="page-header">
-            <div>
-                <h1>Admin Dashboard</h1>
-                <p>Manage placement activities, job opportunities and student applications.</p>
-            </div>
-        </section>
+        <div class="stats-grid">
 
-        <section aria-labelledby="overview-heading">
-            <h2 class="section-heading" id="overview-heading">Overview</h2>
+            <article class="stat-card">
+                <p class="stat-label">Total Jobs</p>
+                <p class="stat-number">${totalJobs}</p>
 
-            <div class="stats-grid">
+                <a class="card-link"
+                   href="${pageContext.request.contextPath}/JobServlet">
+                    Manage jobs &rarr;
+                </a>
+            </article>
 
-                <article class="stat-card">
-                    <p class="stat-label">Total Jobs</p>
-                    <p class="stat-number">${totalJobs}</p>
-                    <a class="card-link"
-                       href="${pageContext.request.contextPath}/jobs.jsp">
-                        Manage jobs &rarr;
-                    </a>
-                </article>
+            <article class="stat-card">
+                <p class="stat-label">Total Applications</p>
+                <p class="stat-number">${totalApplications}</p>
 
-                <article class="stat-card">
-                    <p class="stat-label">Total Applications</p>
-                    <p class="stat-number">${totalApplications}</p>
-                    <a class="card-link"
-                       href="${pageContext.request.contextPath}/ApplicationServlet">
-                        View applications &rarr;
-                    </a>
-                </article>
+                <a class="card-link"
+                   href="${pageContext.request.contextPath}/ApplicationServlet">
+                    View applications &rarr;
+                </a>
+            </article>
 
-            </div>
-        </section>
+        </div>
+    </section>
 
-        <section aria-labelledby="management-heading">
-            <h2 class="section-heading" id="management-heading">Management</h2>
+    <section aria-labelledby="management-heading">
+        <h2 class="section-heading" id="management-heading">
+            Management
+        </h2>
 
-            <div class="modules-grid">
+        <div class="modules-grid">
 
-                <article class="module-card">
-                    <span class="module-number">STUDENTS</span>
-                    <h3>Student Management</h3>
-                    <p>Access the student area and related placement information.</p>
-                    <a class="card-link"
-                       href="${pageContext.request.contextPath}/">
-                        Open student area &rarr;
-                    </a>
-                </article>
+            <article class="module-card">
+                <span class="module-number">STUDENTS</span>
+                <h3>Student Management</h3>
+                <p>
+                    Access the student area and related placement
+                    information.
+                </p>
+                <a class="card-link"
+                   href="${pageContext.request.contextPath}/students">
+                    Open student area &rarr;
+                </a>
+            </article>
 
-                <article class="module-card">
-                    <span class="module-number">COMPANIES</span>
-                    <h3>Company Management</h3>
-                    <p>Access the system area for company-related information.</p>
-                    <a class="card-link"
-                       href="${pageContext.request.contextPath}/">
-                        Open company area &rarr;
-                    </a>
-                </article>
+            <article class="module-card">
+                <span class="module-number">COMPANIES</span>
+                <h3>Company Management</h3>
+                <p>
+                    Access company records and related information.
+                </p>
+                <a class="card-link"
+                   href="${pageContext.request.contextPath}/companies">
+                    Open company area &rarr;
+                </a>
+            </article>
 
-                <article class="module-card">
-                    <span class="module-number">JOBS</span>
-                    <h3>Job Management</h3>
-                    <p>View available jobs and manage existing job postings.</p>
-                    <a class="card-link"
-                       href="${pageContext.request.contextPath}/jobs.jsp">
-                        Manage jobs &rarr;
-                    </a>
-                </article>
+            <article class="module-card">
+                <span class="module-number">JOBS</span>
+                <h3>Job Management</h3>
+                <p>
+                    View available jobs and manage existing postings.
+                </p>
+                <a class="card-link"
+                   href="${pageContext.request.contextPath}/JobServlet">
+                    Manage jobs &rarr;
+                </a>
+            </article>
 
-                <article class="module-card">
-                    <span class="module-number">INTERNSHIPS</span>
-                    <h3>Internship Opportunities</h3>
-                    <p>Browse the opportunities currently available in the system.</p>
-                    <a class="card-link"
-                       href="${pageContext.request.contextPath}/jobs.jsp">
-                        Browse opportunities &rarr;
-                    </a>
-                </article>
+            <article class="module-card">
+                <span class="module-number">INTERNSHIPS</span>
+                <h3>Internship Opportunities</h3>
+                <p>
+                    Browse opportunities currently listed in the system.
+                </p>
+                <a class="card-link"
+                   href="${pageContext.request.contextPath}/internships">
+                   Internship Opportunities
+                </a>
+            </article>
 
-                <article class="module-card">
-                    <span class="module-number">APPLICATIONS</span>
-                    <h3>Application Management</h3>
-                    <p>Review submitted applications and monitor application activity.</p>
-                    <a class="card-link"
-                       href="${pageContext.request.contextPath}/ApplicationServlet">
-                        View applications &rarr;
-                    </a>
-                </article>
+            <article class="module-card">
+                <span class="module-number">APPLICATIONS</span>
+                <h3>Application Management</h3>
+                <p>
+                    Review submitted applications and monitor activity.
+                </p>
+                <a class="card-link"
+                   href="${pageContext.request.contextPath}/ApplicationServlet">
+                    View applications &rarr;
+                </a>
+            </article>
 
-            </div>
-        </section>
+        </div>
+    </section>
 
-        <footer class="footer">
-            College Placement &amp; Internship Management System
-        </footer>
+    <footer class="footer">
+        College Placement &amp; Internship Management System
+    </footer>
 
-    </main>
+</main>
 
 </body>
 </html>

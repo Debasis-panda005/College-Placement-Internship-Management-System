@@ -1,3 +1,4 @@
+
 package com.college.placement.internship.job;
 
 public class Application {
@@ -8,6 +9,7 @@ public class Application {
     private String studentEmail;
     private String resume;
     private String appliedDate;
+    private String status = "Applied";
 
     public Application() {
     }
@@ -58,5 +60,13 @@ public class Application {
 
     public void setAppliedDate(String appliedDate) {
         this.appliedDate = appliedDate;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

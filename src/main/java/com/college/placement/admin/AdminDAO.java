@@ -1,5 +1,5 @@
 
-package com.collegeplacement.admin;
+package com.college.placement.admin;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -12,22 +12,15 @@ public class AdminDAO {
 
     public int getTotalJobs() throws SQLException {
         String sql = "SELECT COUNT(*) FROM jobs";
-
-        try (Connection con = getConnection();
-             PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        }
-
-        return 0;
+        return getCount(sql);
     }
 
     public int getTotalApplications() throws SQLException {
         String sql = "SELECT COUNT(*) FROM applications";
+        return getCount(sql);
+    }
 
+    private int getCount(String sql) throws SQLException {
         try (Connection con = getConnection();
              PreparedStatement ps = con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -35,9 +28,9 @@ public class AdminDAO {
             if (rs.next()) {
                 return rs.getInt(1);
             }
-        }
 
-        return 0;
+            return 0;
+        }
     }
 
     private Connection getConnection() throws SQLException {

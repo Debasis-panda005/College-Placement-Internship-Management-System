@@ -1,4 +1,8 @@
+
 package com.college.placement.internship.job;
+
+import java.io.IOException;
+import java.util.List;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -6,26 +10,26 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import java.io.IOException;
-
 @WebServlet("/JobServlet")
 public class JobServlet extends HttpServlet {
+
+    private static final long serialVersionUID = 1L;
 
     private JobDAO jobDAO;
 
     @Override
-    public void init() {
+    public void init() throws ServletException {
         jobDAO = new JobDAO();
     }
 
-    // ADD OR UPDATE JOB
     @Override
     protected void doPost(HttpServletRequest request,
                           HttpServletResponse response)
             throws ServletException, IOException {
 
-        String idParameter = request.getParameter("id");
+        request.setCharacterEncoding("UTF-8");
 
+        String idParameter = request.getParameter("id");
         String title = request.getParameter("title");
         String company = request.getParameter("company");
         String location = request.getParameter("location");
@@ -44,32 +48,36 @@ public class JobServlet extends HttpServlet {
         job.setJobType(jobType);
         job.setStatus(status);
 
-        // If ID exists, update existing job
-        if (idParameter != null && !idParameter.isEmpty()) {
+        try {
+            if (idParameter != null && !idParameter.trim().isEmpty()) {
+                int id = Integer.parseInt(idParameter);
+                job.setId(id);
 
-            int id = Integer.parseInt(idParameter);
+                jobDAO.updateJob(job);
 
-            job.setId(id);
+                response.sendRedirect(
+                    request.getContextPath()
+                    + "/JobServlet?message=updated"
+                );
+            } else {
+                jobDAO.addJob(job);
 
-            jobDAO.updateJob(job);
-
-            response.sendRedirect("JobServlet?message=updated");
-
-        } else {
-
-            // Otherwise, add a new job
-            jobDAO.addJob(job);
-
-            response.sendRedirect("JobServlet?message=added");
+                response.sendRedirect(
+                    request.getContextPath()
+                    + "/JobServlet?message=added"
+                );
+            }
+        } catch (NumberFormatException e) {
+            throw new ServletException("Invalid job ID.", e);
         }
     }
 
-
-    // VIEW, SEARCH, FILTER, SORT, EDIT, DELETE OR APPLY JOB
     @Override
     protected void doGet(HttpServletRequest request,
                          HttpServletResponse response)
             throws ServletException, IOException {
+
+        request.setCharacterEncoding("UTF-8");
 
         String action = request.getParameter("action");
         String search = request.getParameter("search");
@@ -78,135 +86,188 @@ public class JobServlet extends HttpServlet {
         String sortBy = request.getParameter("sortBy");
         String message = request.getParameter("message");
 
+        String idParameter = request.getParameter("id");
 
         // DELETE JOB
-        if ("delete".equals(action)) {
+        if ("delete".equalsIgnoreCase(action)) {
+            try {
+                if (idParameter != null
+                        && !idParameter.trim().isEmpty()) {
 
-            String idParameter = request.getParameter("id");
+                    int id = Integer.parseInt(idParameter);
+                    jobDAO.deleteJob(id);
+                }
 
-            if (idParameter != null && !idParameter.isEmpty()) {
+                response.sendRedirect(
+                    request.getContextPath()
+                    + "/JobServlet?message=deleted"
+                );
+                return;
 
-                int id = Integer.parseInt(idParameter);
-
-                jobDAO.deleteJob(id);
+            } catch (NumberFormatException e) {
+                throw new ServletException("Invalid job ID.", e);
             }
-
-            response.sendRedirect("JobServlet?message=deleted");
-            return;
         }
-
 
         // EDIT JOB
-        if ("edit".equals(action)) {
+        if ("edit".equalsIgnoreCase(action)) {
+            try {
+                if (idParameter != null
+                        && !idParameter.trim().isEmpty()) {
 
-            String idParameter = request.getParameter("id");
+                    int id = Integer.parseInt(idParameter);
+                    Job job = jobDAO.getJobById(id);
 
-            if (idParameter != null && !idParameter.isEmpty()) {
+                    if (job == null) {
+                        response.sendError(
+                            HttpServletResponse.SC_NOT_FOUND,
+                            "Job not found."
+                        );
+                        return;
+                    }
 
-                int id = Integer.parseInt(idParameter);
+                    request.setAttribute("job", job);
 
-                Job job = jobDAO.getJobById(id);
+                    request.getRequestDispatcher("/edit-job.jsp")
+                           .forward(request, response);
+                    return;
+                }
 
-                request.setAttribute("job", job);
-
-                request.getRequestDispatcher("edit-job.jsp")
-                        .forward(request, response);
-
-                return;
+            } catch (NumberFormatException e) {
+                throw new ServletException("Invalid job ID.", e);
             }
         }
-
 
         // APPLY FOR JOB
-        if ("apply".equals(action)) {
+        if ("apply".equalsIgnoreCase(action)) {
+            try {
+                if (idParameter != null
+                        && !idParameter.trim().isEmpty()) {
 
-            String idParameter = request.getParameter("id");
+                    int id = Integer.parseInt(idParameter);
+                    Job job = jobDAO.getJobById(id);
 
-            if (idParameter != null && !idParameter.isEmpty()) {
+                    if (job == null) {
+                        response.sendError(
+                            HttpServletResponse.SC_NOT_FOUND,
+                            "Job not found."
+                        );
+                        return;
+                    }
 
-                int id = Integer.parseInt(idParameter);
+                    request.setAttribute("job", job);
 
-                Job job = jobDAO.getJobById(id);
+                    request.getRequestDispatcher("/apply-job.jsp")
+                           .forward(request, response);
+                    return;
+                }
 
-                request.setAttribute("job", job);
-
-                request.getRequestDispatcher("apply-job.jsp")
-                        .forward(request, response);
-
-                return;
+            } catch (NumberFormatException e) {
+                throw new ServletException("Invalid job ID.", e);
             }
         }
-
 
         // VIEW JOB DETAILS
-        if ("view".equals(action)) {
+        if ("view".equalsIgnoreCase(action)) {
+            try {
+                if (idParameter != null
+                        && !idParameter.trim().isEmpty()) {
 
-            String idParameter = request.getParameter("id");
+                    int id = Integer.parseInt(idParameter);
+                    Job job = jobDAO.getJobById(id);
 
-            if (idParameter != null && !idParameter.isEmpty()) {
+                    if (job == null) {
+                        response.sendError(
+                            HttpServletResponse.SC_NOT_FOUND,
+                            "Job not found."
+                        );
+                        return;
+                    }
 
-                int id = Integer.parseInt(idParameter);
+                    request.setAttribute("job", job);
 
-                Job job = jobDAO.getJobById(id);
+                    request.getRequestDispatcher("/job-details.jsp")
+                           .forward(request, response);
+                    return;
+                }
 
-                request.setAttribute("job", job);
-
-                request.getRequestDispatcher("job-details.jsp")
-                        .forward(request, response);
-
-                return;
+            } catch (NumberFormatException e) {
+                throw new ServletException("Invalid job ID.", e);
             }
         }
 
+        // RETRIEVE JOBS
+        List<Job> jobs;
 
-        // SEARCH JOBS
-        if (search != null && !search.trim().isEmpty()) {
+        try {
+            if (search != null && !search.trim().isEmpty()) {
 
-            request.setAttribute(
-                    "jobs",
-                    jobDAO.searchJobs(search.trim())
-            );
+                jobs = jobDAO.searchJobs(search.trim());
 
-            // FILTER JOBS BY TYPE
-        } else if (jobType != null && !jobType.trim().isEmpty()) {
+            } else if (jobType != null
+                    && !jobType.trim().isEmpty()) {
 
-            request.setAttribute(
-                    "jobs",
-                    jobDAO.getJobsByType(jobType)
-            );
+                jobs = jobDAO.getJobsByType(jobType);
 
-            // FILTER JOBS BY STATUS
-        } else if (status != null && !status.trim().isEmpty()) {
+            } else if (status != null
+                    && !status.trim().isEmpty()) {
 
-            request.setAttribute(
-                    "jobs",
-                    jobDAO.getJobsByStatus(status)
-            );
+                jobs = jobDAO.getJobsByStatus(status);
 
-            // SORT JOBS
-        } else if (sortBy != null && !sortBy.trim().isEmpty()) {
+            } else if (sortBy != null
+                    && !sortBy.trim().isEmpty()) {
 
-            request.setAttribute(
-                    "jobs",
-                    jobDAO.getJobsSortedBy(sortBy)
-            );
+                jobs = jobDAO.getJobsSortedBy(sortBy);
 
-            // VIEW ALL JOBS
-        } else {
+            } else {
 
-            request.setAttribute(
-                    "jobs",
-                    jobDAO.getAllJobs()
+                // Default: retrieve every job
+                jobs = jobDAO.getAllJobs();
+
+                // DEBUG OUTPUT IN ECLIPSE CONSOLE
+                System.out.println("========== JOB DEBUG ==========");
+                System.out.println(
+                    "Context path: " + request.getContextPath()
+                );
+                System.out.println(
+                    "Request URI: " + request.getRequestURI()
+                );
+                System.out.println(
+                    "Jobs retrieved: "
+                    + (jobs == null ? "NULL" : jobs.size())
+                );
+
+                if (jobs != null) {
+                    for (Job currentJob : jobs) {
+                        System.out.println(
+                            "Job ID: " + currentJob.getId()
+                            + ", Title: " + currentJob.getTitle()
+                            + ", Company: " + currentJob.getCompany()
+                        );
+                    }
+                }
+
+                System.out.println("===============================");
+            }
+
+            if (jobs == null) {
+                jobs = new java.util.ArrayList<Job>();
+            }
+
+            request.setAttribute("jobs", jobs);
+            request.setAttribute("message", message);
+
+            request.getRequestDispatcher("/jobs.jsp")
+                   .forward(request, response);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            throw new ServletException(
+                "Unable to retrieve or display jobs. "
+                + "Check the Eclipse Console for the database error.",
+                e
             );
         }
-
-
-        // Send message to JSP
-        request.setAttribute("message", message);
-
-
-        // SHOW JOBS PAGE
-        request.getRequestDispatcher("jobs.jsp")
-                .forward(request, response);
     }
 }
