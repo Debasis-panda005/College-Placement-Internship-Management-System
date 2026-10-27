@@ -1,20 +1,15 @@
-
 package com.college.backend.service;
 
+import com.college.backend.dao.UserDAO;
 import com.college.backend.entity.User;
-import com.college.backend.repository.UserRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.stereotype.Service;
+import org.mindrot.jbcrypt.BCrypt;
 
-@Service
 public class AuthService {
 
-    private final UserRepository userRepository;
-    private final BCryptPasswordEncoder passwordEncoder;
+    private final UserDAO userDAO;
 
-    public AuthService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = new BCryptPasswordEncoder();
+    public AuthService() {
+        this.userDAO = new UserDAO();
     }
 
     public User register(User user) {
@@ -32,39 +27,37 @@ public class AuthService {
 
         if (user.getPassword() == null || user.getPassword().length() < 8) {
             throw new IllegalArgumentException(
-                    "Password must contain at least 8 characters"
-            );
+                    "Password must contain at least 8 characters");
         }
 
         String email = user.getEmail().trim().toLowerCase();
 
-        if (userRepository.existsByEmail(email)) {
+        if (userDAO.existsByEmail(email)) {
             throw new IllegalArgumentException("Email already registered");
         }
 
         user.setName(user.getName().trim());
         user.setEmail(email);
 
-        // Public registration must never grant an elevated role.
+        // Public registration must not grant an elevated role.
         user.setRole("STUDENT");
 
-        // Store only the BCrypt hash, never the raw password.
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-
-        return userRepository.save(user);
+        // UserDAO.create() hashes the password before storing it.
+        return userDAO.create(user);
     }
 
     public User login(String email, String password) {
         if (email == null || email.isBlank()
                 || password == null || password.isBlank()) {
-            throw new IllegalArgumentException("Email and password are required");
+            throw new IllegalArgumentException(
+                    "Email and password are required");
         }
 
-        User user = userRepository.findByEmail(email.trim().toLowerCase())
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Invalid email or password"));
+        User user = userDAO.findByEmail(email.trim().toLowerCase());
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
+        if (user == null
+                || user.getPassword() == null
+                || !BCrypt.checkpw(password, user.getPassword())) {
             throw new IllegalArgumentException("Invalid email or password");
         }
 
