@@ -2,6 +2,8 @@ package com.college.backend.dao;
 
 import com.college.backend.entity.Application;
 import com.college.backend.entity.ApplicationStatusHistory;
+import com.college.backend.exception.DAOException;
+import com.college.backend.exception.DuplicateRecordException;
 import com.college.backend.util.DBConnection;
 
 import java.sql.Connection;
@@ -20,11 +22,21 @@ public class ApplicationDAO {
 
     private final ApplicationStatusHistoryDAO statusHistoryDAO = new ApplicationStatusHistoryDAO();
 
+    /**
+     * Obtains a database connection. Protected to allow test overrides.
+     */
+    protected Connection getConnection() throws SQLException {
+        return DBConnection.getConnection();
+    }
+
     // =====================================================
     // 1. CREATE APPLICATION
     // =====================================================
 
     public boolean createApplication(Application application) {
+        if (application == null) {
+            throw new IllegalArgumentException("Application cannot be null.");
+        }
 
         String sql = "INSERT INTO applications " +
                 "(student_id, job_id, application_date, status) " +
@@ -33,7 +45,7 @@ public class ApplicationDAO {
         Connection connection = null;
 
         try {
-            connection = DBConnection.getConnection();
+            connection = getConnection();
             connection.setAutoCommit(false);
 
             Long generatedId = null;
@@ -94,8 +106,11 @@ public class ApplicationDAO {
                     ex.printStackTrace();
                 }
             }
-            e.printStackTrace();
-            return false;
+            if (e.getErrorCode() == 1062) {
+                throw new DuplicateRecordException("Application already exists for student ID "
+                        + application.getStudentId() + " and job ID " + application.getJobId() + ".", e);
+            }
+            throw new DAOException("Database error occurred while creating application.", e);
         } finally {
             if (connection != null) {
                 try {
@@ -558,10 +573,13 @@ public class ApplicationDAO {
     // =====================================================
 
     public boolean hasAlreadyApplied(Long studentId, Long jobId) {
+        if (studentId == null || jobId == null) {
+            return false;
+        }
 
         String sql = "SELECT COUNT(*) FROM applications WHERE student_id = ? AND job_id = ?";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setLong(1, studentId);
@@ -574,7 +592,7 @@ public class ApplicationDAO {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DAOException("Database error checking existing application: " + e.getMessage(), e);
         }
 
         return false;

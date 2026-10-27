@@ -2,8 +2,11 @@ package com.college.backend.servlet;
 
 import com.college.backend.dao.ApplicationDAO;
 import com.college.backend.dao.InterviewDAO;
+import com.college.backend.dao.StudentDAO;
 import com.college.backend.entity.Application;
 import com.college.backend.entity.Interview;
+import com.college.backend.entity.Student;
+import com.college.backend.util.AuthUtil;
 import com.college.backend.util.CsrfUtil;
 
 import jakarta.servlet.ServletException;
@@ -11,25 +14,45 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @WebServlet("/interviews")
 public class InterviewServlet extends HttpServlet {
 
     private InterviewDAO interviewDAO;
     private ApplicationDAO applicationDAO;
+    private StudentDAO studentDAO;
 
     @Override
     public void init() {
         interviewDAO = new InterviewDAO();
         applicationDAO = new ApplicationDAO();
+        studentDAO = new StudentDAO();
+    }
+
+    // Setters for test dependency injection
+    public void setInterviewDAO(InterviewDAO interviewDAO) {
+        this.interviewDAO = interviewDAO;
+    }
+
+    public void setApplicationDAO(ApplicationDAO applicationDAO) {
+        this.applicationDAO = applicationDAO;
+    }
+
+    public void setStudentDAO(StudentDAO studentDAO) {
+        this.studentDAO = studentDAO;
     }
 
     // =====================================================
@@ -43,13 +66,38 @@ public class InterviewServlet extends HttpServlet {
 
         CsrfUtil.getOrCreateToken(request.getSession());
 
+        // 1. Enforce Authentication (Requirement 5.2)
+        if (!AuthUtil.isAuthenticated(request)) {
+            HttpSession newSession = request.getSession(true);
+            CsrfUtil.getOrCreateToken(newSession);
+            newSession.setAttribute("errorMessage", "You must log in to view interview schedules.");
+            response.sendRedirect(request.getContextPath() + "/login");
+            return;
+        }
+
         String action = request.getParameter("action");
 
         // Reject state-changing actions on GET with HTTP 405 Method Not Allowed
-        if ("complete".equals(action) || "cancel".equals(action) || "delete".equals(action)) {
+        if ("complete".equals(action) || "cancel".equals(action) || "delete".equals(action)
+                || "create".equals(action) || "update".equals(action)) {
             response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED,
                     "HTTP method GET is not supported for action: " + action);
             return;
+        }
+
+        boolean isStaff = AuthUtil.isCoordinatorOrAdmin(request);
+        Long sessionUserId = AuthUtil.getSessionUserId(request);
+        Student currentStudent = null;
+        if (!isStaff) {
+            currentStudent = studentDAO.findByUserId(sessionUserId);
+            if (currentStudent == null) {
+                HttpSession currSession = request.getSession(false);
+                if (currSession != null) {
+                    currSession.setAttribute("errorMessage", "No student profile found for your account. Please complete your registration.");
+                }
+                response.sendRedirect(request.getContextPath() + "/jobs");
+                return;
+            }
         }
 
         // -------------------------------------------------
@@ -57,6 +105,12 @@ public class InterviewServlet extends HttpServlet {
         // -------------------------------------------------
 
         if ("edit".equals(action)) {
+            // Only COORDINATOR or ADMIN can access the edit/reschedule form (Requirement 5.2)
+            if (!isStaff) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "Access denied: Only coordinators and administrators can edit interviews.");
+                return;
+            }
 
             String idParam = request.getParameter("id");
             if (idParam == null || idParam.trim().isEmpty()) {
@@ -127,7 +181,7 @@ public class InterviewServlet extends HttpServlet {
         }
 
         // -------------------------------------------------
-        // DEFAULT - SHOW ALL INTERVIEWS
+        // DEFAULT - SHOW ALL INTERVIEWS (ROLE-SCOPED)
         // -------------------------------------------------
 
         else {
@@ -160,23 +214,6 @@ public class InterviewServlet extends HttpServlet {
                 request.setAttribute("successMessage", successMessage);
                 request.getSession().removeAttribute("successMessage");
             }
-
-            // Retrieve interview statistics
-            Map<String, Integer> interviewStats =
-                    interviewDAO.getInterviewStatistics();
-
-            request.setAttribute(
-                    "interviewStats",
-                    interviewStats
-            );
-
-            Map<Long, Boolean> rescheduledMap =
-                    interviewDAO.getRescheduledApplicationsMap();
-
-            request.setAttribute(
-                    "rescheduledMap",
-                    rescheduledMap
-            );
 
             // Parse search and filter parameters
             String filterAppIdParam = request.getParameter("filterAppId");
@@ -213,16 +250,72 @@ public class InterviewServlet extends HttpServlet {
             }
 
             List<Interview> interviews;
-            if (filterAppId != null || filterDate != null || filterMode != null || filterStatus != null) {
-                interviews = interviewDAO.searchInterviews(filterAppId, filterDate, filterMode, filterStatus);
+            Map<String, Integer> interviewStats;
+            Map<Long, Boolean> rescheduledMap = interviewDAO.getRescheduledApplicationsMap();
+
+            if (isStaff) {
+                // Staff (Coordinator / Admin): Full institutional listing & metrics
+                if (filterAppId != null || filterDate != null || filterMode != null || filterStatus != null) {
+                    interviews = interviewDAO.searchInterviews(filterAppId, filterDate, filterMode, filterStatus);
+                } else {
+                    interviews = interviewDAO.getAllInterviews();
+                }
+                interviewStats = interviewDAO.getInterviewStatistics();
             } else {
-                interviews = interviewDAO.getAllInterviews();
+                // Student: Strictly scoped to own applications (Requirement 5.2)
+                List<Application> studentApps = applicationDAO.searchApplications(currentStudent.getId(), null, null);
+                Set<Long> studentAppIds = new HashSet<>();
+                if (studentApps != null) {
+                    for (Application a : studentApps) {
+                        studentAppIds.add(a.getId());
+                    }
+                }
+
+                // If student specifies filterAppId, verify it belongs to their own application
+                if (filterAppId != null && !studentAppIds.contains(filterAppId)) {
+                    interviews = new ArrayList<>();
+                } else {
+                    List<Interview> rawInterviews;
+                    if (filterAppId != null || filterDate != null || filterMode != null || filterStatus != null) {
+                        rawInterviews = interviewDAO.searchInterviews(filterAppId, filterDate, filterMode, filterStatus);
+                    } else {
+                        rawInterviews = interviewDAO.getAllInterviews();
+                    }
+                    interviews = new ArrayList<>();
+                    if (rawInterviews != null) {
+                        for (Interview in : rawInterviews) {
+                            if (studentAppIds.contains(in.getApplicationId())) {
+                                interviews.add(in);
+                            }
+                        }
+                    }
+                }
+
+                // Student-specific metrics (institutional metrics shielded)
+                interviewStats = new HashMap<>();
+                interviewStats.put("TOTAL", 0);
+                interviewStats.put("SCHEDULED", 0);
+                interviewStats.put("COMPLETED", 0);
+                interviewStats.put("CANCELLED", 0);
+                interviewStats.put("RESCHEDULED", 0);
+
+                if (interviews != null) {
+                    for (Interview in : interviews) {
+                        interviewStats.put("TOTAL", interviewStats.get("TOTAL") + 1);
+                        String st = in.getStatus();
+                        if (st != null && interviewStats.containsKey(st.toUpperCase())) {
+                            interviewStats.put(st.toUpperCase(), interviewStats.get(st.toUpperCase()) + 1);
+                        }
+                        if (rescheduledMap != null && Boolean.TRUE.equals(rescheduledMap.get(in.getApplicationId()))) {
+                            interviewStats.put("RESCHEDULED", interviewStats.get("RESCHEDULED") + 1);
+                        }
+                    }
+                }
             }
 
-            request.setAttribute(
-                    "interviews",
-                    interviews
-            );
+            request.setAttribute("interviewStats", interviewStats);
+            request.setAttribute("rescheduledMap", rescheduledMap);
+            request.setAttribute("interviews", interviews);
             request.setAttribute("today", LocalDate.now().toString());
 
             // Retain filter parameter values for JSP form inputs
@@ -250,6 +343,13 @@ public class InterviewServlet extends HttpServlet {
         // Validate CSRF Token
         if (!CsrfUtil.isValid(request)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid or missing CSRF token.");
+            return;
+        }
+
+        // Enforce Coordinator or Admin role on all mutating interview operations (Requirement 5.2)
+        if (!AuthUtil.isCoordinatorOrAdmin(request)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                    "Access denied: Only coordinators and administrators can manage interviews.");
             return;
         }
 
@@ -699,8 +799,8 @@ public class InterviewServlet extends HttpServlet {
                     interviewDAO.deleteInterview(id);
                 } catch (NumberFormatException e) {
                     request.getSession().setAttribute(
-                            "errorMessage",
-                            "Invalid Interview ID format!"
+                        "errorMessage",
+                        "Invalid Interview ID format!"
                     );
                 }
             }

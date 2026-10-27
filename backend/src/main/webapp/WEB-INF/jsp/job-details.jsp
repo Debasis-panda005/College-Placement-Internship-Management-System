@@ -38,6 +38,28 @@
             font-weight: 500;
         }
 
+        .nav-links form {
+            display: inline;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-links .btn-logout {
+            background: none;
+            border: none;
+            color: #dc3545;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 0;
+            margin: 0 12px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .nav-links .btn-logout:hover {
+            text-decoration: underline;
+        }
+
         h1 {
             color: #333;
             margin-top: 0;
@@ -148,6 +170,13 @@
         <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
         <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
         <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
+        <c:if test="${not empty sessionScope.userId}">
+            |
+            <form action="${pageContext.request.contextPath}/logout" method="post" style="display: inline; margin: 0; padding: 0;">
+                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </c:if>
     </div>
 
     <h1>Job / Internship Details</h1>
@@ -196,6 +225,27 @@
         <div class="detail-value"><c:out value="${job.jobType}"/></div>
     </div>
 
+    <c:if test="${not empty job.deadline}">
+        <div class="detail-row">
+            <div class="detail-label">Application Deadline:</div>
+            <div class="detail-value"><strong><c:out value="${job.deadline}"/></strong></div>
+        </div>
+    </c:if>
+
+    <c:if test="${not empty job.minCgpa}">
+        <div class="detail-row">
+            <div class="detail-label">Minimum CGPA:</div>
+            <div class="detail-value"><c:out value="${job.minCgpa}"/> / 10.00</div>
+        </div>
+    </c:if>
+
+    <c:if test="${not empty job.eligibleDepartments}">
+        <div class="detail-row">
+            <div class="detail-label">Eligible Departments:</div>
+            <div class="detail-value"><c:out value="${job.eligibleDepartments}"/></div>
+        </div>
+    </c:if>
+
     <div class="detail-row">
         <div class="detail-label">Status:</div>
         <div class="detail-value">
@@ -210,30 +260,59 @@
         </div>
     </div>
 
-    <!-- STUDENT APPLICATION FLOW NOTICE (AUTHENTICATION DEPENDENCY) -->
+    <!-- STUDENT APPLICATION FLOW -->
     <div class="notice-box">
-        <h3>Student Application Workflow</h3>
-        <p>
-            <strong>Authentication Dependency:</strong> Direct student self-application requires verified
-            session authentication from the upcoming <code>feature/auth-student</code> module to ensure student identity
-            is never trusted from unverified browser input.
-        </p>
-        <p>
-            Coordinators and administrators can manage and register candidate applications for this position
-            (Job ID: <strong><c:out value="${job.id}"/></strong>) through the central application pipeline.
-        </p>
-        <a href="${pageContext.request.contextPath}/applications?jobId=${job.id}" class="btn btn-manage-app">
-            View / Create Applications for this Job
-        </a>
+        <h3>Student Application</h3>
+        <c:choose>
+            <c:when test="${job.status == 'Active'}">
+                <c:choose>
+                    <c:when test="${not empty sessionScope.userId}">
+                        <p>Submit your application directly using your authenticated student profile.</p>
+                        <form action="${pageContext.request.contextPath}/applications" method="post" style="display:inline-block; margin-top: 10px;">
+                            <input type="hidden" name="action" value="apply">
+                            <input type="hidden" name="jobId" value="${job.id}">
+                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                            <button type="submit" class="btn btn-manage-app" style="cursor: pointer; border: none; font-size: 14px;">
+                                Apply Now
+                            </button>
+                        </form>
+                    </c:when>
+                    <c:otherwise>
+                        <p>You must be signed in as a student to apply for this job.</p>
+                        <a href="${pageContext.request.contextPath}/login" class="btn btn-primary" style="margin-top: 10px;">
+                            Log In to Apply
+                        </a>
+                    </c:otherwise>
+                </c:choose>
+            </c:when>
+            <c:otherwise>
+                <p style="color: #dc3545; font-weight: bold;">
+                    Applications are closed for this position.
+                </p>
+            </c:otherwise>
+        </c:choose>
+
+        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+            <div style="margin-top: 15px; padding-top: 12px; border-top: 1px dashed #b6d4fe;">
+                <p style="margin: 0 0 8px 0; font-size: 13px; color: #555;">
+                    Administrative pipeline management:
+                </p>
+                <a href="${pageContext.request.contextPath}/applications?jobId=${job.id}" class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px;">
+                    View / Manage Applications for this Job
+                </a>
+            </div>
+        </c:if>
     </div>
 
     <div class="actions-bar">
         <a href="${pageContext.request.contextPath}/jobs" class="btn btn-secondary">
             &larr; Back to Jobs
         </a>
-        <a href="${pageContext.request.contextPath}/jobs?action=edit&id=${job.id}" class="btn btn-primary">
-            Edit Job
-        </a>
+        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+            <a href="${pageContext.request.contextPath}/jobs?action=edit&id=${job.id}" class="btn btn-primary">
+                Edit Job
+            </a>
+        </c:if>
     </div>
 
 </div>

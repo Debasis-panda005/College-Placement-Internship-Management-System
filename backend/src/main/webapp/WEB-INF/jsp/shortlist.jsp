@@ -51,6 +51,28 @@
             font-weight: bold;
         }
 
+        .nav-links form {
+            display: inline;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-links .btn-logout {
+            background: none;
+            border: none;
+            color: #dc3545;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 0;
+            margin: 0 12px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .nav-links .btn-logout:hover {
+            text-decoration: underline;
+        }
+
         .alert-error {
             background-color: #f8d7da;
             color: #842029;
@@ -194,19 +216,26 @@
         <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
         <a class="active" href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
         <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
+        <c:if test="${not empty sessionScope.userId}">
+            |
+            <form action="${pageContext.request.contextPath}/logout" method="post" style="display: inline; margin: 0; padding: 0;">
+                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </c:if>
     </div>
 
     <h1>Shortlisted Candidates</h1>
 
     <c:if test="${not empty errorMessage}">
         <div class="alert-error">
-            ${errorMessage}
+            <c:out value="${errorMessage}"/>
         </div>
     </c:if>
 
     <c:if test="${not empty successMessage}">
         <div class="alert-success">
-            ${successMessage}
+            <c:out value="${successMessage}"/>
         </div>
     </c:if>
 
@@ -304,10 +333,12 @@
                             <div class="actions">
                                 <c:choose>
                                     <c:when test="${empty interview}">
-                                        <a class="action-button interview-btn"
-                                           href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
-                                            Schedule Interview
-                                        </a>
+                                        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                                            <a class="action-button interview-btn"
+                                               href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
+                                                Schedule Interview
+                                            </a>
+                                        </c:if>
                                         <a class="action-button view-btn"
                                            href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
                                             View Details
@@ -330,23 +361,25 @@
                                     </c:when>
 
                                     <c:when test="${interview.status == 'COMPLETED'}">
-                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                            <input type="hidden" name="action" value="select">
-                                            <input type="hidden" name="id" value="${application.id}">
-                                            <input type="hidden" name="from" value="shortlist">
-                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                            <button type="submit" class="action-button select-btn">Select</button>
-                                        </form>
-                                        <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                            <input type="hidden" name="action" value="reject">
-                                            <input type="hidden" name="id" value="${application.id}">
-                                            <input type="hidden" name="from" value="shortlist">
-                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                            <button type="submit" class="action-button reject-btn"
-                                                    onclick="return confirm('Are you sure you want to reject this candidate?');">
-                                                Reject
-                                            </button>
-                                        </form>
+                                        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                                <input type="hidden" name="action" value="select">
+                                                <input type="hidden" name="id" value="${application.id}">
+                                                <input type="hidden" name="from" value="shortlist">
+                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                <button type="submit" class="action-button select-btn">Select</button>
+                                            </form>
+                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
+                                                <input type="hidden" name="action" value="reject">
+                                                <input type="hidden" name="id" value="${application.id}">
+                                                <input type="hidden" name="from" value="shortlist">
+                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                <button type="submit" class="action-button reject-btn"
+                                                        onclick="return confirm('Are you sure you want to reject this candidate?');">
+                                                    Reject
+                                                </button>
+                                            </form>
+                                        </c:if>
                                         <a class="action-button view-btn"
                                            href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
                                             View Details
@@ -358,10 +391,12 @@
                                     </c:when>
 
                                     <c:when test="${interview.status == 'CANCELLED'}">
-                                        <a class="action-button interview-btn"
-                                           href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
-                                            Schedule Interview
-                                        </a>
+                                        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                                            <a class="action-button interview-btn"
+                                               href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
+                                                Schedule Interview
+                                            </a>
+                                        </c:if>
                                         <a class="action-button view-btn"
                                            href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
                                             View Details

@@ -4,14 +4,23 @@ import com.college.backend.entity.Job;
 import com.college.backend.util.DBConnection;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
 public class JobDAO {
+
+    /**
+     * Obtains a database connection. Protected to allow test overrides.
+     */
+    protected Connection getConnection() throws SQLException {
+        return DBConnection.getConnection();
+    }
 
     // =====================================================
     // 1. ADD JOB
@@ -22,10 +31,10 @@ public class JobDAO {
             return false;
         }
 
-        String sql = "INSERT INTO jobs (title, company, location, description, salary, job_type, status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO jobs (title, company, location, description, salary, job_type, status, deadline, min_cgpa, eligible_departments) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             statement.setString(1, job.getTitle());
@@ -35,6 +44,13 @@ public class JobDAO {
             statement.setString(5, job.getSalary());
             statement.setString(6, job.getJobType());
             statement.setString(7, job.getStatus() != null ? job.getStatus() : "Active");
+            if (job.getDeadline() != null) {
+                statement.setDate(8, Date.valueOf(job.getDeadline()));
+            } else {
+                statement.setNull(8, Types.DATE);
+            }
+            statement.setBigDecimal(9, job.getMinCgpa());
+            statement.setString(10, job.getEligibleDepartments());
 
             int affected = statement.executeUpdate();
             if (affected > 0) {
@@ -59,10 +75,9 @@ public class JobDAO {
 
     public List<Job> getAllJobs() {
         List<Job> jobs = new ArrayList<>();
-        String sql = "SELECT id, title, company, location, description, salary, job_type, status " +
-                "FROM jobs ORDER BY id DESC";
+        String sql = "SELECT * FROM jobs ORDER BY id DESC";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet resultSet = statement.executeQuery()) {
 
@@ -86,10 +101,9 @@ public class JobDAO {
             return null;
         }
 
-        String sql = "SELECT id, title, company, location, description, salary, job_type, status " +
-                "FROM jobs WHERE id = ?";
+        String sql = "SELECT * FROM jobs WHERE id = ?";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setLong(1, id);
@@ -117,9 +131,9 @@ public class JobDAO {
         }
 
         String sql = "UPDATE jobs SET title = ?, company = ?, location = ?, description = ?, " +
-                "salary = ?, job_type = ?, status = ? WHERE id = ?";
+                "salary = ?, job_type = ?, status = ?, deadline = ?, min_cgpa = ?, eligible_departments = ? WHERE id = ?";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setString(1, job.getTitle());
@@ -129,7 +143,14 @@ public class JobDAO {
             statement.setString(5, job.getSalary());
             statement.setString(6, job.getJobType());
             statement.setString(7, job.getStatus() != null ? job.getStatus() : "Active");
-            statement.setLong(8, job.getId());
+            if (job.getDeadline() != null) {
+                statement.setDate(8, Date.valueOf(job.getDeadline()));
+            } else {
+                statement.setNull(8, Types.DATE);
+            }
+            statement.setBigDecimal(9, job.getMinCgpa());
+            statement.setString(10, job.getEligibleDepartments());
+            statement.setLong(11, job.getId());
 
             return statement.executeUpdate() > 0;
 
@@ -150,7 +171,7 @@ public class JobDAO {
 
         String sql = "DELETE FROM jobs WHERE id = ?";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setLong(1, id);
@@ -172,10 +193,9 @@ public class JobDAO {
             return getAllJobs();
         }
 
-        String sql = "SELECT id, title, company, location, description, salary, job_type, status " +
-                "FROM jobs WHERE title LIKE ? OR company LIKE ? OR location LIKE ? ORDER BY id DESC";
+        String sql = "SELECT * FROM jobs WHERE title LIKE ? OR company LIKE ? OR location LIKE ? ORDER BY id DESC";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             String pattern = "%" + keyword.trim() + "%";
@@ -206,10 +226,9 @@ public class JobDAO {
             return getAllJobs();
         }
 
-        String sql = "SELECT id, title, company, location, description, salary, job_type, status " +
-                "FROM jobs WHERE job_type = ? ORDER BY id DESC";
+        String sql = "SELECT * FROM jobs WHERE job_type = ? ORDER BY id DESC";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setString(1, jobType.trim());
@@ -237,10 +256,9 @@ public class JobDAO {
             return getAllJobs();
         }
 
-        String sql = "SELECT id, title, company, location, description, salary, job_type, status " +
-                "FROM jobs WHERE status = ? ORDER BY id DESC";
+        String sql = "SELECT * FROM jobs WHERE status = ? ORDER BY id DESC";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setString(1, status.trim());
@@ -334,10 +352,9 @@ public class JobDAO {
     public List<Job> getJobsSortedBy(String column) {
         List<Job> jobs = new ArrayList<>();
         String sortClause = resolveSortOrder(column);
-        String sql = "SELECT id, title, company, location, description, salary, job_type, status " +
-                "FROM jobs ORDER BY " + sortClause;
+        String sql = "SELECT * FROM jobs ORDER BY " + sortClause;
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet resultSet = statement.executeQuery()) {
 
@@ -366,6 +383,28 @@ public class JobDAO {
         job.setSalary(resultSet.getString("salary"));
         job.setJobType(resultSet.getString("job_type"));
         job.setStatus(resultSet.getString("status"));
+
+        try {
+            Date deadline = resultSet.getDate("deadline");
+            if (deadline != null) {
+                job.setDeadline(deadline.toLocalDate());
+            }
+        } catch (SQLException ignored) {
+            // column not present in pre-migration schema
+        }
+
+        try {
+            job.setMinCgpa(resultSet.getBigDecimal("min_cgpa"));
+        } catch (SQLException ignored) {
+            // column not present in pre-migration schema
+        }
+
+        try {
+            job.setEligibleDepartments(resultSet.getString("eligible_departments"));
+        } catch (SQLException ignored) {
+            // column not present in pre-migration schema
+        }
+
         return job;
     }
 }
