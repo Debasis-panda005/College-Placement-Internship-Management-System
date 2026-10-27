@@ -15,9 +15,10 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 
-@WebServlet({"/jobs", "/jobs/*"})
+@WebServlet({"/jobs", "/jobs/*", "/internships", "/internships/*"})
 public class JobServlet extends HttpServlet {
 
     private JobDAO jobDAO;
@@ -40,6 +41,9 @@ public class JobServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request,
                          HttpServletResponse response)
             throws ServletException, IOException {
+
+        boolean isInternships = isInternshipsEndpoint(request);
+        request.setAttribute("isInternshipsEndpoint", isInternships);
 
         CsrfUtil.getOrCreateToken(request.getSession());
 
@@ -80,6 +84,12 @@ public class JobServlet extends HttpServlet {
                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied: Only coordinators and administrators can create jobs.");
                 return;
             }
+            String reqType = request.getParameter("type");
+            if (isInternships || "Internship".equalsIgnoreCase(reqType)) {
+                Job job = new Job();
+                job.setJobType("Internship");
+                request.setAttribute("job", job);
+            }
             request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
                     .forward(request, response);
             return;
@@ -103,14 +113,14 @@ public class JobServlet extends HttpServlet {
             Long id = parseId(request.getParameter("id"));
             if (id == null) {
                 request.getSession().setAttribute("errorMessage", "Invalid job ID provided.");
-                response.sendRedirect(request.getContextPath() + "/jobs");
+                response.sendRedirect(request.getContextPath() + (isInternships ? "/internships" : "/jobs"));
                 return;
             }
 
             Job job = jobDAO.getJobById(id);
             if (job == null) {
                 request.getSession().setAttribute("errorMessage", "Job not found with ID: " + id);
-                response.sendRedirect(request.getContextPath() + "/jobs");
+                response.sendRedirect(request.getContextPath() + (isInternships ? "/internships" : "/jobs"));
                 return;
             }
 
@@ -125,14 +135,14 @@ public class JobServlet extends HttpServlet {
             Long id = parseId(request.getParameter("id"));
             if (id == null) {
                 request.getSession().setAttribute("errorMessage", "Invalid job ID provided.");
-                response.sendRedirect(request.getContextPath() + "/jobs");
+                response.sendRedirect(request.getContextPath() + (isInternships ? "/internships" : "/jobs"));
                 return;
             }
 
             Job job = jobDAO.getJobById(id);
             if (job == null) {
                 request.getSession().setAttribute("errorMessage", "Job not found with ID: " + id);
-                response.sendRedirect(request.getContextPath() + "/jobs");
+                response.sendRedirect(request.getContextPath() + (isInternships ? "/internships" : "/jobs"));
                 return;
             }
 
@@ -150,20 +160,46 @@ public class JobServlet extends HttpServlet {
 
         List<Job> jobs;
 
-        if (search != null && !search.trim().isEmpty()) {
-            jobs = jobDAO.searchJobs(search.trim());
-            request.setAttribute("searchKeyword", search.trim());
-        } else if (jobType != null && !jobType.trim().isEmpty()) {
-            jobs = jobDAO.getJobsByType(jobType.trim());
-            request.setAttribute("selectedJobType", jobType.trim());
-        } else if (status != null && !status.trim().isEmpty()) {
-            jobs = jobDAO.getJobsByStatus(status.trim());
-            request.setAttribute("selectedStatus", status.trim());
-        } else if (sortBy != null && !sortBy.trim().isEmpty()) {
-            jobs = jobDAO.getJobsSortedBy(sortBy.trim());
-            request.setAttribute("selectedSortBy", sortBy.trim());
+        if (isInternships) {
+            request.setAttribute("selectedJobType", "Internship");
+            if (search != null && !search.trim().isEmpty()) {
+                jobs = jobDAO.searchJobs(search.trim());
+                request.setAttribute("searchKeyword", search.trim());
+            } else if (status != null && !status.trim().isEmpty()) {
+                jobs = jobDAO.getJobsByStatus(status.trim());
+                request.setAttribute("selectedStatus", status.trim());
+            } else if (sortBy != null && !sortBy.trim().isEmpty()) {
+                jobs = jobDAO.getJobsSortedBy(sortBy.trim());
+                request.setAttribute("selectedSortBy", sortBy.trim());
+            } else {
+                jobs = jobDAO.getAllInternships();
+            }
+
+            if (search != null || status != null || sortBy != null) {
+                List<Job> filtered = new ArrayList<>();
+                for (Job j : jobs) {
+                    if (j.isInternship()) {
+                        filtered.add(j);
+                    }
+                }
+                jobs = filtered;
+            }
         } else {
-            jobs = jobDAO.getAllJobs();
+            if (search != null && !search.trim().isEmpty()) {
+                jobs = jobDAO.searchJobs(search.trim());
+                request.setAttribute("searchKeyword", search.trim());
+            } else if (jobType != null && !jobType.trim().isEmpty()) {
+                jobs = jobDAO.getJobsByType(jobType.trim());
+                request.setAttribute("selectedJobType", jobType.trim());
+            } else if (status != null && !status.trim().isEmpty()) {
+                jobs = jobDAO.getJobsByStatus(status.trim());
+                request.setAttribute("selectedStatus", status.trim());
+            } else if (sortBy != null && !sortBy.trim().isEmpty()) {
+                jobs = jobDAO.getJobsSortedBy(sortBy.trim());
+                request.setAttribute("selectedSortBy", sortBy.trim());
+            } else {
+                jobs = jobDAO.getAllJobs();
+            }
         }
 
         request.setAttribute("jobs", jobs);
@@ -196,6 +232,12 @@ public class JobServlet extends HttpServlet {
             }
         }
 
+        boolean isInternships = isInternshipsEndpoint(request)
+                || "internships".equalsIgnoreCase(request.getParameter("source"));
+        String redirectTarget = isInternships
+                ? (request.getContextPath() + "/internships")
+                : (request.getContextPath() + "/jobs");
+
         // 1. CREATE JOB
         if ("create".equals(action)) {
             String title = trimToNull(request.getParameter("title"));
@@ -203,6 +245,7 @@ public class JobServlet extends HttpServlet {
             String location = trimToNull(request.getParameter("location"));
             String description = trimToNull(request.getParameter("description"));
             String salary = trimToNull(request.getParameter("salary"));
+            String duration = trimToNull(request.getParameter("duration"));
             String jobType = trimToNull(request.getParameter("jobType"));
             String status = trimToNull(request.getParameter("status"));
             String deadlineParam = trimToNull(request.getParameter("deadline"));
@@ -214,7 +257,7 @@ public class JobServlet extends HttpServlet {
                 try {
                     deadline = LocalDate.parse(deadlineParam);
                 } catch (DateTimeParseException e) {
-                    Job job = new Job(title, company, location, description, salary, jobType,
+                    Job job = new Job(title, company, location, description, salary, duration, jobType,
                             status != null ? status : "Active", null, null, eligibleDepartments);
                     request.setAttribute("errorMessage", "Invalid Application Deadline format. Please use YYYY-MM-DD.");
                     request.setAttribute("job", job);
@@ -229,7 +272,7 @@ public class JobServlet extends HttpServlet {
                 try {
                     minCgpa = new BigDecimal(minCgpaParam);
                     if (minCgpa.compareTo(BigDecimal.ZERO) < 0 || minCgpa.compareTo(new BigDecimal("10.00")) > 0) {
-                        Job job = new Job(title, company, location, description, salary, jobType,
+                        Job job = new Job(title, company, location, description, salary, duration, jobType,
                                 status != null ? status : "Active", deadline, null, eligibleDepartments);
                         request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
                         request.setAttribute("job", job);
@@ -238,7 +281,7 @@ public class JobServlet extends HttpServlet {
                         return;
                     }
                 } catch (NumberFormatException e) {
-                    Job job = new Job(title, company, location, description, salary, jobType,
+                    Job job = new Job(title, company, location, description, salary, duration, jobType,
                             status != null ? status : "Active", deadline, null, eligibleDepartments);
                     request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
                     request.setAttribute("job", job);
@@ -250,22 +293,23 @@ public class JobServlet extends HttpServlet {
 
             if (title == null || company == null || location == null || jobType == null) {
                 request.setAttribute("errorMessage", "Title, Company, Location, and Job Type are required.");
-                request.setAttribute("job", new Job(title, company, location, description, salary, jobType,
+                request.setAttribute("job", new Job(title, company, location, description, salary, duration, jobType,
                         status != null ? status : "Active", deadline, minCgpa, eligibleDepartments));
                 request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
                         .forward(request, response);
                 return;
             }
 
-            Job job = new Job(title, company, location, description, salary, jobType,
+            Job job = new Job(title, company, location, description, salary, duration, jobType,
                     status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
 
             boolean created = jobDAO.addJob(job);
             if (created) {
-                request.getSession().setAttribute("successMessage", "Job created successfully.");
-                response.sendRedirect(request.getContextPath() + "/jobs");
+                String successMsg = isInternships ? "Internship created successfully." : "Job created successfully.";
+                request.getSession().setAttribute("successMessage", successMsg);
+                response.sendRedirect(redirectTarget);
             } else {
-                request.setAttribute("errorMessage", "Failed to create job. Please check system logs.");
+                request.setAttribute("errorMessage", "Failed to create " + (isInternships ? "internship" : "job") + ". Please check system logs.");
                 request.setAttribute("job", job);
                 request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
                         .forward(request, response);
@@ -277,8 +321,8 @@ public class JobServlet extends HttpServlet {
         if ("update".equals(action)) {
             Long id = parseId(request.getParameter("id"));
             if (id == null) {
-                request.getSession().setAttribute("errorMessage", "Invalid job ID provided for update.");
-                response.sendRedirect(request.getContextPath() + "/jobs");
+                request.getSession().setAttribute("errorMessage", "Invalid " + (isInternships ? "internship" : "job") + " ID provided for update.");
+                response.sendRedirect(redirectTarget);
                 return;
             }
 
@@ -287,6 +331,7 @@ public class JobServlet extends HttpServlet {
             String location = trimToNull(request.getParameter("location"));
             String description = trimToNull(request.getParameter("description"));
             String salary = trimToNull(request.getParameter("salary"));
+            String duration = trimToNull(request.getParameter("duration"));
             String jobType = trimToNull(request.getParameter("jobType"));
             String status = trimToNull(request.getParameter("status"));
             String deadlineParam = trimToNull(request.getParameter("deadline"));
@@ -298,7 +343,7 @@ public class JobServlet extends HttpServlet {
                 try {
                     deadline = LocalDate.parse(deadlineParam);
                 } catch (DateTimeParseException e) {
-                    Job job = new Job(id, title, company, location, description, salary, jobType,
+                    Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                             status != null ? status : "Active", null, null, eligibleDepartments);
                     request.setAttribute("errorMessage", "Invalid Application Deadline format. Please use YYYY-MM-DD.");
                     request.setAttribute("job", job);
@@ -313,7 +358,7 @@ public class JobServlet extends HttpServlet {
                 try {
                     minCgpa = new BigDecimal(minCgpaParam);
                     if (minCgpa.compareTo(BigDecimal.ZERO) < 0 || minCgpa.compareTo(new BigDecimal("10.00")) > 0) {
-                        Job job = new Job(id, title, company, location, description, salary, jobType,
+                        Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                                 status != null ? status : "Active", deadline, null, eligibleDepartments);
                         request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
                         request.setAttribute("job", job);
@@ -322,7 +367,7 @@ public class JobServlet extends HttpServlet {
                         return;
                     }
                 } catch (NumberFormatException e) {
-                    Job job = new Job(id, title, company, location, description, salary, jobType,
+                    Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                             status != null ? status : "Active", deadline, null, eligibleDepartments);
                     request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
                     request.setAttribute("job", job);
@@ -333,7 +378,7 @@ public class JobServlet extends HttpServlet {
             }
 
             if (title == null || company == null || location == null || jobType == null) {
-                Job job = new Job(id, title, company, location, description, salary, jobType,
+                Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                         status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
                 request.setAttribute("errorMessage", "Title, Company, Location, and Job Type are required.");
                 request.setAttribute("job", job);
@@ -342,15 +387,16 @@ public class JobServlet extends HttpServlet {
                 return;
             }
 
-            Job job = new Job(id, title, company, location, description, salary, jobType,
+            Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                     status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
 
             boolean updated = jobDAO.updateJob(job);
             if (updated) {
-                request.getSession().setAttribute("successMessage", "Job updated successfully.");
-                response.sendRedirect(request.getContextPath() + "/jobs");
+                String successMsg = isInternships ? "Internship updated successfully." : "Job updated successfully.";
+                request.getSession().setAttribute("successMessage", successMsg);
+                response.sendRedirect(redirectTarget);
             } else {
-                request.setAttribute("errorMessage", "Failed to update job with ID: " + id);
+                request.setAttribute("errorMessage", "Failed to update " + (isInternships ? "internship" : "job") + " with ID: " + id);
                 request.setAttribute("job", job);
                 request.getRequestDispatcher("/WEB-INF/jsp/job-edit.jsp")
                         .forward(request, response);
@@ -362,18 +408,18 @@ public class JobServlet extends HttpServlet {
         if ("delete".equals(action)) {
             Long id = parseId(request.getParameter("id"));
             if (id == null) {
-                request.getSession().setAttribute("errorMessage", "Invalid job ID provided for deletion.");
-                response.sendRedirect(request.getContextPath() + "/jobs");
+                request.getSession().setAttribute("errorMessage", "Invalid " + (isInternships ? "internship" : "job") + " ID provided for deletion.");
+                response.sendRedirect(redirectTarget);
                 return;
             }
 
             boolean deleted = jobDAO.deleteJob(id);
             if (deleted) {
-                request.getSession().setAttribute("successMessage", "Job deleted successfully.");
+                request.getSession().setAttribute("successMessage", isInternships ? "Internship deleted successfully." : "Job deleted successfully.");
             } else {
-                request.getSession().setAttribute("errorMessage", "Failed to delete job with ID: " + id);
+                request.getSession().setAttribute("errorMessage", "Failed to delete " + (isInternships ? "internship" : "job") + " with ID: " + id);
             }
-            response.sendRedirect(request.getContextPath() + "/jobs");
+            response.sendRedirect(redirectTarget);
             return;
         }
 
@@ -384,6 +430,14 @@ public class JobServlet extends HttpServlet {
     // =====================================================
     // HELPERS
     // =====================================================
+
+    private boolean isInternshipsEndpoint(HttpServletRequest request) {
+        if (request == null) {
+            return false;
+        }
+        String servletPath = request.getServletPath();
+        return servletPath != null && servletPath.startsWith("/internships");
+    }
 
     private boolean isCoordinatorOrAdmin(HttpServletRequest request) {
         HttpSession session = request.getSession(false);

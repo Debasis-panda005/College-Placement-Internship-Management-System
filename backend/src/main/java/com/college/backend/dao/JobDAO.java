@@ -1,6 +1,7 @@
 package com.college.backend.dao;
 
 import com.college.backend.entity.Job;
+import com.college.backend.exception.DAOException;
 import com.college.backend.util.DBConnection;
 
 import java.sql.Connection;
@@ -11,7 +12,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class JobDAO {
 
@@ -31,6 +34,52 @@ public class JobDAO {
             return false;
         }
 
+        if (job.getDuration() != null && !job.getDuration().trim().isEmpty()) {
+            String sqlWithDuration = "INSERT INTO jobs (title, company, location, description, salary, duration, job_type, status, deadline, min_cgpa, eligible_departments) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            try (Connection connection = getConnection();
+                 PreparedStatement statement = connection.prepareStatement(sqlWithDuration, Statement.RETURN_GENERATED_KEYS)) {
+
+                statement.setString(1, job.getTitle());
+                statement.setString(2, job.getCompany());
+                statement.setString(3, job.getLocation());
+                statement.setString(4, job.getDescription());
+                statement.setString(5, job.getSalary());
+                statement.setString(6, job.getDuration());
+                statement.setString(7, job.getJobType());
+                statement.setString(8, job.getStatus() != null ? job.getStatus() : "Active");
+                if (job.getDeadline() != null) {
+                    statement.setDate(9, Date.valueOf(job.getDeadline()));
+                } else {
+                    statement.setNull(9, Types.DATE);
+                }
+                statement.setBigDecimal(10, job.getMinCgpa());
+                statement.setString(11, job.getEligibleDepartments());
+
+                int affected = statement.executeUpdate();
+                if (affected > 0) {
+                    try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
+                        if (generatedKeys.next()) {
+                            job.setId(generatedKeys.getLong(1));
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            } catch (SQLException e) {
+                // If duration column is not present in schema, fallback to insert without duration
+                if (e.getErrorCode() == 1054 || (e.getMessage() != null && e.getMessage().toLowerCase().contains("duration"))) {
+                    return addJobWithoutDuration(job);
+                }
+                e.printStackTrace();
+                return false;
+            }
+        }
+
+        return addJobWithoutDuration(job);
+    }
+
+    private boolean addJobWithoutDuration(Job job) {
         String sql = "INSERT INTO jobs (title, company, location, description, salary, job_type, status, deadline, min_cgpa, eligible_departments) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -130,6 +179,44 @@ public class JobDAO {
             return false;
         }
 
+        if (job.getDuration() != null && !job.getDuration().trim().isEmpty()) {
+            String sqlWithDuration = "UPDATE jobs SET title = ?, company = ?, location = ?, description = ?, " +
+                    "salary = ?, duration = ?, job_type = ?, status = ?, deadline = ?, min_cgpa = ?, eligible_departments = ? WHERE id = ?";
+            try (Connection connection = getConnection();
+                 PreparedStatement statement = connection.prepareStatement(sqlWithDuration)) {
+
+                statement.setString(1, job.getTitle());
+                statement.setString(2, job.getCompany());
+                statement.setString(3, job.getLocation());
+                statement.setString(4, job.getDescription());
+                statement.setString(5, job.getSalary());
+                statement.setString(6, job.getDuration());
+                statement.setString(7, job.getJobType());
+                statement.setString(8, job.getStatus() != null ? job.getStatus() : "Active");
+                if (job.getDeadline() != null) {
+                    statement.setDate(9, Date.valueOf(job.getDeadline()));
+                } else {
+                    statement.setNull(9, Types.DATE);
+                }
+                statement.setBigDecimal(10, job.getMinCgpa());
+                statement.setString(11, job.getEligibleDepartments());
+                statement.setLong(12, job.getId());
+
+                return statement.executeUpdate() > 0;
+            } catch (SQLException e) {
+                // If duration column is not present in schema, fallback to update without duration
+                if (e.getErrorCode() == 1054 || (e.getMessage() != null && e.getMessage().toLowerCase().contains("duration"))) {
+                    return updateJobWithoutDuration(job);
+                }
+                e.printStackTrace();
+                return false;
+            }
+        }
+
+        return updateJobWithoutDuration(job);
+    }
+
+    private boolean updateJobWithoutDuration(Job job) {
         String sql = "UPDATE jobs SET title = ?, company = ?, location = ?, description = ?, " +
                 "salary = ?, job_type = ?, status = ?, deadline = ?, min_cgpa = ?, eligible_departments = ? WHERE id = ?";
 
@@ -246,6 +333,10 @@ public class JobDAO {
         return jobs;
     }
 
+    public List<Job> getAllInternships() {
+        return getJobsByType("Internship");
+    }
+
     // =====================================================
     // 8. GET JOBS BY STATUS
     // =====================================================
@@ -274,6 +365,52 @@ public class JobDAO {
         }
 
         return jobs;
+    }
+
+    // =====================================================
+    // 8B. GET JOB STATISTICS
+    // =====================================================
+
+    /**
+     * Retrieves aggregated statistics for jobs and internships.
+     * Uses efficient database-level aggregation to compute counts in a single query.
+     *
+     * @return Map containing TOTAL, JOBS, INTERNSHIPS, ACTIVE, and CLOSED counts
+     * @throws DAOException on database failure
+     */
+    public Map<String, Integer> getJobStatistics() {
+        Map<String, Integer> stats = new HashMap<>();
+        stats.put("TOTAL", 0);
+        stats.put("JOBS", 0);
+        stats.put("INTERNSHIPS", 0);
+        stats.put("ACTIVE", 0);
+        stats.put("CLOSED", 0);
+
+        String sql = "SELECT " +
+                "COUNT(*) AS total_count, " +
+                "COALESCE(SUM(CASE WHEN job_type != 'Internship' THEN 1 ELSE 0 END), 0) AS jobs_count, " +
+                "COALESCE(SUM(CASE WHEN job_type = 'Internship' THEN 1 ELSE 0 END), 0) AS internships_count, " +
+                "COALESCE(SUM(CASE WHEN status = 'Active' THEN 1 ELSE 0 END), 0) AS active_count, " +
+                "COALESCE(SUM(CASE WHEN status = 'Closed' THEN 1 ELSE 0 END), 0) AS closed_count " +
+                "FROM jobs";
+
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+
+            if (resultSet.next()) {
+                stats.put("TOTAL", resultSet.getInt("total_count"));
+                stats.put("JOBS", resultSet.getInt("jobs_count"));
+                stats.put("INTERNSHIPS", resultSet.getInt("internships_count"));
+                stats.put("ACTIVE", resultSet.getInt("active_count"));
+                stats.put("CLOSED", resultSet.getInt("closed_count"));
+            }
+
+        } catch (SQLException e) {
+            throw new DAOException("Database error retrieving job statistics: " + e.getMessage(), e);
+        }
+
+        return stats;
     }
 
     // =====================================================
@@ -401,6 +538,12 @@ public class JobDAO {
 
         try {
             job.setEligibleDepartments(resultSet.getString("eligible_departments"));
+        } catch (SQLException ignored) {
+            // column not present in pre-migration schema
+        }
+
+        try {
+            job.setDuration(resultSet.getString("duration"));
         } catch (SQLException ignored) {
             // column not present in pre-migration schema
         }

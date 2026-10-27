@@ -32,7 +32,7 @@ public class RegisterServlet extends HttpServlet {
     public static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
-    public static final int MIN_PASSWORD_LENGTH = 6;
+    public static final int MIN_PASSWORD_LENGTH = 8;
 
     private StudentDAO studentDAO;
 
@@ -131,7 +131,7 @@ public class RegisterServlet extends HttpServlet {
 
         // 6. Validate password criteria & confirmation match
         if (password.length() < MIN_PASSWORD_LENGTH) {
-            request.setAttribute("errorMessage", "Password must be at least " + MIN_PASSWORD_LENGTH + " characters long.");
+            request.setAttribute("errorMessage", "Password must contain at least " + MIN_PASSWORD_LENGTH + " characters.");
             request.getRequestDispatcher("/WEB-INF/jsp/register.jsp").forward(request, response);
             return;
         }

@@ -14,6 +14,7 @@ import com.college.backend.entity.Student;
 import com.college.backend.entity.User;
 import com.college.backend.exception.DAOException;
 import com.college.backend.exception.DuplicateRecordException;
+import com.college.backend.servlet.AdminDashboardServlet;
 import com.college.backend.servlet.ApplicationServlet;
 import com.college.backend.servlet.InterviewServlet;
 import com.college.backend.servlet.JobServlet;
@@ -1293,7 +1294,7 @@ class BackendApplicationTests {
         sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
         HttpSession session = createMockSession(sessionAttrs);
 
-        // 1. Password too short (< 6 chars)
+        // 1. Password shorter than 8 chars (e.g. 5 chars) is rejected
         Map<String, String> shortPassParams = createValidRegistrationParams();
         shortPassParams.put("password", "12345");
         shortPassParams.put("confirmPassword", "12345");
@@ -1301,8 +1302,19 @@ class BackendApplicationTests {
         Map<String, Object> requestAttrs1 = new HashMap<>();
         HttpServletRequest request1 = createMockRequest(session, shortPassParams, requestAttrs1, new HashMap<>());
         doPostMethod.invoke(servlet, request1, createMockResponse(new HashMap<>()));
-        assertTrue(((String) requestAttrs1.get("errorMessage")).contains("Password must be at least 6 characters"));
+        assertTrue(((String) requestAttrs1.get("errorMessage")).contains("Password must contain at least 8 characters"));
         assertNull(requestAttrs1.get("password"));
+
+        // 1b. Boundary test: Password of exactly 7 characters is rejected
+        Map<String, String> sevenCharPassParams = createValidRegistrationParams();
+        sevenCharPassParams.put("password", "1234567");
+        sevenCharPassParams.put("confirmPassword", "1234567");
+
+        Map<String, Object> requestAttrs7 = new HashMap<>();
+        HttpServletRequest request7 = createMockRequest(session, sevenCharPassParams, requestAttrs7, new HashMap<>());
+        doPostMethod.invoke(servlet, request7, createMockResponse(new HashMap<>()));
+        assertTrue(((String) requestAttrs7.get("errorMessage")).contains("Password must contain at least 8 characters"));
+        assertNull(requestAttrs7.get("password"));
 
         // 2. Passwords mismatch
         Map<String, String> mismatchParams = createValidRegistrationParams();
@@ -1315,6 +1327,49 @@ class BackendApplicationTests {
         assertEquals("Passwords do not match.", requestAttrs2.get("errorMessage"));
         assertNull(requestAttrs2.get("password"));
         assertNull(requestAttrs2.get("confirmPassword"));
+    }
+
+    @Test
+    @DisplayName("RegisterServlet doPost accepts password of exactly 8 characters when valid")
+    void testRegisterServletPostExactEightCharPasswordAccepted() throws Exception {
+        RegisterServlet servlet = new RegisterServlet();
+        Method doPostMethod = RegisterServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final User[] capturedUser = new User[1];
+        final Student[] capturedStudent = new Student[1];
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public boolean registerStudent(User user, Student student) {
+                capturedUser[0] = user;
+                capturedStudent[0] = student;
+                return true;
+            }
+        });
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-token");
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, String> params = createValidRegistrationParams();
+        params.put("password", "Pass1234");
+        params.put("confirmPassword", "Pass1234");
+
+        Map<String, Object> requestAttrs = new HashMap<>();
+        Map<String, Object> requestState = new HashMap<>();
+        HttpServletRequest request = createMockRequest(session, params, requestAttrs, requestState);
+        Map<String, Object> responseState = new HashMap<>();
+        HttpServletResponse response = createMockResponse(responseState);
+
+        doPostMethod.invoke(servlet, request, response);
+
+        assertNotNull(capturedUser[0], "StudentDAO.registerStudent must be invoked with User");
+        assertNotNull(capturedStudent[0], "StudentDAO.registerStudent must be invoked with Student");
+        assertTrue(PasswordHashService.verifyPassword("Pass1234", capturedUser[0].getPasswordHash()),
+                "BCrypt hash should verify against 8-character password");
+        assertEquals("/college/login", responseState.get("redirectUrl"), "Must redirect to /login");
+        assertTrue(((String) sessionAttrs.get("successMessage")).contains("successful"));
+        assertNull(requestAttrs.get("password"), "Password must not be in request");
     }
 
     @Test
@@ -5108,6 +5163,757 @@ class BackendApplicationTests {
 
         assertEquals("/college/jobs", state.get("redirectUrl"));
         assertEquals("No student profile found for your account. Please complete your registration.", session.getAttribute("errorMessage"));
+    }
+
+    // =====================================================
+    // 56. INTERNSHIP INTEGRATION TESTS (PHASE 2 EXPANSION)
+    // =====================================================
+
+    @Test
+    @DisplayName("Job entity supports optional duration, constructor overloads, and isInternship helper")
+    void testJobEntityDurationAndInternshipHelper() {
+        // Test constructor overloads with duration
+        Job job8 = new Job("ML Intern", "OpenAI", "Remote", "NLP research", "60,000/mo", "6 Months", "Internship", "Active");
+        assertEquals("6 Months", job8.getDuration());
+        assertTrue(job8.isInternship());
+        assertTrue(job8.toString().contains("duration='6 Months'"));
+
+        Job job11 = new Job("Frontend Intern", "Meta", "London", "React intern", "50,000/mo", "3 Months",
+                "Internship", "Active", LocalDate.of(2026, 12, 1), new BigDecimal("8.00"), "CSE,IT");
+        assertEquals("3 Months", job11.getDuration());
+        assertTrue(job11.isInternship());
+
+        Job job12 = new Job(99L, "Backend Intern", "Amazon", "Hyderabad", "AWS services", "70,000/mo", "6 Months",
+                "Internship", "Active", LocalDate.of(2026, 12, 1), new BigDecimal("7.50"), "ALL");
+        assertEquals(99L, job12.getId());
+        assertEquals("6 Months", job12.getDuration());
+        assertTrue(job12.isInternship());
+
+        // Test setter and getter
+        job12.setDuration("1 Year");
+        assertEquals("1 Year", job12.getDuration());
+
+        // Test isInternship case-insensitivity and non-internship types
+        Job fullTimeJob = new Job("SDE", "Google", "Bangalore", "Full time role", "20 LPA", "Full Time", "Active");
+        assertFalse(fullTimeJob.isInternship());
+        assertNull(fullTimeJob.getDuration());
+
+        Job nullTypeJob = new Job();
+        assertFalse(nullTypeJob.isInternship());
+
+        Job mixedCaseIntern = new Job();
+        mixedCaseIntern.setJobType("internship");
+        assertTrue(mixedCaseIntern.isInternship());
+
+        Job customInternTitle = new Job();
+        customInternTitle.setJobType("Summer Internship");
+        assertTrue(customInternTitle.isInternship());
+    }
+
+    @Test
+    @DisplayName("JobDAO getAllInternships delegates to getJobsByType with 'Internship'")
+    void testJobDAOGetAllInternships() {
+        final String[] queriedType = new String[1];
+        JobDAO dao = new JobDAO() {
+            @Override
+            public List<Job> getJobsByType(String jobType) {
+                queriedType[0] = jobType;
+                List<Job> list = new ArrayList<>();
+                list.add(new Job("AI Intern", "DeepMind", "London", "Research", "80k", "6 Months", "Internship", "Active"));
+                return list;
+            }
+        };
+
+        List<Job> internships = dao.getAllInternships();
+        assertEquals("Internship", queriedType[0]);
+        assertEquals(1, internships.size());
+        assertEquals("AI Intern", internships.get(0).getTitle());
+    }
+
+    @Test
+    @DisplayName("JobServlet /internships doGet defaults to Internship type and filters listing to internships only")
+    void testJobServletInternshipsEndpointGetDefaultsToInternship() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doGetMethod = JobServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Job internJob = new Job(10L, "Data Science Intern", "Netflix", "Remote", "ML models", "55,000", "Internship", "Active");
+        Job fullTimeJob = new Job(11L, "Software Engineer", "Amazon", "Seattle", "Cloud", "120,000", "Full Time", "Active");
+
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public List<Job> getAllInternships() {
+                List<Job> list = new ArrayList<>();
+                list.add(internJob);
+                return list;
+            }
+            @Override
+            public List<Job> searchJobs(String keyword) {
+                List<Job> list = new ArrayList<>();
+                list.add(internJob);
+                list.add(fullTimeJob);
+                return list;
+            }
+        });
+
+        // Case A: Default /internships listing
+        Map<String, Object> stateA = new HashMap<>();
+        stateA.put("servletPath", "/internships");
+        Map<String, Object> reqAttrsA = new HashMap<>();
+        HttpServletRequest reqA = createMockRequest(null, new HashMap<>(), reqAttrsA, stateA);
+        Map<String, Object> respStateA = new HashMap<>();
+
+        doGetMethod.invoke(servlet, reqA, createMockResponse(respStateA));
+
+        assertEquals(Boolean.TRUE, reqAttrsA.get("isInternshipsEndpoint"));
+        assertEquals("Internship", reqAttrsA.get("selectedJobType"));
+        @SuppressWarnings("unchecked")
+        List<Job> jobsA = (List<Job>) reqAttrsA.get("jobs");
+        assertNotNull(jobsA);
+        assertEquals(1, jobsA.size());
+        assertEquals("Data Science Intern", jobsA.get(0).getTitle());
+        assertEquals("/WEB-INF/jsp/jobs.jsp", stateA.get("dispatchedPath"));
+
+        // Case B: Search on /internships filters out non-internships
+        Map<String, Object> stateB = new HashMap<>();
+        stateB.put("servletPath", "/internships");
+        Map<String, String> searchParams = new HashMap<>();
+        searchParams.put("search", "Engineer");
+        Map<String, Object> reqAttrsB = new HashMap<>();
+        HttpServletRequest reqB = createMockRequest(null, searchParams, reqAttrsB, stateB);
+        Map<String, Object> respStateB = new HashMap<>();
+
+        doGetMethod.invoke(servlet, reqB, createMockResponse(respStateB));
+
+        @SuppressWarnings("unchecked")
+        List<Job> jobsB = (List<Job>) reqAttrsB.get("jobs");
+        assertNotNull(jobsB);
+        assertEquals(1, jobsB.size());
+        assertEquals("Data Science Intern", jobsB.get(0).getTitle());
+        assertTrue(jobsB.get(0).isInternship());
+    }
+
+    @Test
+    @DisplayName("JobServlet /internships?action=new pre-populates Internship jobType for coordinator")
+    void testJobServletInternshipsActionNewPrepopulatesInternship() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doGetMethod = JobServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordAttrs);
+
+        Map<String, String> params = new HashMap<>();
+        params.put("action", "new");
+
+        Map<String, Object> state = new HashMap<>();
+        state.put("servletPath", "/internships");
+        Map<String, Object> reqAttrs = new HashMap<>();
+        HttpServletRequest req = createMockRequest(coordSession, params, reqAttrs, state);
+        Map<String, Object> respState = new HashMap<>();
+
+        doGetMethod.invoke(servlet, req, createMockResponse(respState));
+
+        assertEquals("/WEB-INF/jsp/job-add.jsp", state.get("dispatchedPath"));
+        Job prePopulated = (Job) reqAttrs.get("job");
+        assertNotNull(prePopulated);
+        assertEquals("Internship", prePopulated.getJobType());
+    }
+
+    @Test
+    @DisplayName("JobServlet doPost creates and updates internship with optional duration and redirects to /internships")
+    void testJobServletPostCreateAndUpdateInternshipWithDuration() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        final Job[] capturedJob = new Job[1];
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public boolean addJob(Job job) {
+                capturedJob[0] = job;
+                return true;
+            }
+            @Override
+            public boolean updateJob(Job job) {
+                capturedJob[0] = job;
+                return true;
+            }
+        });
+
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "csrf-token-123");
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 305L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordAttrs);
+
+        // 1. Create Internship from /internships
+        Map<String, String> createParams = new HashMap<>();
+        createParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "csrf-token-123");
+        createParams.put("action", "create");
+        createParams.put("title", "Cloud DevOps Intern");
+        createParams.put("company", "Red Hat");
+        createParams.put("location", "Pune");
+        createParams.put("description", "Kubernetes infrastructure automation");
+        createParams.put("salary", "40,000 / month");
+        createParams.put("duration", "6 Months");
+        createParams.put("jobType", "Internship");
+        createParams.put("status", "Active");
+        createParams.put("deadline", "2026-11-30");
+        createParams.put("minCgpa", "8.00");
+        createParams.put("eligibleDepartments", "CSE,IT");
+
+        Map<String, Object> state1 = new HashMap<>();
+        state1.put("servletPath", "/internships");
+        HttpServletRequest req1 = createMockRequest(coordSession, createParams, new HashMap<>(), state1);
+        Map<String, Object> respState1 = new HashMap<>();
+
+        doPostMethod.invoke(servlet, req1, createMockResponse(respState1));
+
+        assertNotNull(capturedJob[0]);
+        assertEquals("Cloud DevOps Intern", capturedJob[0].getTitle());
+        assertEquals("6 Months", capturedJob[0].getDuration());
+        assertTrue(capturedJob[0].isInternship());
+        assertEquals("/college/internships", respState1.get("redirectUrl"));
+        assertEquals("Internship created successfully.", coordAttrs.get("successMessage"));
+
+        // 2. Update Internship from /internships
+        Map<String, String> updateParams = new HashMap<>();
+        updateParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "csrf-token-123");
+        updateParams.put("action", "update");
+        updateParams.put("id", "42");
+        updateParams.put("title", "Lead Cloud DevOps Intern");
+        updateParams.put("company", "Red Hat");
+        updateParams.put("location", "Pune");
+        updateParams.put("description", "Kubernetes infrastructure automation");
+        updateParams.put("salary", "50,000 / month");
+        updateParams.put("duration", "12 Months");
+        updateParams.put("jobType", "Internship");
+        updateParams.put("status", "Active");
+        updateParams.put("deadline", "2026-12-31");
+        updateParams.put("minCgpa", "8.50");
+        updateParams.put("eligibleDepartments", "CSE");
+
+        Map<String, Object> state2 = new HashMap<>();
+        state2.put("servletPath", "/internships");
+        HttpServletRequest req2 = createMockRequest(coordSession, updateParams, new HashMap<>(), state2);
+        Map<String, Object> respState2 = new HashMap<>();
+
+        doPostMethod.invoke(servlet, req2, createMockResponse(respState2));
+
+        assertNotNull(capturedJob[0]);
+        assertEquals(42L, capturedJob[0].getId());
+        assertEquals("Lead Cloud DevOps Intern", capturedJob[0].getTitle());
+        assertEquals("12 Months", capturedJob[0].getDuration());
+        assertEquals("/college/internships", respState2.get("redirectUrl"));
+        assertEquals("Internship updated successfully.", coordAttrs.get("successMessage"));
+    }
+
+    @Test
+    @DisplayName("JobServlet /internships enforces CSRF and role-based authorization")
+    void testJobServletInternshipsSecurityPreserved() throws Exception {
+        JobServlet servlet = new JobServlet();
+        Method doPostMethod = JobServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+
+        // Case A: Missing CSRF token rejects with 403 Forbidden
+        Map<String, Object> coordAttrs = new HashMap<>();
+        coordAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "valid-csrf");
+        coordAttrs.put(LoginServlet.SESSION_USER_ID, 301L);
+        coordAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession coordSession = createMockSession(coordAttrs);
+
+        Map<String, String> noCsrfParams = new HashMap<>();
+        noCsrfParams.put("action", "create");
+        noCsrfParams.put("title", "Intern");
+        noCsrfParams.put("jobType", "Internship");
+
+        Map<String, Object> stateA = new HashMap<>();
+        stateA.put("servletPath", "/internships");
+        Map<String, Object> respStateA = new HashMap<>();
+        doPostMethod.invoke(servlet, createMockRequest(coordSession, noCsrfParams, new HashMap<>(), stateA), createMockResponse(respStateA));
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, respStateA.get("errorCode"));
+
+        // Case B: Student user cannot create internship on /internships
+        Map<String, Object> studentAttrs = new HashMap<>();
+        studentAttrs.put(CsrfUtil.CSRF_TOKEN_SESSION_ATTR, "student-csrf");
+        studentAttrs.put(LoginServlet.SESSION_USER_ID, 401L);
+        studentAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession studentSession = createMockSession(studentAttrs);
+
+        Map<String, String> studentParams = new HashMap<>(noCsrfParams);
+        studentParams.put(CsrfUtil.CSRF_TOKEN_PARAM, "student-csrf");
+
+        Map<String, Object> stateB = new HashMap<>();
+        stateB.put("servletPath", "/internships");
+        Map<String, Object> respStateB = new HashMap<>();
+        doPostMethod.invoke(servlet, createMockRequest(studentSession, studentParams, new HashMap<>(), stateB), createMockResponse(respStateB));
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, respStateB.get("errorCode"));
+    }
+
+    // =====================================================
+    // 33. ADMIN DASHBOARD & STATISTICS TESTS
+    // =====================================================
+
+    @Test
+    @DisplayName("AdminDashboardServlet doGet unauthenticated redirects to login")
+    void testAdminDashboardUnauthenticatedRedirectsToLogin() throws Exception {
+        AdminDashboardServlet servlet = new AdminDashboardServlet();
+        Method doGetMethod = AdminDashboardServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> state = new HashMap<>();
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        HttpSession session = createMockSession(sessionAttrs);
+        HttpServletRequest req = createMockRequest(session, new HashMap<>(), new HashMap<>(), state);
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletResponse resp = createMockResponse(respState);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/college/login", respState.get("redirectUrl"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> activeSession = state.containsKey("newSessionAttrs")
+                ? (Map<String, Object>) state.get("newSessionAttrs") : sessionAttrs;
+        assertEquals("You must log in to view the admin dashboard.", activeSession.get("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("AdminDashboardServlet doGet student role receives 403 Forbidden")
+    void testAdminDashboardStudentRoleReceives403Forbidden() throws Exception {
+        AdminDashboardServlet servlet = new AdminDashboardServlet();
+        Method doGetMethod = AdminDashboardServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 201L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_STUDENT);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, Object> state = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, new HashMap<>(), new HashMap<>(), state);
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletResponse resp = createMockResponse(respState);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, respState.get("errorCode"));
+    }
+
+    @Test
+    @DisplayName("AdminDashboardServlet doGet coordinator role forwards to admin-dashboard.jsp")
+    void testAdminDashboardCoordinatorRolePermitted() throws Exception {
+        AdminDashboardServlet servlet = new AdminDashboardServlet();
+        servlet.init();
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public int getTotalStudents() {
+                return 40;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Map<String, Integer> getJobStatistics() {
+                Map<String, Integer> map = new HashMap<>();
+                map.put("TOTAL", 10);
+                map.put("JOBS", 7);
+                map.put("INTERNSHIPS", 3);
+                map.put("ACTIVE", 9);
+                map.put("CLOSED", 1);
+                return map;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Map<String, Integer> getApplicationStatistics() {
+                Map<String, Integer> map = new HashMap<>();
+                map.put("TOTAL", 5);
+                map.put("APPLIED", 2);
+                map.put("SHORTLISTED", 2);
+                map.put("SELECTED", 1);
+                map.put("REJECTED", 0);
+                return map;
+            }
+        });
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public Map<String, Integer> getInterviewStatistics() {
+                Map<String, Integer> map = new HashMap<>();
+                map.put("TOTAL", 3);
+                map.put("SCHEDULED", 2);
+                map.put("COMPLETED", 1);
+                map.put("CANCELLED", 0);
+                return map;
+            }
+        });
+
+        Method doGetMethod = AdminDashboardServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, Object> state = new HashMap<>();
+        Map<String, Object> reqAttrs = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, new HashMap<>(), reqAttrs, state);
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletResponse resp = createMockResponse(respState);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/WEB-INF/jsp/admin-dashboard.jsp", state.get("dispatchedPath"));
+        assertEquals(Boolean.TRUE, state.get("forwarded"));
+        assertNull(respState.get("errorCode"));
+    }
+
+    @Test
+    @DisplayName("AdminDashboardServlet doGet admin role forwards to admin-dashboard.jsp")
+    void testAdminDashboardAdminRolePermitted() throws Exception {
+        AdminDashboardServlet servlet = new AdminDashboardServlet();
+        servlet.init();
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public int getTotalStudents() {
+                return 60;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Map<String, Integer> getJobStatistics() {
+                Map<String, Integer> map = new HashMap<>();
+                map.put("TOTAL", 15);
+                map.put("JOBS", 10);
+                map.put("INTERNSHIPS", 5);
+                map.put("ACTIVE", 12);
+                map.put("CLOSED", 3);
+                return map;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Map<String, Integer> getApplicationStatistics() {
+                Map<String, Integer> map = new HashMap<>();
+                map.put("TOTAL", 10);
+                map.put("APPLIED", 4);
+                map.put("SHORTLISTED", 3);
+                map.put("SELECTED", 2);
+                map.put("REJECTED", 1);
+                return map;
+            }
+        });
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public Map<String, Integer> getInterviewStatistics() {
+                Map<String, Integer> map = new HashMap<>();
+                map.put("TOTAL", 5);
+                map.put("SCHEDULED", 3);
+                map.put("COMPLETED", 2);
+                map.put("CANCELLED", 0);
+                return map;
+            }
+        });
+
+        Method doGetMethod = AdminDashboardServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 1L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_ADMIN);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, Object> state = new HashMap<>();
+        Map<String, Object> reqAttrs = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, new HashMap<>(), reqAttrs, state);
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletResponse resp = createMockResponse(respState);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/WEB-INF/jsp/admin-dashboard.jsp", state.get("dispatchedPath"));
+        assertEquals(Boolean.TRUE, state.get("forwarded"));
+        assertNull(respState.get("errorCode"));
+    }
+
+    @Test
+    @DisplayName("AdminDashboardServlet populates all 8 metric attributes correctly")
+    void testAdminDashboardMetricsPopulatedCorrectly() throws Exception {
+        AdminDashboardServlet servlet = new AdminDashboardServlet();
+        servlet.init();
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public int getTotalStudents() {
+                return 150;
+            }
+        });
+        servlet.setJobDAO(new JobDAO() {
+            @Override
+            public Map<String, Integer> getJobStatistics() {
+                Map<String, Integer> map = new HashMap<>();
+                map.put("TOTAL", 35);
+                map.put("JOBS", 22);
+                map.put("INTERNSHIPS", 13);
+                map.put("ACTIVE", 30);
+                map.put("CLOSED", 5);
+                return map;
+            }
+        });
+        servlet.setApplicationDAO(new ApplicationDAO() {
+            @Override
+            public Map<String, Integer> getApplicationStatistics() {
+                Map<String, Integer> map = new HashMap<>();
+                map.put("TOTAL", 80);
+                map.put("APPLIED", 30);
+                map.put("SHORTLISTED", 25);
+                map.put("SELECTED", 15);
+                map.put("REJECTED", 10);
+                return map;
+            }
+        });
+        servlet.setInterviewDAO(new InterviewDAO() {
+            @Override
+            public Map<String, Integer> getInterviewStatistics() {
+                Map<String, Integer> map = new HashMap<>();
+                map.put("TOTAL", 25);
+                map.put("SCHEDULED", 18);
+                map.put("COMPLETED", 5);
+                map.put("CANCELLED", 2);
+                return map;
+            }
+        });
+
+        Method doGetMethod = AdminDashboardServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, Object> state = new HashMap<>();
+        Map<String, Object> reqAttrs = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, new HashMap<>(), reqAttrs, state);
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletResponse resp = createMockResponse(respState);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals(150, reqAttrs.get("totalStudents"));
+        assertEquals(22, reqAttrs.get("totalJobs"));
+        assertEquals(13, reqAttrs.get("totalInternships"));
+        assertEquals(30, reqAttrs.get("activeOpportunities"));
+        assertEquals(80, reqAttrs.get("totalApplications"));
+        assertEquals(25, reqAttrs.get("shortlistedApplications"));
+        assertEquals(15, reqAttrs.get("selectedApplications"));
+        assertEquals(18, reqAttrs.get("scheduledInterviews"));
+    }
+
+    @Test
+    @DisplayName("AdminDashboardServlet database error triggers graceful fallback without leaking details")
+    void testAdminDashboardDatabaseErrorGracefulFallback() throws Exception {
+        AdminDashboardServlet servlet = new AdminDashboardServlet();
+        servlet.init();
+
+        servlet.setStudentDAO(new StudentDAO() {
+            @Override
+            public int getTotalStudents() {
+                throw new DAOException("Simulated connection timeout to MySQL");
+            }
+        });
+
+        Method doGetMethod = AdminDashboardServlet.class.getDeclaredMethod("doGet", HttpServletRequest.class, HttpServletResponse.class);
+        doGetMethod.setAccessible(true);
+
+        Map<String, Object> sessionAttrs = new HashMap<>();
+        sessionAttrs.put(LoginServlet.SESSION_USER_ID, 101L);
+        sessionAttrs.put(LoginServlet.SESSION_USER_ROLE, User.ROLE_COORDINATOR);
+        HttpSession session = createMockSession(sessionAttrs);
+
+        Map<String, Object> state = new HashMap<>();
+        Map<String, Object> reqAttrs = new HashMap<>();
+        HttpServletRequest req = createMockRequest(session, new HashMap<>(), reqAttrs, state);
+        Map<String, Object> respState = new HashMap<>();
+        HttpServletResponse resp = createMockResponse(respState);
+
+        doGetMethod.invoke(servlet, req, resp);
+
+        assertEquals("/WEB-INF/jsp/admin-dashboard.jsp", state.get("dispatchedPath"));
+        assertNotNull(reqAttrs.get("errorMessage"));
+        assertTrue(((String) reqAttrs.get("errorMessage")).contains("database error"));
+        assertFalse(((String) reqAttrs.get("errorMessage")).contains("Simulated connection timeout"));
+        assertEquals(0, reqAttrs.get("totalStudents"));
+        assertEquals(0, reqAttrs.get("totalJobs"));
+        assertEquals(0, reqAttrs.get("totalInternships"));
+        assertEquals(0, reqAttrs.get("activeOpportunities"));
+        assertEquals(0, reqAttrs.get("totalApplications"));
+        assertEquals(0, reqAttrs.get("shortlistedApplications"));
+        assertEquals(0, reqAttrs.get("selectedApplications"));
+        assertEquals(0, reqAttrs.get("scheduledInterviews"));
+    }
+
+    @Test
+    @DisplayName("AdminDashboardServlet non-GET methods return 405 Method Not Allowed")
+    void testAdminDashboardNonGetMethodsReturn405() throws Exception {
+        AdminDashboardServlet servlet = new AdminDashboardServlet();
+
+        // 1. doPost
+        Method doPostMethod = AdminDashboardServlet.class.getDeclaredMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+        doPostMethod.setAccessible(true);
+        Map<String, Object> respPost = new HashMap<>();
+        doPostMethod.invoke(servlet, createMockRequest(null, new HashMap<>()), createMockResponse(respPost));
+        assertEquals(HttpServletResponse.SC_METHOD_NOT_ALLOWED, respPost.get("errorCode"));
+
+        // 2. doPut
+        Method doPutMethod = AdminDashboardServlet.class.getDeclaredMethod("doPut", HttpServletRequest.class, HttpServletResponse.class);
+        doPutMethod.setAccessible(true);
+        Map<String, Object> respPut = new HashMap<>();
+        doPutMethod.invoke(servlet, createMockRequest(null, new HashMap<>()), createMockResponse(respPut));
+        assertEquals(HttpServletResponse.SC_METHOD_NOT_ALLOWED, respPut.get("errorCode"));
+
+        // 3. doDelete
+        Method doDeleteMethod = AdminDashboardServlet.class.getDeclaredMethod("doDelete", HttpServletRequest.class, HttpServletResponse.class);
+        doDeleteMethod.setAccessible(true);
+        Map<String, Object> respDelete = new HashMap<>();
+        doDeleteMethod.invoke(servlet, createMockRequest(null, new HashMap<>()), createMockResponse(respDelete));
+        assertEquals(HttpServletResponse.SC_METHOD_NOT_ALLOWED, respDelete.get("errorCode"));
+    }
+
+    @Test
+    @DisplayName("JobDAO getJobStatistics returns aggregated counts from mock ResultSet")
+    void testJobDAOGetJobStatistics() throws Exception {
+        Map<String, Object> queryResults = new HashMap<>();
+        queryResults.put("total_count", 25);
+        queryResults.put("jobs_count", 18);
+        queryResults.put("internships_count", 7);
+        queryResults.put("active_count", 20);
+        queryResults.put("closed_count", 5);
+
+        JobDAO jobDAO = new JobDAO() {
+            @Override
+            protected Connection getConnection() throws SQLException {
+                return (Connection) Proxy.newProxyInstance(
+                        Connection.class.getClassLoader(),
+                        new Class<?>[]{Connection.class},
+                        (connProxy, connMethod, connArgs) -> {
+                            if ("prepareStatement".equals(connMethod.getName())) {
+                                return Proxy.newProxyInstance(
+                                        PreparedStatement.class.getClassLoader(),
+                                        new Class<?>[]{PreparedStatement.class},
+                                        (stmtProxy, stmtMethod, stmtArgs) -> {
+                                            if ("executeQuery".equals(stmtMethod.getName())) {
+                                                return Proxy.newProxyInstance(
+                                                        java.sql.ResultSet.class.getClassLoader(),
+                                                        new Class<?>[]{java.sql.ResultSet.class},
+                                                        (rsProxy, rsMethod, rsArgs) -> {
+                                                            if ("next".equals(rsMethod.getName())) {
+                                                                boolean first = !queryResults.containsKey("_read");
+                                                                queryResults.put("_read", true);
+                                                                return first;
+                                                            } else if ("getInt".equals(rsMethod.getName())) {
+                                                                String colName = (String) rsArgs[0];
+                                                                return queryResults.getOrDefault(colName, 0);
+                                                            }
+                                                            return null;
+                                                        }
+                                                );
+                                            }
+                                            return null;
+                                        }
+                                );
+                            }
+                            return null;
+                        }
+                );
+            }
+        };
+
+        Map<String, Integer> stats = jobDAO.getJobStatistics();
+        assertNotNull(stats);
+        assertEquals(25, stats.get("TOTAL"));
+        assertEquals(18, stats.get("JOBS"));
+        assertEquals(7, stats.get("INTERNSHIPS"));
+        assertEquals(20, stats.get("ACTIVE"));
+        assertEquals(5, stats.get("CLOSED"));
+    }
+
+    @Test
+    @DisplayName("JobDAO getJobStatistics wraps SQLException in DAOException")
+    void testJobDAOGetJobStatisticsThrowsDAOExceptionOnSqlError() {
+        JobDAO jobDAO = new JobDAO() {
+            @Override
+            protected Connection getConnection() throws SQLException {
+                throw new SQLException("Simulated database connection failure");
+            }
+        };
+
+        DAOException ex = assertThrows(DAOException.class, () -> jobDAO.getJobStatistics());
+        assertTrue(ex.getMessage().contains("Database error retrieving job statistics"));
+    }
+
+    @Test
+    @DisplayName("StudentDAO getTotalStudents returns count from students table")
+    void testStudentDAOGetTotalStudents() throws Exception {
+        boolean[] nextCalled = new boolean[]{false};
+        StudentDAO studentDAO = new StudentDAO() {
+            @Override
+            protected Connection getConnection() throws SQLException {
+                return (Connection) Proxy.newProxyInstance(
+                        Connection.class.getClassLoader(),
+                        new Class<?>[]{Connection.class},
+                        (connProxy, connMethod, connArgs) -> {
+                            if ("prepareStatement".equals(connMethod.getName())) {
+                                return Proxy.newProxyInstance(
+                                        PreparedStatement.class.getClassLoader(),
+                                        new Class<?>[]{PreparedStatement.class},
+                                        (stmtProxy, stmtMethod, stmtArgs) -> {
+                                            if ("executeQuery".equals(stmtMethod.getName())) {
+                                                return Proxy.newProxyInstance(
+                                                        java.sql.ResultSet.class.getClassLoader(),
+                                                        new Class<?>[]{java.sql.ResultSet.class},
+                                                        (rsProxy, rsMethod, rsArgs) -> {
+                                                            if ("next".equals(rsMethod.getName())) {
+                                                                if (!nextCalled[0]) {
+                                                                    nextCalled[0] = true;
+                                                                    return true;
+                                                                }
+                                                                return false;
+                                                            } else if ("getInt".equals(rsMethod.getName())) {
+                                                                return 85;
+                                                            }
+                                                            return null;
+                                                        }
+                                                );
+                                            }
+                                            return null;
+                                        }
+                                );
+                            }
+                            return null;
+                        }
+                );
+            }
+        };
+
+        int total = studentDAO.getTotalStudents();
+        assertEquals(85, total);
+    }
+
+    @Test
+    @DisplayName("StudentDAO getTotalStudents wraps SQLException in DAOException")
+    void testStudentDAOGetTotalStudentsThrowsDAOExceptionOnSqlError() {
+        StudentDAO studentDAO = new StudentDAO() {
+            @Override
+            protected Connection getConnection() throws SQLException {
+                throw new SQLException("Simulated database query failure");
+            }
+        };
+
+        DAOException ex = assertThrows(DAOException.class, () -> studentDAO.getTotalStudents());
+        assertTrue(ex.getMessage().contains("Database error counting registered students"));
     }
 
     // =====================================================

@@ -166,7 +166,8 @@
 <div class="container">
 
     <div class="nav-links">
-        <a href="${pageContext.request.contextPath}/jobs">Jobs &amp; Internships</a> |
+        <a href="${pageContext.request.contextPath}/jobs">Jobs</a> |
+        <a href="${pageContext.request.contextPath}/internships">Internships</a> |
         <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
         <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
         <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
@@ -179,7 +180,7 @@
         </c:if>
     </div>
 
-    <h1>Job / Internship Details</h1>
+    <h1><c:out value="${job.isInternship() ? 'Internship Details' : 'Job Details'}"/></h1>
 
     <div class="detail-row">
         <div class="detail-label">Job ID:</div>
@@ -216,9 +217,16 @@
     </div>
 
     <div class="detail-row">
-        <div class="detail-label">Salary / Stipend:</div>
+        <div class="detail-label"><c:out value="${job.isInternship() ? 'Stipend:' : 'Salary / Stipend:'}"/></div>
         <div class="detail-value"><c:out value="${job.salary}"/></div>
     </div>
+
+    <c:if test="${not empty job.duration}">
+        <div class="detail-row">
+            <div class="detail-label">Duration:</div>
+            <div class="detail-value"><c:out value="${job.duration}"/></div>
+        </div>
+    </c:if>
 
     <div class="detail-row">
         <div class="detail-label">Job Type:</div>
@@ -305,12 +313,12 @@
     </div>
 
     <div class="actions-bar">
-        <a href="${pageContext.request.contextPath}/jobs" class="btn btn-secondary">
-            &larr; Back to Jobs
+        <a href="${pageContext.request.contextPath}${job.isInternship() || isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn btn-secondary">
+            &larr; <c:out value="${job.isInternship() || isInternshipsEndpoint ? 'Back to Internships' : 'Back to Jobs'}"/>
         </a>
         <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
             <a href="${pageContext.request.contextPath}/jobs?action=edit&id=${job.id}" class="btn btn-primary">
-                Edit Job
+                <c:out value="${job.isInternship() ? 'Edit Internship' : 'Edit Job'}"/>
             </a>
         </c:if>
     </div>

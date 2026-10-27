@@ -16,6 +16,6 @@ public class BackendApplication {
 
     @Bean
     public ServletRegistrationBean<JobServlet> jobServletRegistration() {
-        return new ServletRegistrationBean<>(new JobServlet(), "/jobs", "/jobs/*");
+        return new ServletRegistrationBean<>(new JobServlet(), "/jobs", "/jobs/*", "/internships", "/internships/*");
     }
 }

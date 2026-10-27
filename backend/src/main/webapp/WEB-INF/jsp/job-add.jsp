@@ -5,7 +5,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Add Job / Internship</title>
+    <title><c:out value="${param.type == 'Internship' || job.jobType == 'Internship' ? 'Add Internship' : 'Add Job / Internship'}"/></title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -141,7 +141,8 @@
 <div class="container">
 
     <div class="nav-links">
-        <a href="${pageContext.request.contextPath}/jobs">Jobs &amp; Internships</a> |
+        <a href="${pageContext.request.contextPath}/jobs">Jobs</a> |
+        <a href="${pageContext.request.contextPath}/internships">Internships</a> |
         <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
         <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
         <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
@@ -154,7 +155,7 @@
         </c:if>
     </div>
 
-    <h1>Add New Job / Internship</h1>
+    <h1><c:out value="${param.type == 'Internship' || job.jobType == 'Internship' ? 'Add New Internship' : 'Add New Job / Internship'}"/></h1>
 
     <c:if test="${not empty errorMessage}">
         <div class="alert-error">
@@ -166,6 +167,9 @@
 
         <input type="hidden" name="action" value="create">
         <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+        <c:if test="${param.type == 'Internship' || isInternshipsEndpoint}">
+            <input type="hidden" name="source" value="internships">
+        </c:if>
 
         <div class="form-group">
             <label for="title">Job Title *</label>
@@ -192,9 +196,15 @@
         </div>
 
         <div class="form-group">
-            <label for="salary">Salary / Stipend</label>
+            <label for="salary"><c:out value="${param.type == 'Internship' || job.jobType == 'Internship' ? 'Stipend' : 'Salary / Stipend'}"/></label>
             <input type="text" id="salary" name="salary" class="form-control"
                    value="<c:out value='${job.salary}'/>" placeholder="e.g. 50,000 / month or 8 LPA">
+        </div>
+
+        <div class="form-group" id="durationGroup">
+            <label for="duration">Internship Duration (Optional)</label>
+            <input type="text" id="duration" name="duration" class="form-control"
+                   value="<c:out value='${job.duration}'/>" placeholder="e.g. 6 Months, 3 Months, Summer 2026">
         </div>
 
         <div class="form-group">
@@ -203,7 +213,7 @@
                 <option value="">Select Job Type</option>
                 <option value="Full Time" ${job.jobType == 'Full Time' ? 'selected' : ''}>Full Time</option>
                 <option value="Part Time" ${job.jobType == 'Part Time' ? 'selected' : ''}>Part Time</option>
-                <option value="Internship" ${job.jobType == 'Internship' ? 'selected' : ''}>Internship</option>
+                <option value="Internship" ${param.type == 'Internship' || job.jobType == 'Internship' ? 'selected' : ''}>Internship</option>
             </select>
         </div>
 
@@ -234,8 +244,10 @@
         </div>
 
         <div class="button-bar">
-            <button type="submit" class="btn-submit">Create Job</button>
-            <a href="${pageContext.request.contextPath}/jobs" class="btn-cancel">Cancel</a>
+            <button type="submit" class="btn-submit">
+                <c:out value="${param.type == 'Internship' || job.jobType == 'Internship' ? 'Create Internship' : 'Create Job'}"/>
+            </button>
+            <a href="${pageContext.request.contextPath}${param.type == 'Internship' || isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn-cancel">Cancel</a>
         </div>
 
     </form>

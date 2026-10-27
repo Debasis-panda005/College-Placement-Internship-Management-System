@@ -5,7 +5,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Edit Job / Internship</title>
+    <title><c:out value="${job.isInternship() ? 'Edit Internship' : 'Edit Job / Internship'}"/></title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -147,7 +147,8 @@
 <div class="container">
 
     <div class="nav-links">
-        <a href="${pageContext.request.contextPath}/jobs">Jobs &amp; Internships</a> |
+        <a href="${pageContext.request.contextPath}/jobs">Jobs</a> |
+        <a href="${pageContext.request.contextPath}/internships">Internships</a> |
         <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
         <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
         <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
@@ -160,7 +161,7 @@
         </c:if>
     </div>
 
-    <h1>Edit Job / Internship</h1>
+    <h1><c:out value="${job.isInternship() ? 'Edit Internship' : 'Edit Job / Internship'}"/></h1>
 
     <c:if test="${not empty errorMessage}">
         <div class="alert-error">
@@ -173,6 +174,9 @@
         <input type="hidden" name="action" value="update">
         <input type="hidden" name="id" value="${job.id}">
         <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+        <c:if test="${job.isInternship() || isInternshipsEndpoint}">
+            <input type="hidden" name="source" value="internships">
+        </c:if>
 
         <div class="form-group">
             <label>Job ID</label>
@@ -203,9 +207,15 @@
         </div>
 
         <div class="form-group">
-            <label for="salary">Salary / Stipend</label>
+            <label for="salary"><c:out value="${job.isInternship() ? 'Stipend' : 'Salary / Stipend'}"/></label>
             <input type="text" id="salary" name="salary" class="form-control"
                    value="<c:out value='${job.salary}'/>">
+        </div>
+
+        <div class="form-group" id="durationGroup">
+            <label for="duration">Internship Duration (Optional)</label>
+            <input type="text" id="duration" name="duration" class="form-control"
+                   value="<c:out value='${job.duration}'/>" placeholder="e.g. 6 Months, 3 Months, Summer 2026">
         </div>
 
         <div class="form-group">
@@ -245,8 +255,10 @@
         </div>
 
         <div class="button-bar">
-            <button type="submit" class="btn-submit">Update Job</button>
-            <a href="${pageContext.request.contextPath}/jobs" class="btn-cancel">Cancel</a>
+            <button type="submit" class="btn-submit">
+                <c:out value="${job.isInternship() ? 'Update Internship' : 'Update Job'}"/>
+            </button>
+            <a href="${pageContext.request.contextPath}${job.isInternship() || isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn-cancel">Cancel</a>
         </div>
 
     </form>

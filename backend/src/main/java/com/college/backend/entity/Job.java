@@ -14,6 +14,7 @@ public class Job implements Serializable {
     private String location;
     private String description;
     private String salary;
+    private String duration;
     private String jobType; // "Full Time", "Part Time", "Internship"
     private String status;  // "Active", "Closed"
     private LocalDate deadline;
@@ -34,6 +35,18 @@ public class Job implements Serializable {
         this.status = status;
     }
 
+    public Job(String title, String company, String location, String description,
+               String salary, String duration, String jobType, String status) {
+        this.title = title;
+        this.company = company;
+        this.location = location;
+        this.description = description;
+        this.salary = salary;
+        this.duration = duration;
+        this.jobType = jobType;
+        this.status = status;
+    }
+
     public Job(Long id, String title, String company, String location, String description,
                String salary, String jobType, String status) {
         this.id = id;
@@ -42,6 +55,19 @@ public class Job implements Serializable {
         this.location = location;
         this.description = description;
         this.salary = salary;
+        this.jobType = jobType;
+        this.status = status;
+    }
+
+    public Job(Long id, String title, String company, String location, String description,
+               String salary, String duration, String jobType, String status) {
+        this.id = id;
+        this.title = title;
+        this.company = company;
+        this.location = location;
+        this.description = description;
+        this.salary = salary;
+        this.duration = duration;
         this.jobType = jobType;
         this.status = status;
     }
@@ -70,6 +96,39 @@ public class Job implements Serializable {
         this.location = location;
         this.description = description;
         this.salary = salary;
+        this.jobType = jobType;
+        this.status = status;
+        this.deadline = deadline;
+        this.minCgpa = minCgpa;
+        this.eligibleDepartments = eligibleDepartments;
+    }
+
+    public Job(Long id, String title, String company, String location, String description,
+               String salary, String duration, String jobType, String status,
+               LocalDate deadline, BigDecimal minCgpa, String eligibleDepartments) {
+        this.id = id;
+        this.title = title;
+        this.company = company;
+        this.location = location;
+        this.description = description;
+        this.salary = salary;
+        this.duration = duration;
+        this.jobType = jobType;
+        this.status = status;
+        this.deadline = deadline;
+        this.minCgpa = minCgpa;
+        this.eligibleDepartments = eligibleDepartments;
+    }
+
+    public Job(String title, String company, String location, String description,
+               String salary, String duration, String jobType, String status,
+               LocalDate deadline, BigDecimal minCgpa, String eligibleDepartments) {
+        this.title = title;
+        this.company = company;
+        this.location = location;
+        this.description = description;
+        this.salary = salary;
+        this.duration = duration;
         this.jobType = jobType;
         this.status = status;
         this.deadline = deadline;
@@ -123,6 +182,22 @@ public class Job implements Serializable {
 
     public void setSalary(String salary) {
         this.salary = salary;
+    }
+
+    public String getDuration() {
+        return duration;
+    }
+
+    public void setDuration(String duration) {
+        this.duration = duration;
+    }
+
+    public boolean isInternship() {
+        if (this.jobType == null) {
+            return false;
+        }
+        String lower = this.jobType.trim().toLowerCase();
+        return lower.contains("intern");
     }
 
     public String getJobType() {
@@ -250,6 +325,7 @@ public class Job implements Serializable {
                 ", company='" + company + '\'' +
                 ", location='" + location + '\'' +
                 ", salary='" + salary + '\'' +
+                ", duration='" + duration + '\'' +
                 ", jobType='" + jobType + '\'' +
                 ", status='" + status + '\'' +
                 ", deadline=" + deadline +

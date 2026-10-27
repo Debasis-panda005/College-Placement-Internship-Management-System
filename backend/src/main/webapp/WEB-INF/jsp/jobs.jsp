@@ -5,7 +5,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Jobs &amp; Internships</title>
+    <title><c:out value="${isInternshipsEndpoint ? 'Internships' : 'Jobs & Internships'}"/></title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -244,7 +244,11 @@
 <div class="container">
 
     <div class="nav-links">
-        <a class="active" href="${pageContext.request.contextPath}/jobs">Jobs &amp; Internships</a> |
+        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+            <a href="${pageContext.request.contextPath}/admin/dashboard">Admin Dashboard</a> |
+        </c:if>
+        <a class="${not isInternshipsEndpoint ? 'active' : ''}" href="${pageContext.request.contextPath}/jobs">Jobs</a> |
+        <a class="${isInternshipsEndpoint ? 'active' : ''}" href="${pageContext.request.contextPath}/internships">Internships</a> |
         <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
         <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
         <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
@@ -257,7 +261,7 @@
         </c:if>
     </div>
 
-    <h1>Available Jobs &amp; Internships</h1>
+    <h1><c:out value="${isInternshipsEndpoint ? 'Available Internships' : 'Available Jobs & Internships'}"/></h1>
 
     <c:if test="${not empty errorMessage}">
         <div class="alert-error">
@@ -273,9 +277,18 @@
 
     <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
         <div class="toolbar">
-            <a href="${pageContext.request.contextPath}/jobs?action=new" class="btn-add">
-                + Add Job / Internship
-            </a>
+            <c:choose>
+                <c:when test="${isInternshipsEndpoint}">
+                    <a href="${pageContext.request.contextPath}/jobs?action=new&type=Internship" class="btn-add">
+                        + Add Internship
+                    </a>
+                </c:when>
+                <c:otherwise>
+                    <a href="${pageContext.request.contextPath}/jobs?action=new" class="btn-add">
+                        + Add Job / Internship
+                    </a>
+                </c:otherwise>
+            </c:choose>
         </div>
     </c:if>
 
@@ -283,31 +296,33 @@
     <div class="filters-container">
 
         <!-- Search -->
-        <form action="${pageContext.request.contextPath}/jobs" method="get" class="filter-form">
+        <form action="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" method="get" class="filter-form">
             <input type="text" name="search" placeholder="Search title, company, location"
                    value="<c:out value='${searchKeyword}'/>" style="width: 240px;">
             <button type="submit">Search</button>
             <c:if test="${not empty searchKeyword}">
-                <a href="${pageContext.request.contextPath}/jobs" class="btn-clear">Clear</a>
+                <a href="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn-clear">Clear</a>
             </c:if>
         </form>
 
-        <!-- Filter by Type -->
-        <form action="${pageContext.request.contextPath}/jobs" method="get" class="filter-form">
-            <select name="jobType">
-                <option value="">All Job Types</option>
-                <option value="Full Time" ${selectedJobType == 'Full Time' ? 'selected' : ''}>Full Time</option>
-                <option value="Part Time" ${selectedJobType == 'Part Time' ? 'selected' : ''}>Part Time</option>
-                <option value="Internship" ${selectedJobType == 'Internship' ? 'selected' : ''}>Internship</option>
-            </select>
-            <button type="submit">Filter Type</button>
-            <c:if test="${not empty selectedJobType}">
-                <a href="${pageContext.request.contextPath}/jobs" class="btn-clear">Clear</a>
-            </c:if>
-        </form>
+        <!-- Filter by Type (Show if on general jobs list) -->
+        <c:if test="${not isInternshipsEndpoint}">
+            <form action="${pageContext.request.contextPath}/jobs" method="get" class="filter-form">
+                <select name="jobType">
+                    <option value="">All Job Types</option>
+                    <option value="Full Time" ${selectedJobType == 'Full Time' ? 'selected' : ''}>Full Time</option>
+                    <option value="Part Time" ${selectedJobType == 'Part Time' ? 'selected' : ''}>Part Time</option>
+                    <option value="Internship" ${selectedJobType == 'Internship' ? 'selected' : ''}>Internship</option>
+                </select>
+                <button type="submit">Filter Type</button>
+                <c:if test="${not empty selectedJobType}">
+                    <a href="${pageContext.request.contextPath}/jobs" class="btn-clear">Clear</a>
+                </c:if>
+            </form>
+        </c:if>
 
         <!-- Filter by Status -->
-        <form action="${pageContext.request.contextPath}/jobs" method="get" class="filter-form">
+        <form action="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" method="get" class="filter-form">
             <select name="status">
                 <option value="">All Statuses</option>
                 <option value="Active" ${selectedStatus == 'Active' ? 'selected' : ''}>Active</option>
@@ -315,22 +330,24 @@
             </select>
             <button type="submit">Filter Status</button>
             <c:if test="${not empty selectedStatus}">
-                <a href="${pageContext.request.contextPath}/jobs" class="btn-clear">Clear</a>
+                <a href="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn-clear">Clear</a>
             </c:if>
         </form>
 
         <!-- Sort -->
-        <form action="${pageContext.request.contextPath}/jobs" method="get" class="filter-form">
+        <form action="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" method="get" class="filter-form">
             <select name="sortBy">
                 <option value="">Sort By</option>
-                <option value="title" ${selectedSortBy == 'title' ? 'selected' : ''}>Job Title</option>
+                <option value="title" ${selectedSortBy == 'title' ? 'selected' : ''}>Title</option>
                 <option value="company" ${selectedSortBy == 'company' ? 'selected' : ''}>Company</option>
-                <option value="job_type" ${selectedSortBy == 'job_type' ? 'selected' : ''}>Job Type</option>
-                <option value="salary" ${selectedSortBy == 'salary' ? 'selected' : ''}>Salary</option>
+                <c:if test="${not isInternshipsEndpoint}">
+                    <option value="job_type" ${selectedSortBy == 'job_type' ? 'selected' : ''}>Job Type</option>
+                </c:if>
+                <option value="salary" ${selectedSortBy == 'salary' ? 'selected' : ''}>${isInternshipsEndpoint ? 'Stipend' : 'Salary'}</option>
             </select>
             <button type="submit">Sort</button>
             <c:if test="${not empty selectedSortBy}">
-                <a href="${pageContext.request.contextPath}/jobs" class="btn-clear">Clear</a>
+                <a href="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn-clear">Clear</a>
             </c:if>
         </form>
 
@@ -344,7 +361,8 @@
                 <th>Title</th>
                 <th>Company</th>
                 <th>Location</th>
-                <th>Salary</th>
+                <th>${isInternshipsEndpoint ? 'Stipend' : 'Salary / Stipend'}</th>
+                <th>Duration</th>
                 <th>Job Type</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -360,6 +378,7 @@
                             <td><c:out value="${job.company}"/></td>
                             <td><c:out value="${job.location}"/></td>
                             <td><c:out value="${job.salary}"/></td>
+                            <td style="text-align: center;"><c:out value="${not empty job.duration ? job.duration : '-'}"/></td>
                             <td style="text-align: center;"><c:out value="${job.jobType}"/></td>
                             <td style="text-align: center;">
                                 <c:choose>
@@ -380,9 +399,12 @@
                                     <form action="${pageContext.request.contextPath}/jobs" method="post" class="inline-form">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="id" value="${job.id}">
+                                        <c:if test="${isInternshipsEndpoint}">
+                                            <input type="hidden" name="source" value="internships">
+                                        </c:if>
                                         <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
                                         <button type="submit" class="btn-delete"
-                                                onclick="return confirm('Are you sure you want to delete this job?');">
+                                                onclick="return confirm('Are you sure you want to delete this ${job.isInternship() ? 'internship' : 'job'}?');">
                                             Delete
                                         </button>
                                     </form>
@@ -393,7 +415,7 @@
                 </c:when>
                 <c:otherwise>
                     <tr>
-                        <td colspan="8" class="empty-row">No jobs or internships available.</td>
+                        <td colspan="9" class="empty-row">No <c:out value="${isInternshipsEndpoint ? 'internships' : 'jobs or internships'}"/> available.</td>
                     </tr>
                 </c:otherwise>
             </c:choose>

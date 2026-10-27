@@ -495,4 +495,26 @@ public class StudentDAO {
         student.setResumeUrl(rs.getString("resume_url"));
         return student;
     }
+
+    /**
+     * Retrieves the total count of registered student profiles.
+     * Queries the authoritative students table which maintains 1-to-1 linkage
+     * with users having role = 'STUDENT' and represents completed placement profiles.
+     *
+     * @return count of student profile records in students table
+     * @throws DAOException on database failure
+     */
+    public int getTotalStudents() {
+        String sql = "SELECT COUNT(*) FROM students";
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet rs = statement.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new DAOException("Database error counting registered students: " + e.getMessage(), e);
+        }
+        return 0;
+    }
 }

@@ -271,7 +271,11 @@
 <div class="container">
 
     <div class="nav-links">
-        <a href="${pageContext.request.contextPath}/jobs">Jobs &amp; Internships</a> |
+        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+            <a href="${pageContext.request.contextPath}/admin/dashboard">Admin Dashboard</a> |
+        </c:if>
+        <a href="${pageContext.request.contextPath}/jobs">Jobs</a> |
+        <a href="${pageContext.request.contextPath}/internships">Internships</a> |
         <a class="active" href="${pageContext.request.contextPath}/applications">All Applications</a> |
         <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
         <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>

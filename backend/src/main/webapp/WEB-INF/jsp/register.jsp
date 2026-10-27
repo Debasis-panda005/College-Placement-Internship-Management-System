@@ -175,13 +175,13 @@
 
         <div class="form-row">
             <div class="form-col form-group">
-                <label for="password">Password * (min. 6 characters)</label>
-                <input type="password" id="password" name="password" class="form-control"
+                <label for="password">Password * (min. 8 characters)</label>
+                <input type="password" id="password" name="password" minlength="8" class="form-control"
                        required placeholder="Create a secure password">
             </div>
             <div class="form-col form-group">
                 <label for="confirmPassword">Confirm Password *</label>
-                <input type="password" id="confirmPassword" name="confirmPassword" class="form-control"
+                <input type="password" id="confirmPassword" name="confirmPassword" minlength="8" class="form-control"
                        required placeholder="Repeat password">
             </div>
         </div>
@@ -258,8 +258,8 @@
             return false;
         }
 
-        if (password.length < 6) {
-            alert("Password must be at least 6 characters long.");
+        if (password.length < 8) {
+            alert("Password must contain at least 8 characters.");
             return false;
         }
 

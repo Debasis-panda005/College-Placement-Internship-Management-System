@@ -18,8 +18,12 @@ CREATE TABLE IF NOT EXISTS jobs (
     location VARCHAR(100) NOT NULL,
     description TEXT,
     salary VARCHAR(100),
+    duration VARCHAR(100),                          -- Optional: e.g. '3 Months', '6 Months'
     job_type VARCHAR(50) NOT NULL,                  -- 'Full Time', 'Part Time', 'Internship'
     status VARCHAR(50) NOT NULL DEFAULT 'Active',   -- 'Active', 'Closed'
+    deadline DATE,                                  -- Application deadline (Phase 3/4)
+    min_cgpa DECIMAL(4, 2),                         -- Minimum CGPA requirement (Phase 3/4)
+    eligible_departments VARCHAR(255),              -- Eligible departments e.g. 'CSE,ECE' (Phase 3/4)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -49,4 +53,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 --
 -- If 'id' is INT, migrate to BIGINT using:
 --   ALTER TABLE jobs MODIFY id BIGINT AUTO_INCREMENT;
+--
+-- To add the optional 'duration' column to an existing jobs table:
+--   ALTER TABLE jobs ADD COLUMN duration VARCHAR(100) NULL AFTER salary;
 -- =====================================================================
