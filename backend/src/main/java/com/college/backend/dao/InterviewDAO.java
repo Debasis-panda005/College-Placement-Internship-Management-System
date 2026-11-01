@@ -2,6 +2,7 @@ package com.college.backend.dao;
 
 import com.college.backend.entity.ApplicationStatusHistory;
 import com.college.backend.entity.Interview;
+import com.college.backend.exception.DAOException;
 import com.college.backend.util.DBConnection;
 
 import java.sql.*;
@@ -17,6 +18,13 @@ import java.util.Set;
 public class InterviewDAO {
 
     private final ApplicationStatusHistoryDAO statusHistoryDAO = new ApplicationStatusHistoryDAO();
+
+    /**
+     * Obtains a database connection. Protected to allow test overrides.
+     */
+    protected Connection getConnection() throws SQLException {
+        return DBConnection.getConnection();
+    }
 
     // 1. Create Interview
     public boolean createInterview(Interview interview) {
@@ -646,7 +654,7 @@ public class InterviewDAO {
                 "FROM application_status_history " +
                 "WHERE status = 'INTERVIEW_RESCHEDULED'";
 
-        try (Connection connection = DBConnection.getConnection()) {
+        try (Connection connection = getConnection()) {
 
             try (PreparedStatement statement = connection.prepareStatement(sql);
                  ResultSet resultSet = statement.executeQuery()) {
@@ -676,7 +684,7 @@ public class InterviewDAO {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DAOException("Database error retrieving interview statistics: " + e.getMessage(), e);
         }
 
         return stats;

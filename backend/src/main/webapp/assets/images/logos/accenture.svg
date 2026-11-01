@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 70" width="240" height="70">
+  <rect width="100%" height="100%" fill="transparent"/>
+  <!-- Accenture wordmark with purple forward caret -->
+  <text x="30" y="44" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-weight="700" font-size="30" fill="#000000" letter-spacing="-0.5">accenture</text>
+  <!-- purple greater-than above 't' -->
+  <path d="M 125 18 L 133 22 L 125 26" fill="none" stroke="#a100ff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

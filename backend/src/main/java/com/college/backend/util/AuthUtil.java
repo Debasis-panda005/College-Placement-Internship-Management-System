@@ -56,6 +56,17 @@ public final class AuthUtil {
      * @param request the HTTP request
      * @return true if an authenticated session exists with a valid user ID
      */
+    public static String getSessionUserName(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return null;
+        }
+        return (String) session.getAttribute(LoginServlet.SESSION_USER_NAME);
+    }
+
     public static boolean isAuthenticated(HttpServletRequest request) {
         return getSessionUserId(request) != null;
     }

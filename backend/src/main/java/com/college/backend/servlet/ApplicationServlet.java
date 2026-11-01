@@ -3,11 +3,18 @@ package com.college.backend.servlet;
 import com.college.backend.dao.ApplicationDAO;
 import com.college.backend.dao.ApplicationStatusHistoryDAO;
 import com.college.backend.dao.InterviewDAO;
+import com.college.backend.dao.InterviewReportDAO;
+import com.college.backend.dao.InterviewRoundDAO;
+import com.college.backend.dao.InterviewRoundHistoryDAO;
 import com.college.backend.dao.JobDAO;
 import com.college.backend.dao.StudentDAO;
+import com.college.backend.dao.UserDAO;
 import com.college.backend.entity.Application;
 import com.college.backend.entity.ApplicationStatusHistory;
 import com.college.backend.entity.Interview;
+import com.college.backend.entity.InterviewReport;
+import com.college.backend.entity.InterviewRound;
+import com.college.backend.entity.InterviewRoundHistory;
 import com.college.backend.entity.Job;
 import com.college.backend.entity.Student;
 import com.college.backend.entity.User;
@@ -24,8 +31,11 @@ import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +48,10 @@ public class ApplicationServlet extends HttpServlet {
     private ApplicationStatusHistoryDAO statusHistoryDAO;
     private StudentDAO studentDAO;
     private JobDAO jobDAO;
+    private UserDAO userDAO = new UserDAO();
+    private InterviewRoundDAO roundDAO = new InterviewRoundDAO();
+    private InterviewRoundHistoryDAO roundHistoryDAO = new InterviewRoundHistoryDAO();
+    private InterviewReportDAO reportDAO = new InterviewReportDAO();
 
     @Override
     public void init() {
@@ -46,6 +60,10 @@ public class ApplicationServlet extends HttpServlet {
         statusHistoryDAO = new ApplicationStatusHistoryDAO();
         studentDAO = new StudentDAO();
         jobDAO = new JobDAO();
+        userDAO = new UserDAO();
+        roundDAO = new InterviewRoundDAO();
+        roundHistoryDAO = new InterviewRoundHistoryDAO();
+        reportDAO = new InterviewReportDAO();
     }
 
     // Setters for test dependency injection
@@ -65,8 +83,60 @@ public class ApplicationServlet extends HttpServlet {
         this.studentDAO = studentDAO;
     }
 
+    public void setUserDAO(UserDAO userDAO) { this.userDAO = userDAO; }
+
     public void setJobDAO(JobDAO jobDAO) {
         this.jobDAO = jobDAO;
+    }
+
+    public void setRoundDAO(InterviewRoundDAO roundDAO) {
+        this.roundDAO = roundDAO;
+    }
+
+    public void setRoundHistoryDAO(InterviewRoundHistoryDAO roundHistoryDAO) {
+        this.roundHistoryDAO = roundHistoryDAO;
+    }
+
+    public void setReportDAO(InterviewReportDAO reportDAO) {
+        this.reportDAO = reportDAO;
+    }
+
+    private void attachDisplayMaps(HttpServletRequest request, List<Application> appList) {
+        Map<Long, Student> studentMap = new HashMap<>();
+        Map<Long, User> userMap = new HashMap<>();
+        Map<Long, Job> jobMap = new HashMap<>();
+
+        if (appList != null) {
+            for (Application app : appList) {
+                if (app != null) {
+                    if (app.getStudentId() != null && !studentMap.containsKey(app.getStudentId()) && studentDAO != null) {
+                        try {
+                            Student s = studentDAO.findById(app.getStudentId());
+                            if (s != null) {
+                                studentMap.put(app.getStudentId(), s);
+                                if (s.getUserId() != null && !userMap.containsKey(s.getUserId()) && userDAO != null) {
+                                    User u = userDAO.findById(s.getUserId());
+                                    if (u != null) {
+                                        userMap.put(s.getUserId(), u);
+                                    }
+                                }
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    if (app.getJobId() != null && !jobMap.containsKey(app.getJobId()) && jobDAO != null) {
+                        try {
+                            Job j = jobDAO.getJobById(app.getJobId());
+                            if (j != null) {
+                                jobMap.put(app.getJobId(), j);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+        }
+        request.setAttribute("studentMap", studentMap);
+        request.setAttribute("userMap", userMap);
+        request.setAttribute("jobMap", jobMap);
     }
 
     // ============================
@@ -174,6 +244,8 @@ public class ApplicationServlet extends HttpServlet {
                     "rescheduledMap",
                     rescheduledMap
             );
+            attachDisplayMaps(request, shortlistedApplications
+            );
 
             request.getRequestDispatcher(
                     "/WEB-INF/jsp/shortlist.jsp"
@@ -214,6 +286,17 @@ public class ApplicationServlet extends HttpServlet {
                         Interview interview =
                                 interviewDAO.getInterviewByApplicationId(id);
 
+                        try {
+                            Student s = studentDAO.findById(application.getStudentId());
+                            request.setAttribute("student", s);
+                            if (s != null && s.getUserId() != null && userDAO != null) {
+                                request.setAttribute("studentUser", userDAO.findById(s.getUserId()));
+                            }
+                            if (jobDAO != null) {
+                                request.setAttribute("job", jobDAO.getJobById(application.getJobId()));
+                            }
+                        } catch (Exception ignored) {}
+
                         request.setAttribute(
                                 "application",
                                 application
@@ -222,6 +305,20 @@ public class ApplicationServlet extends HttpServlet {
                         request.setAttribute(
                                 "interview",
                                 interview
+                        );
+                        try {
+                            Student s = studentDAO.findById(application.getStudentId());
+                            request.setAttribute("student", s);
+                            if (s != null && s.getUserId() != null && userDAO != null) {
+                                request.setAttribute("studentUser", userDAO.findById(s.getUserId()));
+                            }
+                            if (jobDAO != null) {
+                                request.setAttribute("job", jobDAO.getJobById(application.getJobId()));
+                            }
+                        } catch (Exception ignored) {}
+                        request.setAttribute(
+                                "dummyDetails",
+                                "dummy"
                         );
 
                         request.getRequestDispatcher(
@@ -272,8 +369,29 @@ public class ApplicationServlet extends HttpServlet {
                             return;
                         }
 
+                        List<ApplicationStatusHistory> rawStatusHistory =
+                                statusHistoryDAO != null ? statusHistoryDAO.getHistoryByApplicationId(id) : new ArrayList<>();
+
+                        Interview interview =
+                                interviewDAO != null ? interviewDAO.getInterviewByApplicationId(id) : null;
+
+                        List<InterviewRound> interviewRounds =
+                                roundDAO != null ? roundDAO.getRoundsByApplicationId(id) : new ArrayList<>();
+
+                        Map<Long, List<InterviewRoundHistory>> roundHistoryMap = new HashMap<>();
+                        if (roundHistoryDAO != null && interviewRounds != null) {
+                            for (InterviewRound r : interviewRounds) {
+                                if (r.getId() != null) {
+                                    roundHistoryMap.put(r.getId(), roundHistoryDAO.getHistoryByRoundId(r.getId()));
+                                }
+                            }
+                        }
+
+                        InterviewReport interviewReport =
+                                reportDAO != null ? reportDAO.getReportByApplicationId(id) : null;
+
                         List<ApplicationStatusHistory> statusHistory =
-                                statusHistoryDAO.getHistoryByApplicationId(id);
+                                reconcileStatusHistory(application, rawStatusHistory, interview, interviewRounds, interviewReport);
 
                         request.setAttribute(
                                 "application",
@@ -284,6 +402,36 @@ public class ApplicationServlet extends HttpServlet {
                                 "statusHistory",
                                 statusHistory
                         );
+
+                        request.setAttribute(
+                                "interview",
+                                interview
+                        );
+
+                        request.setAttribute(
+                                "interviewRounds",
+                                interviewRounds
+                        );
+
+                        request.setAttribute(
+                                "roundHistoryMap",
+                                roundHistoryMap
+                        );
+
+                        request.setAttribute(
+                                "interviewReport",
+                                interviewReport
+                        );
+                        try {
+                            Student s = studentDAO.findById(application.getStudentId());
+                            request.setAttribute("student", s);
+                            if (s != null && s.getUserId() != null && userDAO != null) {
+                                request.setAttribute("studentUser", userDAO.findById(s.getUserId()));
+                            }
+                            if (jobDAO != null) {
+                                request.setAttribute("job", jobDAO.getJobById(application.getJobId()));
+                            }
+                        } catch (Exception ignored) {}
 
                         request.getRequestDispatcher(
                                 "/WEB-INF/jsp/application-history.jsp"
@@ -426,6 +574,7 @@ public class ApplicationServlet extends HttpServlet {
                 "applicationStats",
                 applicationStats
         );
+        attachDisplayMaps(request, applications);
 
         request.getRequestDispatcher(
                 "/WEB-INF/jsp/applications.jsp"
@@ -826,5 +975,168 @@ public class ApplicationServlet extends HttpServlet {
         }
         request.setAttribute("errorMessage", errorMessage);
         response.sendRedirect(request.getContextPath() + "/applications");
+    }
+
+    private List<ApplicationStatusHistory> reconcileStatusHistory(
+            Application application,
+            List<ApplicationStatusHistory> rawHistory,
+            Interview interview,
+            List<InterviewRound> interviewRounds,
+            InterviewReport interviewReport) {
+
+        List<ApplicationStatusHistory> result = new ArrayList<>();
+        if (rawHistory != null) {
+            String lastStatus = null;
+            for (ApplicationStatusHistory h : rawHistory) {
+                if (h != null && h.getStatus() != null) {
+                    String s = h.getStatus().trim().toUpperCase();
+                    // Deduplicate consecutive identical statuses
+                    if (!s.equals(lastStatus)) {
+                        result.add(h);
+                        lastStatus = s;
+                    }
+                }
+            }
+        }
+
+        boolean hasApplied = false;
+        boolean hasShortlisted = false;
+        boolean hasInterviewScheduled = false;
+        boolean hasInterviewCompleted = false;
+        boolean hasSelected = false;
+        boolean hasRejected = false;
+
+        for (ApplicationStatusHistory h : result) {
+            String s = h.getStatus() != null ? h.getStatus().toUpperCase() : "";
+            if (s.contains("APPLIED")) hasApplied = true;
+            if (s.contains("SHORTLISTED")) hasShortlisted = true;
+            if (s.contains("INTERVIEW_SCHEDULED") || s.contains("INTERVIEW SCHEDULED")) hasInterviewScheduled = true;
+            if (s.contains("INTERVIEW_COMPLETED") || s.contains("INTERVIEW COMPLETED")) hasInterviewCompleted = true;
+            if (s.contains("SELECTED")) hasSelected = true;
+            if (s.contains("REJECTED")) hasRejected = true;
+        }
+
+        LocalDateTime appDateTime = (application != null && application.getApplicationDate() != null)
+                ? application.getApplicationDate().atTime(9, 0)
+                : LocalDateTime.now().minusDays(7);
+
+        // 1. Ensure APPLIED milestone exists
+        if (!hasApplied && application != null) {
+            ApplicationStatusHistory appliedHistory = new ApplicationStatusHistory(
+                    application.getId(),
+                    "APPLIED",
+                    appDateTime
+            );
+            result.add(0, appliedHistory);
+        }
+
+        // 2. Ensure SHORTLISTED milestone exists if shortlisted or further along
+        boolean shouldHaveShortlisted = (interview != null) ||
+                (interviewRounds != null && !interviewRounds.isEmpty()) ||
+                (application != null && ("SHORTLISTED".equalsIgnoreCase(application.getStatus()) ||
+                        "SELECTED".equalsIgnoreCase(application.getStatus()) ||
+                        "REJECTED".equalsIgnoreCase(application.getStatus())));
+
+        if (!hasShortlisted && shouldHaveShortlisted && application != null) {
+            LocalDateTime shortlistTime = appDateTime.plusHours(2);
+            ApplicationStatusHistory shortlistedHistory = new ApplicationStatusHistory(
+                    application.getId(),
+                    "SHORTLISTED",
+                    shortlistTime
+            );
+            int insertIdx = 0;
+            for (int i = 0; i < result.size(); i++) {
+                if ("APPLIED".equalsIgnoreCase(result.get(i).getStatus())) {
+                    insertIdx = i + 1;
+                    break;
+                }
+            }
+            result.add(insertIdx, shortlistedHistory);
+        }
+
+        // 3. Ensure INTERVIEW_SCHEDULED milestone exists if interview or rounds exist
+        boolean hasInterviewOrRounds = (interview != null) || (interviewRounds != null && !interviewRounds.isEmpty());
+        if (!hasInterviewScheduled && hasInterviewOrRounds && application != null) {
+            LocalDateTime interviewTime = null;
+            if (interview != null && interview.getInterviewDate() != null) {
+                interviewTime = interview.getInterviewDate().atTime(
+                        interview.getInterviewTime() != null ? interview.getInterviewTime() : LocalTime.of(10, 0));
+            } else if (interviewRounds != null && !interviewRounds.isEmpty() && interviewRounds.get(0).getInterviewDate() != null) {
+                interviewTime = interviewRounds.get(0).getInterviewDate().atTime(
+                        interviewRounds.get(0).getInterviewTime() != null ? interviewRounds.get(0).getInterviewTime() : LocalTime.of(10, 0));
+            } else {
+                interviewTime = appDateTime.plusDays(1);
+            }
+
+            ApplicationStatusHistory interviewSchedHistory = new ApplicationStatusHistory(
+                    application.getId(),
+                    "INTERVIEW_SCHEDULED",
+                    interviewTime
+            );
+            int insertIdx = result.size();
+            for (int i = 0; i < result.size(); i++) {
+                if ("SHORTLISTED".equalsIgnoreCase(result.get(i).getStatus())) {
+                    insertIdx = i + 1;
+                }
+            }
+            result.add(insertIdx, interviewSchedHistory);
+        }
+
+        // 4. Ensure INTERVIEW_COMPLETED milestone exists if completed or selected
+        boolean isInterviewCompleted = (interview != null && "COMPLETED".equalsIgnoreCase(interview.getStatus())) ||
+                (interviewReport != null && interviewReport.getCompletedRounds() != null && interviewReport.getCompletedRounds() > 0) ||
+                (application != null && "SELECTED".equalsIgnoreCase(application.getStatus()));
+
+        if (!hasInterviewCompleted && isInterviewCompleted && application != null) {
+            LocalDateTime completedTime = appDateTime.plusDays(2);
+            if (interview != null && interview.getInterviewDate() != null) {
+                completedTime = interview.getInterviewDate().atTime(
+                        interview.getInterviewTime() != null ? interview.getInterviewTime().plusHours(2) : LocalTime.of(12, 0));
+            }
+            ApplicationStatusHistory completedHistory = new ApplicationStatusHistory(
+                    application.getId(),
+                    "INTERVIEW_COMPLETED",
+                    completedTime
+            );
+            int insertIdx = result.size();
+            for (int i = 0; i < result.size(); i++) {
+                String s = result.get(i).getStatus();
+                if ("INTERVIEW_SCHEDULED".equalsIgnoreCase(s) || "INTERVIEW_RESCHEDULED".equalsIgnoreCase(s)) {
+                    insertIdx = i + 1;
+                }
+            }
+            result.add(insertIdx, completedHistory);
+        }
+
+        // 5. Ensure SELECTED milestone exists if current status is SELECTED
+        if (!hasSelected && application != null && "SELECTED".equalsIgnoreCase(application.getStatus())) {
+            LocalDateTime selectedTime = (interviewReport != null && interviewReport.getDecisionDate() != null)
+                    ? interviewReport.getDecisionDate()
+                    : LocalDateTime.now();
+            ApplicationStatusHistory selectedHistory = new ApplicationStatusHistory(
+                    application.getId(),
+                    "SELECTED",
+                    selectedTime
+            );
+            result.add(selectedHistory);
+        }
+
+        // 6. Ensure REJECTED milestone exists if current status is REJECTED
+        if (!hasRejected && application != null && "REJECTED".equalsIgnoreCase(application.getStatus())) {
+            LocalDateTime rejectedTime = (interviewReport != null && interviewReport.getDecisionDate() != null)
+                    ? interviewReport.getDecisionDate()
+                    : LocalDateTime.now();
+            ApplicationStatusHistory rejectedHistory = new ApplicationStatusHistory(
+                    application.getId(),
+                    "REJECTED",
+                    rejectedTime
+            );
+            result.add(rejectedHistory);
+        }
+
+        // Chronological sort
+        result.sort(Comparator.comparing(h -> h.getChangedAt() != null ? h.getChangedAt() : LocalDateTime.MIN));
+
+        return result;
     }
 }

@@ -16,7 +16,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Controller servlet for the administrative dashboard.
@@ -29,6 +32,7 @@ import java.util.Map;
 public class AdminDashboardServlet extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOGGER = Logger.getLogger(AdminDashboardServlet.class.getName());
 
     private StudentDAO studentDAO;
     private JobDAO jobDAO;
@@ -114,10 +118,26 @@ public class AdminDashboardServlet extends HttpServlet {
 
             int scheduledInterviews = interviewStats != null ? interviewStats.getOrDefault("SCHEDULED", 0) : 0;
 
+            // Consolidated statistics map for JSP EL expressions (e.g. ${stats.totalStudents})
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("totalStudents", totalStudents);
+            stats.put("totalJobs", totalJobs);
+            stats.put("totalInternships", totalInternships);
+            stats.put("activeJobs", activeOpportunities);
+            stats.put("activeOpportunities", activeOpportunities);
+            stats.put("totalApplications", totalApplications);
+            stats.put("shortlistedApplications", shortlistedApplications);
+            stats.put("selectedApplications", selectedApplications);
+            stats.put("scheduledInterviews", scheduledInterviews);
+
+            request.setAttribute("stats", stats);
+
+            // Also expose individual request attributes for backwards compatibility
             request.setAttribute("totalStudents", totalStudents);
             request.setAttribute("totalJobs", totalJobs);
             request.setAttribute("totalInternships", totalInternships);
             request.setAttribute("activeOpportunities", activeOpportunities);
+            request.setAttribute("activeJobs", activeOpportunities);
             request.setAttribute("totalApplications", totalApplications);
             request.setAttribute("shortlistedApplications", shortlistedApplications);
             request.setAttribute("selectedApplications", selectedApplications);
@@ -125,11 +145,27 @@ public class AdminDashboardServlet extends HttpServlet {
 
         } catch (DAOException e) {
             // Log internally and present user-safe error without exposing database details or credentials
+            LOGGER.log(Level.SEVERE, "Database error retrieving live dashboard metrics", e);
             request.setAttribute("errorMessage", "Unable to load complete dashboard metrics due to a database error. Please try again later.");
+            request.setAttribute("databaseError", Boolean.TRUE);
+
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("totalStudents", 0);
+            stats.put("totalJobs", 0);
+            stats.put("totalInternships", 0);
+            stats.put("activeJobs", 0);
+            stats.put("activeOpportunities", 0);
+            stats.put("totalApplications", 0);
+            stats.put("shortlistedApplications", 0);
+            stats.put("selectedApplications", 0);
+            stats.put("scheduledInterviews", 0);
+            request.setAttribute("stats", stats);
+
             request.setAttribute("totalStudents", 0);
             request.setAttribute("totalJobs", 0);
             request.setAttribute("totalInternships", 0);
             request.setAttribute("activeOpportunities", 0);
+            request.setAttribute("activeJobs", 0);
             request.setAttribute("totalApplications", 0);
             request.setAttribute("shortlistedApplications", 0);
             request.setAttribute("selectedApplications", 0);

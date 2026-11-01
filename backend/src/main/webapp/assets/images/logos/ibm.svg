@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 70" width="240" height="70">
+  <rect width="100%" height="100%" fill="transparent"/>
+  <!-- IBM classic 8-bar blue logo styled text -->
+  <g transform="translate(60, 16)">
+    <!-- I -->
+    <rect x="0" y="0" width="22" height="3" fill="#1f70c1"/>
+    <rect x="0" y="5" width="22" height="3" fill="#1f70c1"/>
+    <rect x="7" y="10" width="8" height="3" fill="#1f70c1"/>
+    <rect x="7" y="15" width="8" height="3" fill="#1f70c1"/>
+    <rect x="7" y="20" width="8" height="3" fill="#1f70c1"/>
+    <rect x="7" y="25" width="8" height="3" fill="#1f70c1"/>
+    <rect x="0" y="30" width="22" height="3" fill="#1f70c1"/>
+    <rect x="0" y="35" width="22" height="3" fill="#1f70c1"/>
+
+    <!-- B -->
+    <rect x="30" y="0" width="30" height="3" fill="#1f70c1"/>
+    <rect x="30" y="5" width="34" height="3" fill="#1f70c1"/>
+    <rect x="30" y="10" width="8" height="3" fill="#1f70c1"/>
+    <rect x="56" y="10" width="8" height="3" fill="#1f70c1"/>
+    <rect x="30" y="15" width="32" height="3" fill="#1f70c1"/>
+    <rect x="30" y="20" width="8" height="3" fill="#1f70c1"/>
+    <rect x="58" y="20" width="8" height="3" fill="#1f70c1"/>
+    <rect x="30" y="25" width="8" height="3" fill="#1f70c1"/>
+    <rect x="58" y="25" width="8" height="3" fill="#1f70c1"/>
+    <rect x="30" y="30" width="36" height="3" fill="#1f70c1"/>
+    <rect x="30" y="35" width="32" height="3" fill="#1f70c1"/>
+
+    <!-- M -->
+    <rect x="75" y="0" width="45" height="3" fill="#1f70c1"/>
+    <rect x="75" y="5" width="45" height="3" fill="#1f70c1"/>
+    <rect x="75" y="10" width="8" height="3" fill="#1f70c1"/>
+    <rect x="94" y="10" width="7" height="3" fill="#1f70c1"/>
+    <rect x="112" y="10" width="8" height="3" fill="#1f70c1"/>
+    <rect x="75" y="15" width="8" height="3" fill="#1f70c1"/>
+    <rect x="94" y="15" width="7" height="3" fill="#1f70c1"/>
+    <rect x="112" y="15" width="8" height="3" fill="#1f70c1"/>
+    <rect x="75" y="20" width="8" height="3" fill="#1f70c1"/>
+    <rect x="94" y="20" width="7" height="3" fill="#1f70c1"/>
+    <rect x="112" y="20" width="8" height="3" fill="#1f70c1"/>
+    <rect x="75" y="25" width="8" height="3" fill="#1f70c1"/>
+    <rect x="112" y="25" width="8" height="3" fill="#1f70c1"/>
+    <rect x="75" y="30" width="8" height="3" fill="#1f70c1"/>
+    <rect x="112" y="30" width="8" height="3" fill="#1f70c1"/>
+    <rect x="75" y="35" width="8" height="3" fill="#1f70c1"/>
+    <rect x="112" y="35" width="8" height="3" fill="#1f70c1"/>
+  </g>
+</svg>

@@ -680,7 +680,7 @@ public class ApplicationDAO {
 
         String sql = "SELECT status, COUNT(*) AS cnt FROM applications GROUP BY status";
 
-        try (Connection connection = DBConnection.getConnection();
+        try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet resultSet = statement.executeQuery()) {
 
@@ -700,7 +700,7 @@ public class ApplicationDAO {
             stats.put("TOTAL", total);
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DAOException("Database error retrieving application statistics: " + e.getMessage(), e);
         }
 
         return stats;

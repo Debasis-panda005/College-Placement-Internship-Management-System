@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 70" width="240" height="70">
+  <rect width="100%" height="100%" fill="transparent"/>
+  <!-- Deloitte wordmark with iconic green dot -->
+  <text x="35" y="45" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-weight="700" font-size="32" fill="#000000" letter-spacing="-1">Deloitte</text>
+  <circle cx="158" cy="42" r="5" fill="#86bc25"/>
+</svg>

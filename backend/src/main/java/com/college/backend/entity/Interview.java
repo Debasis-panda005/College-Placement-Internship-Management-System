@@ -79,4 +79,18 @@ public class Interview {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    public String getFormattedInterviewDate() {
+        if (interviewDate == null) {
+            return "TBD";
+        }
+        return interviewDate.format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy"));
+    }
+
+    public String getFormattedInterviewTime() {
+        if (interviewTime == null) {
+            return "TBD";
+        }
+        return interviewTime.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"));
+    }
 }

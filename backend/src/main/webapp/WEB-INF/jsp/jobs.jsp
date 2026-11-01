@@ -1,428 +1,262 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<c:set var="activeNav" value="${isInternshipsEndpoint ? 'internships' : 'jobs'}" scope="request" />
+<c:set var="pageTitle" value="${isInternshipsEndpoint ? 'Internship Drives' : 'Campus Placement Drives'} | Centurion University Placement Portal" scope="request" />
 
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title><c:out value="${isInternshipsEndpoint ? 'Internships' : 'Jobs & Internships'}"/></title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 30px;
-        }
+<jsp:include page="/WEB-INF/jsp/common/header.jsp" />
 
-        .container {
-            width: 95%;
-            margin: auto;
-            background: white;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
+<c:if test="${not empty sessionScope.userId}">
+    <form action="${pageContext.request.contextPath}/logout" method="post" style="display:none;" aria-hidden="true">
+        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+        <button type="submit">Logout</button>
+    </form>
+</c:if>
 
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 25px;
-        }
+<main class="page-container" style="max-width: 1200px; margin: 30px auto 60px auto;">
 
-        .nav-links {
-            text-align: center;
-            margin-bottom: 25px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-        }
+    <!-- Page Header Banner -->
+    <div style="background: white; border-radius: var(--radius-lg); padding: 24px 28px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="width: 48px; height: 48px; background: rgba(27, 54, 93, 0.08); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--primary-navy); font-size: 22px;">
+                <i class="fa-solid <c:out value="${isInternshipsEndpoint ? 'fa-id-badge' : 'fa-briefcase'}"/>"></i>
+            </div>
+            <div>
+                <h1 class="page-title" style="margin: 0 0 4px 0; font-size: 1.5rem; color: var(--primary-navy); font-weight: 800;">
+                    <c:out value="${isInternshipsEndpoint ? 'Campus Internship Opportunities' : 'Campus Placement & Internship Opportunities'}"/>
+                </h1>
+                <p class="page-subtitle" style="margin: 0; color: var(--text-muted); font-size: 0.88rem;">
+                    Explore verified campus recruitment drives, industry apprenticeships, and stipend internships.
+                </p>
+            </div>
+        </div>
 
-        .nav-links a {
-            margin: 0 12px;
-            text-decoration: none;
-            color: #0066cc;
-            font-weight: 500;
-        }
-
-        .nav-links a.active {
-            color: #333;
-            font-weight: bold;
-        }
-
-        .nav-links form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .nav-links .btn-logout {
-            background: none;
-            border: none;
-            color: #dc3545;
-            font-weight: 500;
-            cursor: pointer;
-            padding: 0;
-            margin: 0 12px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        .nav-links .btn-logout:hover {
-            text-decoration: underline;
-        }
-
-        .alert-error {
-            background-color: #f8d7da;
-            color: #842029;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #f5c2c7;
-        }
-
-        .alert-success {
-            background-color: #d1e7dd;
-            color: #0f5132;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #badbcc;
-        }
-
-        .toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .btn-add {
-            display: inline-block;
-            padding: 10px 18px;
-            background-color: #1976d2;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-
-        .btn-add:hover {
-            background-color: #125aa0;
-        }
-
-        .filters-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            align-items: center;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-
-        .filter-form {
-            display: inline-flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .filter-form input,
-        .filter-form select {
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        .filter-form button {
-            padding: 8px 14px;
-            background-color: #495057;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .filter-form button:hover {
-            background-color: #343a40;
-        }
-
-        .btn-clear {
-            color: #6c757d;
-            text-decoration: none;
-            font-size: 13px;
-            margin-left: 4px;
-        }
-
-        .btn-clear:hover {
-            text-decoration: underline;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-
-        th, td {
-            padding: 12px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-
-        th {
-            background: #333;
-            color: white;
-            text-align: center;
-        }
-
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-
-        .status-active {
-            color: #28a745;
-            font-weight: bold;
-        }
-
-        .status-closed {
-            color: #dc3545;
-            font-weight: bold;
-        }
-
-        .actions-cell {
-            white-space: nowrap;
-            text-align: center;
-        }
-
-        .action-link {
-            text-decoration: none;
-            color: #0066cc;
-            font-weight: 500;
-            margin: 0 4px;
-        }
-
-        .action-link:hover {
-            text-decoration: underline;
-        }
-
-        .inline-form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .btn-delete {
-            background: none;
-            border: none;
-            color: #dc3545;
-            font-weight: 500;
-            cursor: pointer;
-            padding: 0;
-            margin: 0 4px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        .btn-delete:hover {
-            text-decoration: underline;
-        }
-
-        .empty-row {
-            text-align: center;
-            color: #777;
-            padding: 30px;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-
-    <div class="nav-links">
         <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-            <a href="${pageContext.request.contextPath}/admin/dashboard">Admin Dashboard</a> |
-        </c:if>
-        <a class="${not isInternshipsEndpoint ? 'active' : ''}" href="${pageContext.request.contextPath}/jobs">Jobs</a> |
-        <a class="${isInternshipsEndpoint ? 'active' : ''}" href="${pageContext.request.contextPath}/internships">Internships</a> |
-        <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
-        <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
-        <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
-        <c:if test="${not empty sessionScope.userId}">
-            |
-            <form action="${pageContext.request.contextPath}/logout" method="post" style="display: inline; margin: 0; padding: 0;">
-                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                <button type="submit" class="btn-logout">Logout</button>
-            </form>
+            <div>
+                <c:choose>
+                    <c:when test="${isInternshipsEndpoint}">
+                        <a href="${pageContext.request.contextPath}/jobs?action=new&type=Internship" class="btn btn-primary" style="padding: 10px 18px; border-radius: var(--radius-md);">
+                            <i class="fa-solid fa-plus" style="margin-right: 6px;"></i> Post New Internship
+                        </a>
+                    </c:when>
+                    <c:otherwise>
+                        <a href="${pageContext.request.contextPath}/jobs?action=new" class="btn btn-primary" style="padding: 10px 18px; border-radius: var(--radius-md);">
+                            <i class="fa-solid fa-plus" style="margin-right: 6px;"></i> Post Opportunity
+                        </a>
+                    </c:otherwise>
+                </c:choose>
+            </div>
         </c:if>
     </div>
 
-    <h1><c:out value="${isInternshipsEndpoint ? 'Available Internships' : 'Available Jobs & Internships'}"/></h1>
-
     <c:if test="${not empty errorMessage}">
-        <div class="alert-error">
-            <c:out value="${errorMessage}"/>
+        <div class="alert alert-error" style="margin-bottom: 20px;" role="alert">
+            <i class="fa-solid fa-circle-exclamation alert-icon"></i>
+            <div class="alert-content">
+                <strong>Notice:</strong> <c:out value="${errorMessage}"/>
+            </div>
         </div>
     </c:if>
 
     <c:if test="${not empty successMessage}">
-        <div class="alert-success">
-            <c:out value="${successMessage}"/>
+        <div class="alert alert-success" style="margin-bottom: 20px;" role="alert">
+            <i class="fa-solid fa-circle-check alert-icon"></i>
+            <div class="alert-content">
+                <strong>Success:</strong> <c:out value="${successMessage}"/>
+            </div>
         </div>
     </c:if>
 
-    <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-        <div class="toolbar">
-            <c:choose>
-                <c:when test="${isInternshipsEndpoint}">
-                    <a href="${pageContext.request.contextPath}/jobs?action=new&type=Internship" class="btn-add">
-                        + Add Internship
-                    </a>
-                </c:when>
-                <c:otherwise>
-                    <a href="${pageContext.request.contextPath}/jobs?action=new" class="btn-add">
-                        + Add Job / Internship
-                    </a>
-                </c:otherwise>
-            </c:choose>
-        </div>
-    </c:if>
+    <!-- SEARCH & FILTER TOOLBAR -->
+    <div class="card" style="margin-bottom: 24px; background: white; border: 1px solid var(--border-light); padding: 20px 24px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+        <form action="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" method="get"
+              style="display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;">
 
-    <!-- SEARCH & FILTER BAR -->
-    <div class="filters-container">
+            <!-- Search input -->
+            <div class="form-group" style="flex: 2; min-width: 220px; margin: 0;">
+                <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-dark); margin-bottom: 5px;">
+                    <i class="fa-solid fa-magnifying-glass" style="margin-right: 4px; color: var(--primary-navy);"></i> Search Opportunities
+                </label>
+                <input type="text" name="search" class="form-control" placeholder="Search by role title, company, location..."
+                       value="<c:out value='${searchKeyword}'/>" style="height: 40px; border-radius: var(--radius-sm);">
+            </div>
 
-        <!-- Search -->
-        <form action="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" method="get" class="filter-form">
-            <input type="text" name="search" placeholder="Search title, company, location"
-                   value="<c:out value='${searchKeyword}'/>" style="width: 240px;">
-            <button type="submit">Search</button>
-            <c:if test="${not empty searchKeyword}">
-                <a href="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn-clear">Clear</a>
+            <!-- Job Type Filter (if not on internships endpoint) -->
+            <c:if test="${not isInternshipsEndpoint}">
+                <div class="form-group" style="flex: 1; min-width: 150px; margin: 0;">
+                    <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-dark); margin-bottom: 5px;">
+                        Opportunity Type
+                    </label>
+                    <select name="jobType" class="form-control" style="height: 40px; border-radius: var(--radius-sm);">
+                        <option value="">All Types</option>
+                        <option value="Full Time" ${selectedJobType == 'Full Time' ? 'selected' : ''}>Full Time</option>
+                        <option value="Part Time" ${selectedJobType == 'Part Time' ? 'selected' : ''}>Part Time</option>
+                        <option value="Internship" ${selectedJobType == 'Internship' ? 'selected' : ''}>Internship</option>
+                    </select>
+                </div>
             </c:if>
-        </form>
 
-        <!-- Filter by Type (Show if on general jobs list) -->
-        <c:if test="${not isInternshipsEndpoint}">
-            <form action="${pageContext.request.contextPath}/jobs" method="get" class="filter-form">
-                <select name="jobType">
-                    <option value="">All Job Types</option>
-                    <option value="Full Time" ${selectedJobType == 'Full Time' ? 'selected' : ''}>Full Time</option>
-                    <option value="Part Time" ${selectedJobType == 'Part Time' ? 'selected' : ''}>Part Time</option>
-                    <option value="Internship" ${selectedJobType == 'Internship' ? 'selected' : ''}>Internship</option>
+            <!-- Status Filter -->
+            <div class="form-group" style="flex: 1; min-width: 140px; margin: 0;">
+                <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-dark); margin-bottom: 5px;">
+                    Application Status
+                </label>
+                <select name="status" class="form-control" style="height: 40px; border-radius: var(--radius-sm);">
+                    <option value="">All Statuses</option>
+                    <option value="Active" ${selectedStatus == 'Active' ? 'selected' : ''}>Active</option>
+                    <option value="Closed" ${selectedStatus == 'Closed' ? 'selected' : ''}>Closed</option>
                 </select>
-                <button type="submit">Filter Type</button>
-                <c:if test="${not empty selectedJobType}">
-                    <a href="${pageContext.request.contextPath}/jobs" class="btn-clear">Clear</a>
-                </c:if>
-            </form>
-        </c:if>
+            </div>
 
-        <!-- Filter by Status -->
-        <form action="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" method="get" class="filter-form">
-            <select name="status">
-                <option value="">All Statuses</option>
-                <option value="Active" ${selectedStatus == 'Active' ? 'selected' : ''}>Active</option>
-                <option value="Closed" ${selectedStatus == 'Closed' ? 'selected' : ''}>Closed</option>
-            </select>
-            <button type="submit">Filter Status</button>
-            <c:if test="${not empty selectedStatus}">
-                <a href="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn-clear">Clear</a>
-            </c:if>
+            <!-- Sort By -->
+            <div class="form-group" style="flex: 1; min-width: 140px; margin: 0;">
+                <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-dark); margin-bottom: 5px;">
+                    Sort Listings
+                </label>
+                <select name="sortBy" class="form-control" style="height: 40px; border-radius: var(--radius-sm);">
+                    <option value="">Sort Order</option>
+                    <option value="title" ${selectedSortBy == 'title' ? 'selected' : ''}>Role Title</option>
+                    <option value="company" ${selectedSortBy == 'company' ? 'selected' : ''}>Company Name</option>
+                    <option value="salary" ${selectedSortBy == 'salary' ? 'selected' : ''}>Package / Stipend</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin: 0;">
+                <button type="submit" class="btn btn-primary" style="height: 40px; padding: 0 18px; border-radius: var(--radius-sm); font-weight: 600;">
+                    Filter
+                </button>
+                <a href="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn btn-outline" style="height: 40px; padding: 0 14px; display: inline-flex; align-items: center; border-radius: var(--radius-sm);">
+                    Reset
+                </a>
+            </div>
         </form>
-
-        <!-- Sort -->
-        <form action="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" method="get" class="filter-form">
-            <select name="sortBy">
-                <option value="">Sort By</option>
-                <option value="title" ${selectedSortBy == 'title' ? 'selected' : ''}>Title</option>
-                <option value="company" ${selectedSortBy == 'company' ? 'selected' : ''}>Company</option>
-                <c:if test="${not isInternshipsEndpoint}">
-                    <option value="job_type" ${selectedSortBy == 'job_type' ? 'selected' : ''}>Job Type</option>
-                </c:if>
-                <option value="salary" ${selectedSortBy == 'salary' ? 'selected' : ''}>${isInternshipsEndpoint ? 'Stipend' : 'Salary'}</option>
-            </select>
-            <button type="submit">Sort</button>
-            <c:if test="${not empty selectedSortBy}">
-                <a href="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn-clear">Clear</a>
-            </c:if>
-        </form>
-
     </div>
 
-    <!-- JOBS TABLE -->
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Company</th>
-                <th>Location</th>
-                <th>${isInternshipsEndpoint ? 'Stipend' : 'Salary / Stipend'}</th>
-                <th>Duration</th>
-                <th>Job Type</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <c:choose>
-                <c:when test="${not empty jobs}">
-                    <c:forEach items="${jobs}" var="job">
-                        <tr>
-                            <td style="text-align: center;"><c:out value="${job.id}"/></td>
-                            <td><strong><c:out value="${job.title}"/></strong></td>
-                            <td><c:out value="${job.company}"/></td>
-                            <td><c:out value="${job.location}"/></td>
-                            <td><c:out value="${job.salary}"/></td>
-                            <td style="text-align: center;"><c:out value="${not empty job.duration ? job.duration : '-'}"/></td>
-                            <td style="text-align: center;"><c:out value="${job.jobType}"/></td>
-                            <td style="text-align: center;">
-                                <c:choose>
-                                    <c:when test="${job.status == 'Active'}">
-                                        <span class="status-active">Active</span>
-                                    </c:when>
-                                    <c:otherwise>
-                                        <span class="status-closed">Closed</span>
-                                    </c:otherwise>
-                                </c:choose>
-                            </td>
-                            <td class="actions-cell">
-                                <a href="${pageContext.request.contextPath}/jobs?action=view&id=${job.id}" class="action-link">View</a>
-                                <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-                                    <span>|</span>
-                                    <a href="${pageContext.request.contextPath}/jobs?action=edit&id=${job.id}" class="action-link">Edit</a>
-                                    <span>|</span>
-                                    <form action="${pageContext.request.contextPath}/jobs" method="post" class="inline-form">
-                                        <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="id" value="${job.id}">
-                                        <c:if test="${isInternshipsEndpoint}">
-                                            <input type="hidden" name="source" value="internships">
-                                        </c:if>
-                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                        <button type="submit" class="btn-delete"
-                                                onclick="return confirm('Are you sure you want to delete this ${job.isInternship() ? 'internship' : 'job'}?');">
-                                            Delete
-                                        </button>
-                                    </form>
-                                </c:if>
-                            </td>
-                        </tr>
-                    </c:forEach>
-                </c:when>
-                <c:otherwise>
+    <!-- OPPORTUNITIES TABLE / CARDS -->
+    <div class="card" style="padding: 0; overflow: hidden; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);">
+        <div style="padding: 16px 22px; background: white; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.05rem; color: var(--primary-navy); font-weight: 700;">
+                Available Listings
+            </div>
+            <span style="font-size: 0.82rem; background: var(--bg-subtle); color: var(--text-muted); padding: 4px 10px; border-radius: 12px; font-weight: 600;">
+                ${not empty jobs ? jobs.size() : 0} listing(s) found
+            </span>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="data-table" style="margin: 0; width: 100%; border-collapse: collapse;">
+                <thead>
                     <tr>
-                        <td colspan="9" class="empty-row">No <c:out value="${isInternshipsEndpoint ? 'internships' : 'jobs or internships'}"/> available.</td>
+                        <th style="padding: 14px 16px; text-align: left;">Role &amp; Opportunity</th>
+                        <th style="padding: 14px 16px; text-align: left;">Company</th>
+                        <th style="padding: 14px 16px; text-align: left;">Location</th>
+                        <th style="padding: 14px 16px; text-align: right;">Package / Stipend</th>
+                        <th style="padding: 14px 16px; text-align: center;">Type &amp; Duration</th>
+                        <th style="padding: 14px 16px; text-align: center;">Status</th>
+                        <th style="padding: 14px 16px; text-align: center;">Actions</th>
                     </tr>
-                </c:otherwise>
-            </c:choose>
-        </tbody>
-    </table>
+                </thead>
+                <tbody>
+                    <c:choose>
+                        <c:when test="${not empty jobs}">
+                            <c:forEach items="${jobs}" var="job">
+                                <tr style="border-bottom: 1px solid var(--border-light);">
+                                    <td style="padding: 14px 16px; text-align: left;">
+                                        <a href="${pageContext.request.contextPath}/jobs?action=view&id=${job.id}"
+                                           style="font-weight: 700; color: var(--primary-navy); text-decoration: none;">
+                                            <c:out value="${job.title}"/>
+                                        </a>
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 2px;">Ref: #${job.id}</span>
+                                    </td>
 
-</div>
+                                    <td style="padding: 14px 16px; text-align: left; font-weight: 600; color: var(--text-dark);">
+                                        <i class="fa-regular fa-building" style="color: var(--text-muted); margin-right: 6px;"></i><c:out value="${job.company}"/>
+                                    </td>
 
-</body>
-</html>
+                                    <td style="padding: 14px 16px; text-align: left; color: var(--text-muted); font-size: 0.88rem;">
+                                        <i class="fa-solid fa-location-dot" style="color: var(--danger); margin-right: 4px; font-size: 11px;"></i><c:out value="${job.location}"/>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: right; font-weight: 700; color: var(--success); font-size: 0.95rem;">
+                                        <c:out value="${job.salary}"/>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <span class="badge" style="background: rgba(27, 54, 93, 0.08); color: var(--primary-navy); font-weight: 600; font-size: 0.75rem;">
+                                            <c:out value="${job.jobType}"/>
+                                        </span>
+                                        <c:if test="${not empty job.duration}">
+                                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 3px;">
+                                                <i class="fa-regular fa-clock" style="font-size: 10px;"></i> <c:out value="${job.duration}"/>
+                                            </div>
+                                        </c:if>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <c:choose>
+                                            <c:when test="${job.status == 'Active'}">
+                                                <span class="badge badge-success"><i class="fa-solid fa-circle" style="font-size:7px; vertical-align:middle; margin-right:4px;"></i>Active</span>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <span class="badge badge-danger"><i class="fa-solid fa-circle" style="font-size:7px; vertical-align:middle; margin-right:4px;"></i>Closed</span>
+                                            </c:otherwise>
+                                        </c:choose>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: center; white-space: nowrap;">
+                                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                                            <a href="${pageContext.request.contextPath}/jobs?action=view&id=${job.id}"
+                                               class="btn btn-outline" style="font-size: 0.78rem; padding: 6px 12px; border-radius: var(--radius-sm);" title="View details and requirements">
+                                                <i class="fa-solid fa-eye" style="margin-right: 4px;"></i> View
+                                            </a>
+
+                                            <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                                                <a href="${pageContext.request.contextPath}/jobs?action=edit&id=${job.id}"
+                                                   class="btn btn-secondary" style="font-size: 0.78rem; padding: 6px 12px; border-radius: var(--radius-sm);" title="Edit listing">
+                                                    <i class="fa-solid fa-pen-to-square"></i>
+                                                </a>
+
+                                                <form action="${pageContext.request.contextPath}/jobs" method="post" style="display: inline; margin: 0;"
+                                                      onsubmit="return (typeof PortalPopups !== 'undefined') ? PortalPopups.confirmAction(event, 'Are you sure you want to delete this listing?') : confirm('Are you sure you want to delete this listing?');">
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="id" value="${job.id}">
+                                                    <c:if test="${isInternshipsEndpoint}">
+                                                        <input type="hidden" name="source" value="internships">
+                                                    </c:if>
+                                                    <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                    <button type="submit" class="btn btn-danger" style="font-size: 0.78rem; padding: 6px 10px; border-radius: var(--radius-sm);" title="Delete listing">
+                                                        <i class="fa-solid fa-trash-can"></i>
+                                                    </button>
+                                                </form>
+                                            </c:if>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </c:forEach>
+                        </c:when>
+                        <c:otherwise>
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+                                    <div style="font-size: 2.2rem; margin-bottom: 10px; color: var(--accent-gold);">
+                                        <i class="fa-solid fa-briefcase"></i>
+                                    </div>
+                                    <div style="font-weight: 700; font-size: 1.15rem; color: var(--primary-navy);">No Opportunities Found</div>
+                                    <div style="font-size: 0.9rem; margin-top: 6px; max-width: 420px; margin-left: auto; margin-right: auto;">
+                                        No <c:out value="${isInternshipsEndpoint ? 'internships' : 'jobs or internships'}"/> match your filter criteria. Try adjusting keywords or clear filters.
+                                    </div>
+                                    <div style="margin-top: 16px;">
+                                        <a href="${pageContext.request.contextPath}${isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn btn-outline" style="font-size: 0.85rem; padding: 7px 16px;">
+                                            Reset All Filters
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        </c:otherwise>
+                    </c:choose>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</main>
+
+<jsp:include page="/WEB-INF/jsp/common/footer.jsp" />

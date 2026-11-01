@@ -155,6 +155,9 @@ public class JobServlet extends HttpServlet {
         // 4. LIST JOBS (SEARCH, FILTER, SORT, ALL)
         String search = request.getParameter("search");
         String jobType = request.getParameter("jobType");
+        if (jobType == null || jobType.trim().isEmpty()) {
+            jobType = request.getParameter("type");
+        }
         String status = request.getParameter("status");
         String sortBy = request.getParameter("sortBy");
 

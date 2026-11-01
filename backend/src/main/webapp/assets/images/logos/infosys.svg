@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 70" width="240" height="70">
+  <rect width="100%" height="100%" fill="transparent"/>
+  <!-- Infosys corporate blue logo -->
+  <text x="30" y="46" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-weight="700" font-size="34" fill="#007cc3" letter-spacing="-0.5">Infosys</text>
+  <circle cx="155" cy="24" r="3.5" fill="#007cc3"/>
+  <text x="32" y="60" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-weight="400" font-size="9" fill="#555" letter-spacing="3">NAVIGATE YOUR NEXT</text>
+</svg>

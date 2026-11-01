@@ -1,337 +1,279 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<c:set var="activeNav" value="dashboard" scope="request" />
+<c:set var="pageTitle" value="Admin Dashboard | Centurion University Placement Portal" scope="request" />
 
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Admin Dashboard - College Placement System</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 30px;
-        }
+<jsp:include page="/WEB-INF/jsp/common/header.jsp" />
 
-        .container {
-            width: 95%;
-            max-width: 1200px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        }
+<div class="portal-container">
 
-        .header-section {
-            text-align: center;
-            margin-bottom: 25px;
-        }
-
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 6px;
-            font-size: 28px;
-        }
-
-        .subtitle {
-            color: #7f8c8d;
-            font-size: 15px;
-            margin-top: 0;
-        }
-
-        .nav-links {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 6px;
-        }
-
-        .nav-links a {
-            margin: 0 10px;
-            text-decoration: none;
-            color: #0066cc;
-            font-weight: 500;
-            font-size: 14px;
-        }
-
-        .nav-links a.active {
-            color: #2c3e50;
-            font-weight: bold;
-        }
-
-        .nav-links form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .nav-links .btn-logout {
-            background: none;
-            border: none;
-            color: #dc3545;
-            font-weight: 500;
-            cursor: pointer;
-            padding: 0;
-            margin: 0 10px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        .nav-links .btn-logout:hover {
-            text-decoration: underline;
-        }
-
-        .alert-error {
-            background-color: #f8d7da;
-            color: #842029;
-            padding: 12px 16px;
-            margin-bottom: 25px;
-            border-radius: 5px;
-            border: 1px solid #f5c2c7;
-        }
-
-        .alert-success {
-            background-color: #d1e7dd;
-            color: #0f5132;
-            padding: 12px 16px;
-            margin-bottom: 25px;
-            border-radius: 5px;
-            border: 1px solid #badbcc;
-        }
-
-        .section-title {
-            color: #34495e;
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #ecf0f1;
-        }
-
-        /* Metric Grid */
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-            gap: 20px;
-            margin-bottom: 35px;
-        }
-
-        .metric-card {
-            background: #ffffff;
-            border: 1px solid #e1e8ed;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-        }
-
-        .metric-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .metric-card.accent-students { border-top: 4px solid #3498db; }
-        .metric-card.accent-jobs { border-top: 4px solid #2ecc71; }
-        .metric-card.accent-internships { border-top: 4px solid #9b59b6; }
-        .metric-card.accent-active { border-top: 4px solid #1abc9c; }
-        .metric-card.accent-applications { border-top: 4px solid #f39c12; }
-        .metric-card.accent-shortlisted { border-top: 4px solid #e67e22; }
-        .metric-card.accent-selected { border-top: 4px solid #27ae60; }
-        .metric-card.accent-interviews { border-top: 4px solid #e74c3c; }
-
-        .metric-number {
-            font-size: 32px;
-            font-weight: bold;
-            color: #2c3e50;
-            margin: 10px 0 6px 0;
-        }
-
-        .metric-label {
-            font-size: 13px;
-            color: #7f8c8d;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 600;
-        }
-
-        /* Action Panels */
-        .actions-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .action-card {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .action-card h3 {
-            margin-top: 0;
-            margin-bottom: 8px;
-            color: #1e293b;
-            font-size: 16px;
-        }
-
-        .action-card p {
-            color: #64748b;
-            font-size: 13px;
-            margin-bottom: 16px;
-            line-height: 1.4;
-        }
-
-        .btn-action {
-            display: inline-block;
-            padding: 9px 16px;
-            background-color: #2563eb;
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 13px;
-            font-weight: 600;
-            text-align: center;
-            transition: background-color 0.15s;
-        }
-
-        .btn-action:hover {
-            background-color: #1d4ed8;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-
-    <div class="nav-links">
-        <a class="active" href="${pageContext.request.contextPath}/admin/dashboard">Admin Dashboard</a> |
-        <a href="${pageContext.request.contextPath}/jobs">Jobs</a> |
-        <a href="${pageContext.request.contextPath}/internships">Internships</a> |
-        <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
-        <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
-        <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
-        <c:if test="${not empty sessionScope.userId}">
-            |
-            <form action="${pageContext.request.contextPath}/logout" method="post" style="display: inline; margin: 0; padding: 0;">
-                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                <button type="submit" class="btn-logout">Logout</button>
-            </form>
-        </c:if>
+    <!-- Header Section -->
+    <div style="margin-bottom: 28px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span class="badge badge-gold" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">
+                <i class="fas fa-shield-alt"></i> Administrative Console
+            </span>
+            <span class="badge badge-primary" style="font-size: 11px; padding: 4px 10px;">Live Real-Time Telemetry</span>
+        </div>
+        <h1 style="font-size: 28px; margin: 0 0 6px 0; color: var(--navy-900);">
+            <i class="fas fa-tachometer-alt" style="color: var(--gold-500); margin-right: 8px;"></i>Placement &amp; Internship Admin Dashboard
+        </h1>
+        <p style="color: var(--text-muted); font-size: 14px; margin: 0;">
+            Real-time operational indicators across registered students, opportunity drives, applicant evaluations, and multi-stage interview rounds.
+        </p>
     </div>
 
-    <div class="header-section">
-        <h1>Placement &amp; Internship Admin Dashboard</h1>
-        <p class="subtitle">System Overview, Real-Time Key Performance Indicators, and Management Portals</p>
-    </div>
-
+    <!-- Flash Alerts -->
     <c:if test="${not empty errorMessage}">
-        <div class="alert-error">
-            <c:out value="${errorMessage}"/>
+        <div class="portal-alert portal-alert-danger" role="alert">
+            <i class="fas fa-exclamation-circle" style="font-size: 18px;"></i>
+            <div><c:out value="${errorMessage}"/></div>
         </div>
     </c:if>
 
     <c:if test="${not empty successMessage}">
-        <div class="alert-success">
-            <c:out value="${successMessage}"/>
+        <div class="portal-alert portal-alert-success" role="alert">
+            <i class="fas fa-check-circle" style="font-size: 18px;"></i>
+            <div><c:out value="${successMessage}"/></div>
         </div>
     </c:if>
 
-    <div class="section-title">Key Performance Indicators</div>
-    <div class="metrics-grid">
-        <div class="metric-card accent-students">
-            <div class="metric-number"><c:out value="${totalStudents}"/></div>
-            <div class="metric-label">Total Students</div>
+    <!-- KPI Metrics Section -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; margin: 0; color: var(--navy-900); display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-chart-line" style="color: var(--navy-700);"></i> Live Placement Performance
+        </h3>
+        <span style="font-size: 12px; color: var(--text-muted);">
+            <i class="fas fa-sync-alt"></i> Auto-synced with MySQL Database
+        </span>
+    </div>
+
+    <div class="kpi-grid">
+        <a href="${pageContext.request.contextPath}/applications" class="kpi-card kpi-blue clickable-card" title="Click to view candidate applications">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="kpi-value"><c:out value="${not empty stats.totalStudents ? stats.totalStudents : (not empty totalStudents ? totalStudents : 0)}"/></div>
+                    <div class="kpi-label">Registered Students</div>
+                </div>
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(27, 54, 93, 0.08); display: flex; align-items: center; justify-content: center; color: var(--navy-700);">
+                    <i class="fas fa-user-graduate" style="font-size: 18px;"></i>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--navy-700); display: flex; align-items: center; gap: 4px;">
+                View Student Profiles <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+            </div>
+        </a>
+
+        <a href="${pageContext.request.contextPath}/jobs?type=Full+Time" class="kpi-card kpi-green clickable-card" title="Click to view Full-Time opportunities">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="kpi-value"><c:out value="${not empty stats.totalJobs ? stats.totalJobs : (not empty totalJobs ? totalJobs : 0)}"/></div>
+                    <div class="kpi-label">Full-Time Jobs</div>
+                </div>
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(46, 125, 50, 0.1); display: flex; align-items: center; justify-content: center; color: var(--success);">
+                    <i class="fas fa-briefcase" style="font-size: 18px;"></i>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--success); display: flex; align-items: center; gap: 4px;">
+                View Full-Time Postings <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+            </div>
+        </a>
+
+        <a href="${pageContext.request.contextPath}/jobs?type=Internship" class="kpi-card kpi-gold clickable-card" title="Click to view Internship opportunities">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="kpi-value"><c:out value="${not empty stats.totalInternships ? stats.totalInternships : (not empty totalInternships ? totalInternships : 0)}"/></div>
+                    <div class="kpi-label">Internship Postings</div>
+                </div>
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(230, 154, 24, 0.12); display: flex; align-items: center; justify-content: center; color: var(--gold-600);">
+                    <i class="fas fa-laptop-code" style="font-size: 18px;"></i>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--gold-600); display: flex; align-items: center; gap: 4px;">
+                View Internships <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+            </div>
+        </a>
+
+        <a href="${pageContext.request.contextPath}/jobs?status=Active" class="kpi-card clickable-card" title="Click to view Active hiring drives">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="kpi-value"><c:out value="${not empty stats.activeJobs ? stats.activeJobs : (not empty activeJobs ? activeJobs : (not empty activeOpportunities ? activeOpportunities : 0))}"/></div>
+                    <div class="kpi-label">Active Drives</div>
+                </div>
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(16, 36, 62, 0.08); display: flex; align-items: center; justify-content: center; color: var(--navy-800);">
+                    <i class="fas fa-bullhorn" style="font-size: 18px;"></i>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                Filter Active Drives <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+            </div>
+        </a>
+
+        <a href="${pageContext.request.contextPath}/applications" class="kpi-card kpi-blue clickable-card" title="Click to view all applications">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="kpi-value"><c:out value="${not empty stats.totalApplications ? stats.totalApplications : (not empty totalApplications ? totalApplications : 0)}"/></div>
+                    <div class="kpi-label">Total Applications</div>
+                </div>
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(27, 54, 93, 0.08); display: flex; align-items: center; justify-content: center; color: var(--navy-700);">
+                    <i class="fas fa-file-signature" style="font-size: 18px;"></i>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--navy-700); display: flex; align-items: center; gap: 4px;">
+                Review All Applications <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+            </div>
+        </a>
+
+        <a href="${pageContext.request.contextPath}/shortlist" class="kpi-card kpi-gold clickable-card" title="Click to manage shortlisted students">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="kpi-value"><c:out value="${not empty stats.shortlistedApplications ? stats.shortlistedApplications : (not empty shortlistedApplications ? shortlistedApplications : 0)}"/></div>
+                    <div class="kpi-label">Shortlisted Pool</div>
+                </div>
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(230, 154, 24, 0.12); display: flex; align-items: center; justify-content: center; color: var(--gold-600);">
+                    <i class="fas fa-user-check" style="font-size: 18px;"></i>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--gold-600); display: flex; align-items: center; gap: 4px;">
+                Manage Shortlist <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+            </div>
+        </a>
+
+        <a href="${pageContext.request.contextPath}/applications?filterStatus=SELECTED" class="kpi-card kpi-green clickable-card" title="Click to view placed candidates">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="kpi-value"><c:out value="${not empty stats.selectedApplications ? stats.selectedApplications : (not empty selectedApplications ? selectedApplications : 0)}"/></div>
+                    <div class="kpi-label">Final Selections</div>
+                </div>
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(46, 125, 50, 0.1); display: flex; align-items: center; justify-content: center; color: var(--success);">
+                    <i class="fas fa-trophy" style="font-size: 18px;"></i>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--success); display: flex; align-items: center; gap: 4px;">
+                Placed Candidates <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+            </div>
+        </a>
+
+        <a href="${pageContext.request.contextPath}/interviews" class="kpi-card clickable-card" title="Click to view scheduled interview calendar">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="kpi-value"><c:out value="${not empty stats.scheduledInterviews ? stats.scheduledInterviews : (not empty scheduledInterviews ? scheduledInterviews : 0)}"/></div>
+                    <div class="kpi-label">Active Interviews</div>
+                </div>
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(16, 36, 62, 0.08); display: flex; align-items: center; justify-content: center; color: var(--navy-800);">
+                    <i class="fas fa-calendar-alt" style="font-size: 18px;"></i>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--navy-700); display: flex; align-items: center; gap: 4px;">
+                Interview Calendar <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+            </div>
+        </a>
+    </div>
+
+    <!-- Management Portals & Operations Grid -->
+    <h3 style="font-size: 18px; margin: 36px 0 16px 0; color: var(--navy-900); display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-th-large" style="color: var(--navy-700);"></i> Operational Management Portals
+    </h3>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 32px;">
+        <!-- Portal Card 1: Jobs & Drives -->
+        <div class="portal-card" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(230, 154, 24, 0.15); display: flex; align-items: center; justify-content: center; color: var(--gold-600); font-size: 20px;">
+                        <i class="fas fa-bullhorn"></i>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0; font-size: 16px; color: var(--navy-900);">Post Opportunity / Internship</h4>
+                        <span style="font-size: 12px; color: var(--text-muted);">Recruitment Drives</span>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                    Publish and configure company recruitment drives with eligibility criteria including minimum CGPA thresholds, allowable department filters, job descriptions, and strict deadlines.
+                </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <a href="${pageContext.request.contextPath}/jobs?action=add" class="btn btn-primary btn-sm" style="flex: 1; text-align: center;">
+                    <i class="fas fa-plus-circle"></i> Create Posting
+                </a>
+                <a href="${pageContext.request.contextPath}/jobs" class="btn btn-outline btn-sm" title="View all job drives">
+                    <i class="fas fa-list"></i>
+                </a>
+            </div>
         </div>
 
-        <div class="metric-card accent-jobs">
-            <div class="metric-number"><c:out value="${totalJobs}"/></div>
-            <div class="metric-label">Total Jobs</div>
+        <!-- Portal Card 2: Shortlist & Evaluation -->
+        <div class="portal-card" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(27, 54, 93, 0.12); display: flex; align-items: center; justify-content: center; color: var(--navy-700); font-size: 20px;">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0; font-size: 16px; color: var(--navy-900);">Shortlist &amp; Evaluation</h4>
+                        <span style="font-size: 12px; color: var(--text-muted);">Candidate Screening</span>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                    Filter student candidate pools by CGPA, backlogs, and departmental eligibility. Approve candidate shortlists and transition applicants directly into multi-stage interview rounds.
+                </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <a href="${pageContext.request.contextPath}/shortlist" class="btn btn-accent btn-sm" style="flex: 1; text-align: center;">
+                    <i class="fas fa-filter"></i> Open Shortlist Manager
+                </a>
+                <a href="${pageContext.request.contextPath}/applications" class="btn btn-outline btn-sm" title="View all applicant records">
+                    <i class="fas fa-users"></i>
+                </a>
+            </div>
         </div>
 
-        <div class="metric-card accent-internships">
-            <div class="metric-number"><c:out value="${totalInternships}"/></div>
-            <div class="metric-label">Total Internships</div>
-        </div>
-
-        <div class="metric-card accent-active">
-            <div class="metric-number"><c:out value="${activeOpportunities}"/></div>
-            <div class="metric-label">Active Opportunities</div>
-        </div>
-
-        <div class="metric-card accent-applications">
-            <div class="metric-number"><c:out value="${totalApplications}"/></div>
-            <div class="metric-label">Total Applications</div>
-        </div>
-
-        <div class="metric-card accent-shortlisted">
-            <div class="metric-number"><c:out value="${shortlistedApplications}"/></div>
-            <div class="metric-label">Shortlisted Applications</div>
-        </div>
-
-        <div class="metric-card accent-selected">
-            <div class="metric-number"><c:out value="${selectedApplications}"/></div>
-            <div class="metric-label">Selected Applications</div>
-        </div>
-
-        <div class="metric-card accent-interviews">
-            <div class="metric-number"><c:out value="${scheduledInterviews}"/></div>
-            <div class="metric-label">Scheduled Interviews</div>
+        <!-- Portal Card 3: Dynamic Interview Rounds -->
+        <div class="portal-card" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(46, 125, 50, 0.12); display: flex; align-items: center; justify-content: center; color: var(--success); font-size: 20px;">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0; font-size: 16px; color: var(--navy-900);">Interview Round Schedules</h4>
+                        <span style="font-size: 12px; color: var(--text-muted);">Dynamic Multi-Round Pipeline</span>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                    Monitor candidate progression across Online Assessment, Technical Interview, and HR evaluation. Record round evaluations, manage schedules, and issue PDF placement reports.
+                </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <a href="${pageContext.request.contextPath}/interviews" class="btn btn-primary btn-sm" style="flex: 1; text-align: center;">
+                    <i class="fas fa-calendar-alt"></i> View Schedule
+                </a>
+            </div>
         </div>
     </div>
 
-    <div class="section-title">Management Portals</div>
-    <div class="actions-grid">
-        <div class="action-card">
+    <!-- Quick Navigation Bar -->
+    <div class="portal-card" style="background: linear-gradient(135deg, var(--navy-900) 0%, var(--navy-800) 100%); color: #ffffff; padding: 24px;">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px;">
             <div>
-                <h3>Jobs Management</h3>
-                <p>Browse active full-time and part-time jobs, create new postings, update compensation, and manage application deadlines.</p>
+                <h4 style="color: #ffffff; margin: 0 0 6px 0; font-size: 16px;">
+                    <i class="fas fa-download" style="color: var(--gold-400); margin-right: 8px;"></i>Placement Records &amp; Verification
+                </h4>
+                <p style="color: rgba(255, 255, 255, 0.75); font-size: 13px; margin: 0;">
+                    Official placement offer validation reports and multi-round interview dossiers are available in PDF format.
+                </p>
             </div>
-            <a href="${pageContext.request.contextPath}/jobs" class="btn-action">Manage Jobs &rarr;</a>
-        </div>
-
-        <div class="action-card">
-            <div>
-                <h3>Internship Management</h3>
-                <p>Manage internship opportunities, durations (e.g. 3 Months, 6 Months), monthly stipends, and academic eligibility requirements.</p>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <a href="${pageContext.request.contextPath}/applications" class="btn btn-outline" style="border-color: rgba(255, 255, 255, 0.3); color: #ffffff; background: rgba(255, 255, 255, 0.08);">
+                    <i class="fas fa-file-pdf" style="color: var(--gold-400);"></i> Applicant Dossiers
+                </a>
+                <a href="${pageContext.request.contextPath}/interviews" class="btn btn-accent">
+                    <i class="fas fa-award"></i> Verification Reports
+                </a>
             </div>
-            <a href="${pageContext.request.contextPath}/internships" class="btn-action">Manage Internships &rarr;</a>
-        </div>
-
-        <div class="action-card">
-            <div>
-                <h3>All Applications</h3>
-                <p>Review comprehensive applicant lists, filter by job or student status, review academic eligibility, and track placement history.</p>
-            </div>
-            <a href="${pageContext.request.contextPath}/applications" class="btn-action">Review Applications &rarr;</a>
-        </div>
-
-        <div class="action-card">
-            <div>
-                <h3>Shortlisted Candidates</h3>
-                <p>Access candidates shortlisted for placement rounds, review interview statuses, and record final hiring selections.</p>
-            </div>
-            <a href="${pageContext.request.contextPath}/shortlist" class="btn-action">View Shortlist &rarr;</a>
-        </div>
-
-        <div class="action-card">
-            <div>
-                <h3>Interview Schedule</h3>
-                <p>Coordinate online and offline interview rounds, manage interview dates/times, and record completion outcomes.</p>
-            </div>
-            <a href="${pageContext.request.contextPath}/interviews" class="btn-action">Manage Schedule &rarr;</a>
         </div>
     </div>
 
 </div>
 
-</body>
-</html>
+<jsp:include page="/WEB-INF/jsp/common/footer.jsp" />

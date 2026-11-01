@@ -1,623 +1,371 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<c:set var="activeNav" value="applications" scope="request" />
+<c:set var="pageTitle" value="Placement &amp; Internship Applications | Centurion University Placement Portal" scope="request" />
 
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
+<!-- Common Header -->
+<jsp:include page="/WEB-INF/jsp/common/header.jsp" />
 
-    <title>College Placement Applications</title>
+<c:if test="${not empty sessionScope.userId}">
+    <form action="${pageContext.request.contextPath}/logout" method="post" style="display:none;" aria-hidden="true">
+        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+        <button type="submit">Logout</button>
+    </form>
+</c:if>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 30px;
-        }
+<div class="portal-container" style="max-width: 1240px; margin: 30px auto 60px auto;">
 
-        .container {
-            width: 92%;
-            margin: 30px auto;
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 25px;
-        }
-
-        .form-section {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 25px;
-        }
-
-        .form-section h2 {
-            margin-top: 0;
-            color: #333;
-        }
-
-        input,
-        select {
-            padding: 10px;
-            margin: 5px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-
-        button {
-            padding: 10px 18px;
-            border: none;
-            border-radius: 5px;
-            background-color: #333;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        button:hover {
-            background-color: #555;
-        }
-
-        .btn-reset {
-            display: inline-block;
-            padding: 10px 18px;
-            margin: 5px;
-            background-color: #6c757d;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-
-        .btn-reset:hover {
-            background-color: #5a6268;
-        }
-
-        .stats-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 25px;
-        }
-
-        .stat-card {
-            flex: 1;
-            min-width: 140px;
-            background-color: #f8f9fa;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px 12px;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        .stat-card h3 {
-            margin: 0;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #6c757d;
-        }
-
-        .stat-card .stat-count {
-            font-size: 26px;
-            font-weight: bold;
-            margin-top: 6px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: center;
-        }
-
-        th {
-            background-color: #333;
-            color: white;
-        }
-
-        tr:nth-child(even) {
-            background-color: #f8f8f8;
-        }
-
-        .status {
-            font-weight: bold;
-        }
-
-        .applied {
-            color: #0066cc;
-        }
-
-        .shortlisted {
-            color: #e67e22;
-        }
-
-        .selected {
-            color: #198754;
-        }
-
-        .rejected {
-            color: #dc3545;
-        }
-
-        .action-button {
-            display: inline-block;
-            padding: 7px 10px;
-            margin: 2px;
-            text-decoration: none;
-            border: none;
-            border-radius: 4px;
-            color: white;
-            font-size: 13px;
-            cursor: pointer;
-            font-family: inherit;
-            vertical-align: middle;
-        }
-
-        .action-button:hover {
-            opacity: 0.85;
-        }
-
-        .inline-form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .shortlist-btn {
-            background-color: #e67e22;
-        }
-
-        .select-btn {
-            background-color: #198754;
-        }
-
-        .delete-btn {
-            background-color: #dc3545;
-        }
-
-        .reject-btn {
-            background-color: #6c757d;
-        }
-
-        .interview-btn {
-            background-color: #0d6efd;
-        }
-
-        .view-btn {
-            background-color: #17a2b8;
-        }
-
-        .history-btn {
-            background-color: #6f42c1;
-        }
-
-        .nav-links {
-            text-align: center;
-            margin-bottom: 25px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-        }
-
-        .nav-links a {
-            margin: 0 12px;
-            text-decoration: none;
-            color: #0066cc;
-            font-weight: 500;
-        }
-
-        .nav-links a.active {
-            color: #333;
-            font-weight: bold;
-        }
-
-        .nav-links form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .nav-links .btn-logout {
-            background: none;
-            border: none;
-            color: #dc3545;
-            font-weight: 500;
-            cursor: pointer;
-            padding: 0;
-            margin: 0 12px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        .nav-links .btn-logout:hover {
-            text-decoration: underline;
-        }
-
-        .alert-error {
-            background-color: #f8d7da;
-            color: #842029;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #f5c2c7;
-        }
-
-        .empty {
-            text-align: center;
-            padding: 20px;
-            color: #777;
-        }
-    </style>
-</head>
-
-<body>
-
-<div class="container">
-
-    <div class="nav-links">
-        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-            <a href="${pageContext.request.contextPath}/admin/dashboard">Admin Dashboard</a> |
-        </c:if>
-        <a href="${pageContext.request.contextPath}/jobs">Jobs</a> |
-        <a href="${pageContext.request.contextPath}/internships">Internships</a> |
-        <a class="active" href="${pageContext.request.contextPath}/applications">All Applications</a> |
-        <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
-        <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
-        <c:if test="${not empty sessionScope.userId}">
-            |
-            <form action="${pageContext.request.contextPath}/logout" method="post" style="display: inline; margin: 0; padding: 0;">
-                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                <button type="submit" class="btn-logout">Logout</button>
-            </form>
-        </c:if>
+    <!-- Page Header Banner -->
+    <div style="background: white; border-radius: var(--radius-lg); padding: 24px 28px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="width: 48px; height: 48px; background: rgba(27, 54, 93, 0.08); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--primary-navy); font-size: 22px;">
+                <i class="fa-solid fa-file-signature"></i>
+            </div>
+            <div>
+                <span style="font-size: 11px; font-weight: 700; color: var(--accent-gold); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 2px;">
+                    Application Lifecycle &amp; Tracking
+                </span>
+                <h1 class="page-title" style="margin: 0 0 4px 0; font-size: 1.55rem; color: var(--primary-navy); font-weight: 800;">
+                    <c:choose>
+                        <c:when test="${sessionScope.userRole == 'STUDENT'}">My Campus Applications</c:when>
+                        <c:otherwise>Candidate Applications Management</c:otherwise>
+                    </c:choose>
+                </h1>
+                <p class="page-subtitle" style="margin: 0; color: var(--text-muted); font-size: 0.88rem;">
+                    Manage student submissions, verify academic eligibility, coordinate multi-round interviews, and record hiring decisions.
+                </p>
+            </div>
+        </div>
     </div>
 
-    <h1>College Placement Applications</h1>
-
+    <!-- Flash alerts -->
     <c:if test="${not empty errorMessage}">
-        <div class="alert-error">
-            <c:out value="${errorMessage}"/>
+        <div class="alert alert-error" style="margin-bottom: 20px;" role="alert">
+            <i class="fa-solid fa-circle-exclamation alert-icon"></i>
+            <div class="alert-content">
+                <strong>Notice:</strong> <c:out value="${errorMessage}"/>
+            </div>
         </div>
     </c:if>
 
     <c:if test="${not empty successMessage}">
-        <div class="alert-success" style="background-color: #d1e7dd; color: #0f5132; padding: 12px 16px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #badbcc;">
-            <c:out value="${successMessage}"/>
+        <div class="alert alert-success" style="margin-bottom: 20px;" role="alert">
+            <i class="fa-solid fa-circle-check alert-icon"></i>
+            <div class="alert-content">
+                <strong>Success:</strong> <c:out value="${successMessage}"/>
+            </div>
         </div>
     </c:if>
 
-    <div class="stats-container">
-
-        <div class="stat-card">
-            <h3>Total Applications</h3>
-            <div class="stat-count" style="color: #333;">${applicationStats.TOTAL}</div>
-        </div>
-
-        <div class="stat-card">
-            <h3>Applied</h3>
-            <div class="stat-count applied">${applicationStats.APPLIED}</div>
-        </div>
-
-        <div class="stat-card">
-            <h3>Shortlisted</h3>
-            <div class="stat-count shortlisted">${applicationStats.SHORTLISTED}</div>
-        </div>
-
-        <div class="stat-card">
-            <h3>Selected</h3>
-            <div class="stat-count selected">${applicationStats.SELECTED}</div>
-        </div>
-
-        <div class="stat-card">
-            <h3>Rejected</h3>
-            <div class="stat-count rejected">${applicationStats.REJECTED}</div>
-        </div>
-
+    <!-- KPI Statistic Cards (Clickable Cards) -->
+    <div class="kpi-grid" style="margin-bottom: 24px;">
+        <a href="${pageContext.request.contextPath}/applications" class="kpi-card kpi-blue clickable-card" title="View all applications">
+            <div class="kpi-value">${applicationStats.TOTAL}</div>
+            <div class="kpi-label"><i class="fa-solid fa-list-check" style="margin-right: 4px;"></i> Total Applications</div>
+        </a>
+        <a href="${pageContext.request.contextPath}/applications?status=APPLIED" class="kpi-card clickable-card" title="Filter APPLIED status">
+            <div class="kpi-value" style="color: var(--text-dark);">${applicationStats.APPLIED}</div>
+            <div class="kpi-label"><i class="fa-solid fa-paper-plane" style="margin-right: 4px;"></i> Applied</div>
+        </a>
+        <a href="${pageContext.request.contextPath}/shortlist" class="kpi-card kpi-gold clickable-card" title="View Shortlisted Pool">
+            <div class="kpi-value" style="color: var(--accent-gold);">${applicationStats.SHORTLISTED}</div>
+            <div class="kpi-label"><i class="fa-solid fa-star" style="margin-right: 4px;"></i> Shortlisted Pool</div>
+        </a>
+        <a href="${pageContext.request.contextPath}/applications?status=SELECTED" class="kpi-card kpi-green clickable-card" title="Filter SELECTED status">
+            <div class="kpi-value" style="color: var(--success);">${applicationStats.SELECTED}</div>
+            <div class="kpi-label"><i class="fa-solid fa-trophy" style="margin-right: 4px;"></i> Selected Offers</div>
+        </a>
+        <a href="${pageContext.request.contextPath}/applications?status=REJECTED" class="kpi-card clickable-card" title="Filter REJECTED status">
+            <div class="kpi-value" style="color: var(--danger);">${applicationStats.REJECTED}</div>
+            <div class="kpi-label"><i class="fa-solid fa-circle-xmark" style="margin-right: 4px;"></i> Rejected</div>
+        </a>
     </div>
 
-    <div class="form-section">
+    <!-- Create Application Form Section -->
+    <div class="card" style="padding: 24px 28px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 24px; background: white;">
+        <div style="margin-bottom: 16px;">
+            <h3 style="font-size: 1.05rem; margin: 0 0 4px 0; color: var(--primary-navy); font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-plus-circle" style="color: var(--primary-navy);"></i> Submit New Application
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">
+                Directly submit an application for an active campus placement or internship drive.
+            </p>
+        </div>
 
-        <h2>Create New Application</h2>
+        <form action="${pageContext.request.contextPath}/applications" method="post">
+            <input type="hidden" name="action" value="create">
+            <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>">
 
-        <form action="${pageContext.request.contextPath}/applications"
-              method="post">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; align-items: flex-end;">
+                <c:choose>
+                    <c:when test="${sessionScope.userRole == 'STUDENT'}">
+                        <div class="form-group" style="margin: 0; background: var(--bg-subtle); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); display: flex; align-items: center; height: 42px;">
+                            <span style="font-size: 0.85rem; color: var(--text-muted);">
+                                👤 Applying as: <strong style="color: var(--primary-navy);"><c:out value="${sessionScope.userName}"/></strong>
+                            </span>
+                        </div>
+                    </c:when>
+                    <c:otherwise>
+                        <div class="form-group" style="margin: 0;">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Student ID <span style="color:var(--danger);">*</span></label>
+                            <input type="number" name="studentId" class="form-control" placeholder="Student Profile ID" required style="height: 42px;" />
+                        </div>
+                    </c:otherwise>
+                </c:choose>
 
-            <input type="hidden"
-                   name="action"
-                   value="create">
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Opportunity ID <span style="color:var(--danger);">*</span></label>
+                    <input type="number" name="jobId" class="form-control" placeholder="Job / Internship ID" required style="height: 42px;" />
+                </div>
 
-            <input type="hidden"
-                   name="csrfToken"
-                   value="${sessionScope.csrfToken}">
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Submission Date (Optional)</label>
+                    <input type="date" name="applicationDate" class="form-control" style="height: 42px;" />
+                </div>
 
-            <c:choose>
-                <c:when test="${sessionScope.userRole == 'STUDENT'}">
-                    <span style="display: inline-block; padding: 10px; font-size: 13px; color: #495057;">
-                        Applying as logged-in student (ID server-resolved)
-                    </span>
-                </c:when>
-                <c:otherwise>
-                    <input type="number"
-                           name="studentId"
-                           placeholder="Student ID"
-                           ${sessionScope.userRole != 'STUDENT' ? 'required' : ''}>
-                </c:otherwise>
-            </c:choose>
-
-            <input type="number"
-                   name="jobId"
-                   placeholder="Job ID"
-                   required>
-
-            <input type="date"
-                   name="applicationDate">
-
-            <button type="submit">
-                Apply
-            </button>
-
+                <div class="form-group" style="margin: 0;">
+                    <button type="submit" class="btn btn-primary" style="width: 100%; height: 42px; font-weight: 700; border-radius: var(--radius-sm);">
+                        <i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> Submit Application
+                    </button>
+                </div>
+            </div>
         </form>
-
     </div>
 
-    <div class="form-section">
+    <!-- Filter & Search Section -->
+    <div class="card" style="padding: 20px 24px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 24px; background: white;">
+        <h3 style="font-size: 1rem; margin: 0 0 14px 0; color: var(--primary-navy); font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-filter" style="color: var(--accent-gold);"></i> Filter &amp; Search Applications
+        </h3>
+        <form action="${pageContext.request.contextPath}/applications" method="get">
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+                <c:if test="${sessionScope.userRole != 'STUDENT'}">
+                    <div class="form-group" style="flex: 1; min-width: 160px; margin: 0;">
+                        <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Student ID</label>
+                        <input type="number" name="studentId" class="form-control" placeholder="e.g. 101" value="<c:out value='${selectedStudentId}'/>" style="height: 40px;" />
+                    </div>
+                </c:if>
 
-        <h2>Filter Applications</h2>
+                <div class="form-group" style="flex: 1; min-width: 160px; margin: 0;">
+                    <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Opportunity ID</label>
+                    <input type="number" name="jobId" class="form-control" placeholder="e.g. 201" value="<c:out value='${selectedJobId}'/>" style="height: 40px;" />
+                </div>
 
-        <form action="${pageContext.request.contextPath}/applications"
-              method="get">
+                <div class="form-group" style="flex: 1; min-width: 160px; margin: 0;">
+                    <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Status</label>
+                    <select name="status" class="form-control" style="height: 40px;">
+                        <option value="ALL" ${selectedStatus == 'ALL' ? 'selected' : ''}>All Statuses</option>
+                        <option value="APPLIED" ${selectedStatus == 'APPLIED' ? 'selected' : ''}>APPLIED</option>
+                        <option value="SHORTLISTED" ${selectedStatus == 'SHORTLISTED' ? 'selected' : ''}>SHORTLISTED</option>
+                        <option value="SELECTED" ${selectedStatus == 'SELECTED' ? 'selected' : ''}>SELECTED</option>
+                        <option value="REJECTED" ${selectedStatus == 'REJECTED' ? 'selected' : ''}>REJECTED</option>
+                    </select>
+                </div>
 
-            <input type="number"
-                   name="studentId"
-                   placeholder="Student ID"
-                   value="${selectedStudentId}">
-
-            <input type="number"
-                   name="jobId"
-                   placeholder="Job ID"
-                   value="${selectedJobId}">
-
-            <select name="status">
-                <option value="ALL" ${selectedStatus == 'ALL' ? 'selected' : ''}>All Statuses</option>
-                <option value="APPLIED" ${selectedStatus == 'APPLIED' ? 'selected' : ''}>APPLIED</option>
-                <option value="SHORTLISTED" ${selectedStatus == 'SHORTLISTED' ? 'selected' : ''}>SHORTLISTED</option>
-                <option value="SELECTED" ${selectedStatus == 'SELECTED' ? 'selected' : ''}>SELECTED</option>
-                <option value="REJECTED" ${selectedStatus == 'REJECTED' ? 'selected' : ''}>REJECTED</option>
-            </select>
-
-            <button type="submit">
-                Filter
-            </button>
-
-            <a class="btn-reset"
-               href="${pageContext.request.contextPath}/applications">
-                Reset
-            </a>
-
+                <div style="display: flex; gap: 8px; margin: 0;">
+                    <button type="submit" class="btn btn-primary" style="height: 40px; padding: 0 18px; font-weight: 600; border-radius: var(--radius-sm);">
+                        Filter
+                    </button>
+                    <a href="${pageContext.request.contextPath}/applications" class="btn btn-outline" style="height: 40px; padding: 0 14px; display: inline-flex; align-items: center; border-radius: var(--radius-sm);">
+                        Reset
+                    </a>
+                </div>
+            </div>
         </form>
-
     </div>
 
-
-    <table>
-
-        <thead>
-
-        <tr>
-            <th>ID</th>
-            <th>Student ID</th>
-            <th>Job ID</th>
-            <th>Application Date</th>
-            <th>Status</th>
-            <th>Actions</th>
-        </tr>
-
-        </thead>
-
-
-        <tbody>
+    <!-- Applications Table -->
+    <div class="card" style="padding: 0; overflow: hidden; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);">
+        <div style="padding: 16px 22px; background: white; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.05rem; color: var(--primary-navy); font-weight: 700;">
+                Application Records
+            </div>
+            <span style="font-size: 0.82rem; background: var(--bg-subtle); color: var(--text-muted); padding: 4px 10px; border-radius: 12px; font-weight: 600;">
+                Showing <c:out value="${empty applications ? 0 : applications.size()}"/> application(s)
+            </span>
+        </div>
 
         <c:choose>
-
-            <c:when test="${not empty applications}">
-
-                <c:forEach var="application"
-                           items="${applications}">
-
-                    <tr>
-
-                        <td>
-                                ${application.id}
-                        </td>
-
-                        <td>
-                                ${application.studentId}
-                        </td>
-
-                        <td>
-                                ${application.jobId}
-                        </td>
-
-                        <td>
-                                ${application.applicationDate}
-                        </td>
-
-                        <td>
-
-                            <c:choose>
-
-                                <c:when test="${application.status == 'APPLIED'}">
-                                    <span class="status applied">
-                                        APPLIED
-                                    </span>
-                                </c:when>
-
-                                <c:when test="${application.status == 'SHORTLISTED'}">
-                                    <span class="status shortlisted">
-                                        SHORTLISTED
-                                    </span>
-                                </c:when>
-
-                                <c:when test="${application.status == 'SELECTED'}">
-                                    <span class="status selected">
-                                        SELECTED
-                                    </span>
-                                </c:when>
-
-                                <c:when test="${application.status == 'REJECTED'}">
-                                    <span class="status rejected">
-                                        REJECTED
-                                    </span>
-                                </c:when>
-
-                                <c:otherwise>
-                                    <span class="status">
-                                            ${application.status}
-                                    </span>
-                                </c:otherwise>
-
-                            </c:choose>
-
-                        </td>
-
-
-                        <td>
-
-                            <a class="action-button view-btn"
-                               href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
-                                View Details
-                            </a>
-
-                            <a class="action-button history-btn"
-                               href="${pageContext.request.contextPath}/applications?action=history&id=${application.id}">
-                                History
-                            </a>
-
-                            <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-                                <c:if test="${application.status == 'APPLIED'}">
-
-                                    <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                        <input type="hidden" name="action" value="shortlist">
-                                        <input type="hidden" name="id" value="${application.id}">
-                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                        <button type="submit" class="action-button shortlist-btn">Shortlist</button>
-                                    </form>
-
-                                    <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                        <input type="hidden" name="action" value="reject">
-                                        <input type="hidden" name="id" value="${application.id}">
-                                        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                        <button type="submit" class="action-button reject-btn"
-                                                onclick="return confirm('Are you sure you want to reject this application?');">
-                                            Reject
-                                        </button>
-                                    </form>
-
-                                </c:if>
-
-
-                                <c:if test="${application.status == 'SHORTLISTED'}">
-
-                                    <c:choose>
-                                        <c:when test="${completedAppIds.contains(application.id)}">
-
-                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                                <input type="hidden" name="action" value="select">
-                                                <input type="hidden" name="id" value="${application.id}">
-                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                                <button type="submit" class="action-button select-btn">Select</button>
-                                            </form>
-
-                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                                <input type="hidden" name="action" value="reject">
-                                                <input type="hidden" name="id" value="${application.id}">
-                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                                <button type="submit" class="action-button reject-btn"
-                                                        onclick="return confirm('Are you sure you want to reject this application?');">
-                                                    Reject
-                                                </button>
-                                            </form>
-
-                                        </c:when>
-
-                                        <c:otherwise>
-
-                                            <a class="action-button interview-btn"
-                                               href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
-                                                Schedule Interview
-                                            </a>
-
-                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                                <input type="hidden" name="action" value="reject">
-                                                <input type="hidden" name="id" value="${application.id}">
-                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                                <button type="submit" class="action-button reject-btn"
-                                                        onclick="return confirm('Are you sure you want to reject this application?');">
-                                                    Reject
-                                                </button>
-                                            </form>
-
-                                        </c:otherwise>
-                                    </c:choose>
-
-                                </c:if>
-
-
-                                <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="id" value="${application.id}">
-                                    <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                    <button type="submit" class="action-button delete-btn"
-                                            onclick="return confirm('Are you sure you want to delete this application?');">
-                                        Delete
-                                    </button>
-                                </form>
-                            </c:if>
-
-                        </td>
-
-                    </tr>
-
-                </c:forEach>
-
+            <c:when test="${empty applications}">
+                <div style="text-align: center; padding: 48px 20px; background: white;">
+                    <div style="font-size: 2.2rem; margin-bottom: 10px; color: var(--accent-gold);">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </div>
+                    <h4 style="margin: 0 0 6px 0; color: var(--primary-navy); font-size: 1.15rem; font-weight: 700;">Application Not Found</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-muted); max-width: 480px; margin: 0 auto 18px auto; line-height: 1.5;">
+                        No placement applications match the specified search parameters or filter criteria. Please check entered identifiers or clear filters.
+                    </p>
+                    <a href="${pageContext.request.contextPath}/applications" class="btn btn-primary" style="font-size: 0.85rem; padding: 8px 18px; border-radius: var(--radius-sm);">
+                        Reset All Filters
+                    </a>
+                </div>
             </c:when>
 
-
             <c:otherwise>
+                <div style="overflow-x: auto;">
+                    <table class="portal-table data-table" style="margin: 0; width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="padding: 14px 16px; text-align: left;">App ID</th>
+                                <th style="padding: 14px 16px; text-align: left;">Candidate Profile</th>
+                                <th style="padding: 14px 16px; text-align: left;">Opportunity &amp; Company</th>
+                                <th style="padding: 14px 16px; text-align: center;">Applied Date</th>
+                                <th style="padding: 14px 16px; text-align: center;">Status</th>
+                                <th style="padding: 14px 16px; text-align: center;">Interview &amp; Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <c:forEach var="app" items="${applications}">
+                                <c:set var="stud" value="${studentMap[app.studentId]}" />
+                                <c:set var="usr" value="${userMap[stud.userId]}" />
+                                <c:set var="jb" value="${jobMap[app.jobId]}" />
 
-                <tr>
+                                <tr style="border-bottom: 1px solid var(--border-light);">
+                                    <td style="padding: 14px 16px; text-align: left;">
+                                        <a href="${pageContext.request.contextPath}/applications?action=details&id=${app.id}" style="font-weight: 700; color: var(--primary-navy); text-decoration: none;">
+                                            #${app.id}
+                                        </a>
+                                    </td>
 
-                    <td colspan="6" class="empty">
-                        No applications found.
-                    </td>
+                                    <td style="padding: 14px 16px; text-align: left;">
+                                        <div style="font-weight: 700; color: var(--text-dark);">
+                                            <c:choose>
+                                                <c:when test="${not empty usr.name}"><c:out value="${usr.name}"/></c:when>
+                                                <c:otherwise>Student #${app.studentId}</c:otherwise>
+                                            </c:choose>
+                                        </div>
+                                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                            <c:if test="${not empty stud.rollNumber}">Roll: <c:out value="${stud.rollNumber}"/> &bull; </c:if>
+                                            <c:if test="${not empty stud.department}"><c:out value="${stud.department}"/> &bull; </c:if>
+                                            <c:if test="${not empty stud.cgpa}">CGPA: <strong><c:out value="${stud.cgpa}"/></strong></c:if>
+                                        </div>
+                                    </td>
 
-                </tr>
+                                    <td style="padding: 14px 16px; text-align: left;">
+                                        <div style="font-weight: 700; color: var(--primary-navy);">
+                                            <c:choose>
+                                                <c:when test="${not empty jb.title}"><c:out value="${jb.title}"/></c:when>
+                                                <c:otherwise>Opportunity #${app.jobId}</c:otherwise>
+                                            </c:choose>
+                                        </div>
+                                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                            <c:if test="${not empty jb.company}"><c:out value="${jb.company}"/> &bull; </c:if>
+                                            <c:if test="${not empty jb.jobType}"><c:out value="${jb.jobType}"/></c:if>
+                                        </div>
+                                    </td>
 
+                                    <td style="padding: 14px 16px; text-align: center; color: var(--text-muted); font-size: 0.88rem;">
+                                        ${app.applicationDate}
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <c:choose>
+                                            <c:when test="${app.status == 'APPLIED'}">
+                                                <span class="status-badge badge-applied">APPLIED</span>
+                                            </c:when>
+                                            <c:when test="${app.status == 'SHORTLISTED'}">
+                                                <span class="status-badge badge-shortlisted">SHORTLISTED</span>
+                                            </c:when>
+                                            <c:when test="${app.status == 'SELECTED'}">
+                                                <span class="status-badge badge-selected">SELECTED</span>
+                                            </c:when>
+                                            <c:when test="${app.status == 'REJECTED'}">
+                                                <span class="status-badge badge-rejected">REJECTED</span>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <span class="status-badge"><c:out value="${app.status}"/></span>
+                                            </c:otherwise>
+                                        </c:choose>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center;">
+                                            <a href="${pageContext.request.contextPath}/applications?action=details&id=${app.id}" class="btn btn-outline btn-sm" title="View Application Details" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                <i class="fa-solid fa-eye" style="margin-right: 3px;"></i> Details
+                                            </a>
+                                            <a href="${pageContext.request.contextPath}/applications?action=history&id=${app.id}" class="btn btn-outline btn-sm" title="Audit History" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                <i class="fa-solid fa-clock-rotate-left" style="margin-right: 3px;"></i> History
+                                            </a>
+
+                                            <%-- Multi-round interview & report link --%>
+                                            <c:if test="${app.status == 'SHORTLISTED' || app.status == 'SELECTED' || app.status == 'REJECTED'}">
+                                                <a href="${pageContext.request.contextPath}/interview-rounds?applicationId=${app.id}" class="btn btn-primary btn-sm" title="Manage Multi-Round Evaluations" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                    <i class="fa-solid fa-bullseye" style="margin-right: 3px;"></i> Rounds
+                                                </a>
+                                            </c:if>
+
+                                            <%-- Official PDF Report Link if Selected/Rejected --%>
+                                            <c:if test="${app.status == 'SELECTED' || app.status == 'REJECTED'}">
+                                                <a href="${pageContext.request.contextPath}/interview-report?action=download&applicationId=${app.id}" class="btn btn-accent btn-sm" title="Download Official PDF Report" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                    <i class="fa-solid fa-file-pdf" style="margin-right: 3px;"></i> PDF
+                                                </a>
+                                            </c:if>
+
+                                            <%-- Coordinator Actions with Popups --%>
+                                            <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                                                <c:if test="${app.status == 'APPLIED'}">
+                                                    <form action="${pageContext.request.contextPath}/applications" method="post" style="display:inline; margin:0;" data-action-type="shortlist">
+                                                        <input type="hidden" name="action" value="shortlist">
+                                                        <input type="hidden" name="id" value="${app.id}">
+                                                        <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>">
+                                                        <button type="submit" class="btn btn-success btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                            <i class="fa-solid fa-check" style="margin-right: 3px;"></i> Shortlist
+                                                        </button>
+                                                    </form>
+                                                </c:if>
+
+                                                <c:if test="${app.status == 'SHORTLISTED'}">
+                                                    <c:choose>
+                                                        <c:when test="${completedAppIds.contains(app.id)}">
+                                                            <form action="${pageContext.request.contextPath}/applications" method="post" style="display:inline; margin:0;" data-action-type="select">
+                                                                <input type="hidden" name="action" value="select">
+                                                                <input type="hidden" name="id" value="${app.id}">
+                                                                <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>">
+                                                                <button type="submit" class="btn btn-success btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                                    <i class="fa-solid fa-award" style="margin-right: 3px;"></i> Select
+                                                                </button>
+                                                            </form>
+                                                        </c:when>
+                                                        <c:otherwise>
+                                                            <button type="button" class="btn btn-outline btn-sm" disabled title="Candidate must complete an interview first" style="font-size: 0.78rem; padding: 5px 10px; opacity: 0.6;">
+                                                                Select
+                                                            </button>
+                                                        </c:otherwise>
+                                                    </c:choose>
+
+                                                    <form action="${pageContext.request.contextPath}/applications" method="post" style="display:inline; margin:0;" data-action-type="reject">
+                                                        <input type="hidden" name="action" value="reject">
+                                                        <input type="hidden" name="id" value="${app.id}">
+                                                        <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>">
+                                                        <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                            <i class="fa-solid fa-xmark" style="margin-right: 3px;"></i> Reject
+                                                        </button>
+                                                    </form>
+                                                </c:if>
+
+                                                <c:if test="${app.status != 'SELECTED'}">
+                                                    <form action="${pageContext.request.contextPath}/applications" method="post" style="display:inline; margin:0;" data-action-type="delete">
+                                                        <input type="hidden" name="action" value="delete">
+                                                        <input type="hidden" name="id" value="${app.id}">
+                                                        <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>">
+                                                        <button type="submit" class="btn btn-outline btn-sm" style="color:var(--danger); font-size: 0.78rem; padding: 5px 8px;" title="Delete Record">
+                                                            <i class="fa-solid fa-trash-can"></i>
+                                                        </button>
+                                                    </form>
+                                                </c:if>
+                                            </c:if>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </c:forEach>
+                        </tbody>
+                    </table>
+                </div>
             </c:otherwise>
-
         </c:choose>
-
-        </tbody>
-
-    </table>
+    </div>
 
 </div>
 
-</body>
-</html>
+<!-- Common Footer -->
+<jsp:include page="/WEB-INF/jsp/common/footer.jsp" />

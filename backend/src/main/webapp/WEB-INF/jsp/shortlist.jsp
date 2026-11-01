@@ -1,452 +1,273 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<c:set var="activeNav" value="shortlist" scope="request" />
+<c:set var="pageTitle" value="Shortlisted Candidates Pool | Centurion University Placement Portal" scope="request" />
 
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
+<!-- Common Navigation Header -->
+<jsp:include page="/WEB-INF/jsp/common/header.jsp" />
 
-    <title>Shortlisted Candidates</title>
+<c:if test="${not empty sessionScope.userId}">
+    <form action="${pageContext.request.contextPath}/logout" method="post" style="display:none;" aria-hidden="true">
+        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+        <button type="submit">Logout</button>
+    </form>
+</c:if>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 30px;
-        }
+<div class="portal-container" style="max-width: 1240px; margin: 30px auto 60px auto;">
 
-        .container {
-            width: 92%;
-            margin: 30px auto;
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
+    <!-- Title Section Banner -->
+    <div style="background: white; border-radius: var(--radius-lg); padding: 24px 28px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="width: 48px; height: 48px; background: rgba(230, 154, 24, 0.12); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--accent-gold); font-size: 22px;">
+                <i class="fa-solid fa-star"></i>
+            </div>
+            <div>
+                <span style="font-size: 11px; font-weight: 700; color: var(--accent-gold); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 2px;">
+                    Interview Stage Evaluation
+                </span>
+                <h1 class="page-title" style="margin: 0 0 4px 0; font-size: 1.55rem; color: var(--primary-navy); font-weight: 800;">
+                    Shortlisted Candidates Pool
+                </h1>
+                <p class="page-subtitle" style="margin: 0; color: var(--text-muted); font-size: 0.88rem;">
+                    Candidates approved for corporate interviews. Coordinate multi-round evaluations and record final selection decisions.
+                </p>
+            </div>
+        </div>
 
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 25px;
-        }
-
-        .nav-links {
-            text-align: center;
-            margin-bottom: 25px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-        }
-
-        .nav-links a {
-            margin: 0 12px;
-            text-decoration: none;
-            color: #0066cc;
-            font-weight: 500;
-        }
-
-        .nav-links a.active {
-            color: #333;
-            font-weight: bold;
-        }
-
-        .nav-links form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .nav-links .btn-logout {
-            background: none;
-            border: none;
-            color: #dc3545;
-            font-weight: 500;
-            cursor: pointer;
-            padding: 0;
-            margin: 0 12px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        .nav-links .btn-logout:hover {
-            text-decoration: underline;
-        }
-
-        .alert-error {
-            background-color: #f8d7da;
-            color: #842029;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #f5c2c7;
-        }
-
-        .alert-success {
-            background-color: #d1e7dd;
-            color: #0f5132;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #badbcc;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: center;
-        }
-
-        th {
-            background-color: #333;
-            color: white;
-        }
-
-        tr:nth-child(even) {
-            background-color: #f8f8f8;
-        }
-
-        .status {
-            font-weight: bold;
-        }
-
-        .shortlisted {
-            font-weight: bold;
-            color: #e67e22;
-        }
-
-        .scheduled {
-            font-weight: bold;
-            color: #0d6efd;
-        }
-
-        .completed {
-            font-weight: bold;
-            color: #198754;
-        }
-
-        .cancelled {
-            font-weight: bold;
-            color: #dc3545;
-        }
-
-        .rescheduled {
-            font-weight: bold;
-            color: #fd7e14;
-        }
-
-        .not-scheduled {
-            font-weight: bold;
-            color: #6c757d;
-            font-style: italic;
-        }
-
-        .actions {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 4px;
-        }
-
-        .action-button {
-            display: inline-block;
-            padding: 6px 10px;
-            margin: 2px;
-            text-decoration: none;
-            border: none;
-            border-radius: 4px;
-            color: white;
-            font-size: 13px;
-            cursor: pointer;
-            font-family: inherit;
-            vertical-align: middle;
-        }
-
-        .action-button:hover {
-            opacity: 0.85;
-        }
-
-        .inline-form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .interview-btn {
-            background-color: #0d6efd;
-        }
-
-        .select-btn {
-            background-color: #198754;
-        }
-
-        .reject-btn {
-            background-color: #6c757d;
-        }
-
-        .view-btn {
-            background-color: #17a2b8;
-        }
-
-        .history-btn {
-            background-color: #6f42c1;
-        }
-
-        .empty {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
-    </style>
-</head>
-
-<body>
-
-<div class="container">
-
-    <div class="nav-links">
-        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-            <a href="${pageContext.request.contextPath}/admin/dashboard">Admin Dashboard</a> |
-        </c:if>
-        <a href="${pageContext.request.contextPath}/jobs">Jobs</a> |
-        <a href="${pageContext.request.contextPath}/internships">Internships</a> |
-        <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
-        <a class="active" href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
-        <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
-        <c:if test="${not empty sessionScope.userId}">
-            |
-            <form action="${pageContext.request.contextPath}/logout" method="post" style="display: inline; margin: 0; padding: 0;">
-                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                <button type="submit" class="btn-logout">Logout</button>
-            </form>
-        </c:if>
+        <div>
+            <a href="${pageContext.request.contextPath}/applications" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px; border-radius: var(--radius-sm);">
+                <i class="fa-solid fa-list" style="margin-right: 4px;"></i> View All Applications
+            </a>
+        </div>
     </div>
 
-    <h1>Shortlisted Candidates</h1>
-
+    <!-- Flash alerts -->
     <c:if test="${not empty errorMessage}">
-        <div class="alert-error">
-            <c:out value="${errorMessage}"/>
+        <div class="alert alert-error" style="margin-bottom: 20px;" role="alert">
+            <i class="fa-solid fa-circle-exclamation alert-icon"></i>
+            <div class="alert-content">
+                <strong>Notice:</strong> <c:out value="${errorMessage}"/>
+            </div>
         </div>
     </c:if>
 
     <c:if test="${not empty successMessage}">
-        <div class="alert-success">
-            <c:out value="${successMessage}"/>
+        <div class="alert alert-success" style="margin-bottom: 20px;" role="alert">
+            <i class="fa-solid fa-circle-check alert-icon"></i>
+            <div class="alert-content">
+                <strong>Success:</strong> <c:out value="${successMessage}"/>
+            </div>
         </div>
     </c:if>
 
-    <table>
-
-        <thead>
-        <tr>
-            <th>ID</th>
-            <th>Student ID</th>
-            <th>Job ID</th>
-            <th>Application Date</th>
-            <th>Application Status</th>
-            <th>Interview Status</th>
-            <th>Interview Date</th>
-            <th>Interview Time</th>
-            <th>Mode</th>
-            <th>Actions</th>
-        </tr>
-        </thead>
-
-        <tbody>
+    <div class="card" style="padding: 0; overflow: hidden; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);">
+        <div style="padding: 16px 22px; background: white; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.05rem; color: var(--primary-navy); font-weight: 700;">
+                Approved Candidates for Interview Evaluation
+            </div>
+            <span style="font-size: 0.82rem; background: var(--bg-subtle); color: var(--text-muted); padding: 4px 10px; border-radius: 12px; font-weight: 600;">
+                <c:out value="${empty applications ? 0 : applications.size()}"/> candidate(s) shortlisted
+            </span>
+        </div>
 
         <c:choose>
-
-            <c:when test="${not empty applications}">
-
-                <c:forEach var="application" items="${applications}">
-
-                    <c:set var="interview" value="${interviewMap[application.id]}" />
-
-                    <tr>
-                        <td>${application.id}</td>
-                        <td>${application.studentId}</td>
-                        <td>${application.jobId}</td>
-                        <td>${application.applicationDate}</td>
-
-                        <td>
-                            <span class="shortlisted">
-                                ${application.status}
-                            </span>
-                        </td>
-
-                        <td>
-                            <c:set var="isRescheduled" value="${not empty rescheduledMap[application.id] && rescheduledMap[application.id]}" />
-                            <c:choose>
-                                <c:when test="${empty interview}">
-                                    <span class="not-scheduled">NOT SCHEDULED</span>
-                                </c:when>
-                                <c:when test="${interview.status == 'COMPLETED'}">
-                                    <span class="completed">COMPLETED</span>
-                                </c:when>
-                                <c:when test="${interview.status == 'CANCELLED'}">
-                                    <span class="cancelled">CANCELLED</span>
-                                </c:when>
-                                <c:when test="${interview.status == 'SCHEDULED' && isRescheduled}">
-                                    <span class="rescheduled">RESCHEDULED</span>
-                                </c:when>
-                                <c:when test="${interview.status == 'SCHEDULED'}">
-                                    <span class="scheduled">SCHEDULED</span>
-                                </c:when>
-                                <c:otherwise>
-                                    <span class="status">${interview.status}</span>
-                                </c:otherwise>
-                            </c:choose>
-                        </td>
-
-                        <td>
-                            <c:choose>
-                                <c:when test="${not empty interview && not empty interview.interviewDate}">
-                                    ${interview.interviewDate}
-                                </c:when>
-                                <c:otherwise>-</c:otherwise>
-                            </c:choose>
-                        </td>
-
-                        <td>
-                            <c:choose>
-                                <c:when test="${not empty interview && not empty interview.interviewTime}">
-                                    ${interview.interviewTime}
-                                </c:when>
-                                <c:otherwise>-</c:otherwise>
-                            </c:choose>
-                        </td>
-
-                        <td>
-                            <c:choose>
-                                <c:when test="${not empty interview && not empty interview.mode}">
-                                    ${interview.mode}
-                                </c:when>
-                                <c:otherwise>-</c:otherwise>
-                            </c:choose>
-                        </td>
-
-                        <td>
-                            <div class="actions">
-                                <c:choose>
-                                    <c:when test="${empty interview}">
-                                        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-                                            <a class="action-button interview-btn"
-                                               href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
-                                                Schedule Interview
-                                            </a>
-                                        </c:if>
-                                        <a class="action-button view-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
-                                            View Details
-                                        </a>
-                                        <a class="action-button history-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=history&id=${application.id}">
-                                            History
-                                        </a>
-                                    </c:when>
-
-                                    <c:when test="${interview.status == 'SCHEDULED'}">
-                                        <a class="action-button view-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
-                                            View Details
-                                        </a>
-                                        <a class="action-button history-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=history&id=${application.id}">
-                                            History
-                                        </a>
-                                    </c:when>
-
-                                    <c:when test="${interview.status == 'COMPLETED'}">
-                                        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                                <input type="hidden" name="action" value="select">
-                                                <input type="hidden" name="id" value="${application.id}">
-                                                <input type="hidden" name="from" value="shortlist">
-                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                                <button type="submit" class="action-button select-btn">Select</button>
-                                            </form>
-                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                                <input type="hidden" name="action" value="reject">
-                                                <input type="hidden" name="id" value="${application.id}">
-                                                <input type="hidden" name="from" value="shortlist">
-                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                                <button type="submit" class="action-button reject-btn"
-                                                        onclick="return confirm('Are you sure you want to reject this candidate?');">
-                                                    Reject
-                                                </button>
-                                            </form>
-                                        </c:if>
-                                        <a class="action-button view-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
-                                            View Details
-                                        </a>
-                                        <a class="action-button history-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=history&id=${application.id}">
-                                            History
-                                        </a>
-                                    </c:when>
-
-                                    <c:when test="${interview.status == 'CANCELLED'}">
-                                        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-                                            <a class="action-button interview-btn"
-                                               href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}">
-                                                Schedule Interview
-                                            </a>
-                                        </c:if>
-                                        <a class="action-button view-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
-                                            View Details
-                                        </a>
-                                        <a class="action-button history-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=history&id=${application.id}">
-                                            History
-                                        </a>
-                                    </c:when>
-
-                                    <c:otherwise>
-                                        <a class="action-button view-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}">
-                                            View Details
-                                        </a>
-                                        <a class="action-button history-btn"
-                                           href="${pageContext.request.contextPath}/applications?action=history&id=${application.id}">
-                                            History
-                                        </a>
-                                    </c:otherwise>
-                                </c:choose>
-                            </div>
-                        </td>
-                    </tr>
-
-                </c:forEach>
-
+            <c:when test="${empty applications}">
+                <div style="text-align: center; padding: 48px 20px; background: white;">
+                    <div style="font-size: 2.2rem; margin-bottom: 10px; color: var(--accent-gold);">
+                        <i class="fa-solid fa-clipboard-user"></i>
+                    </div>
+                    <h4 style="margin: 0 0 6px 0; color: var(--primary-navy); font-size: 1.15rem; font-weight: 700;">No Shortlisted Candidates Found</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-muted); max-width: 480px; margin: 0 auto 18px auto; line-height: 1.5;">
+                        There are currently no candidates in the shortlisted pool. Review applied student submissions in the applications portal to shortlist candidates for interview drives.
+                    </p>
+                    <a href="${pageContext.request.contextPath}/applications" class="btn btn-primary" style="font-size: 0.85rem; padding: 8px 18px; border-radius: var(--radius-sm);">
+                        View All Applications
+                    </a>
+                </div>
             </c:when>
 
             <c:otherwise>
+                <div style="overflow-x: auto;">
+                    <table class="portal-table data-table" style="margin: 0; width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="padding: 14px 16px; text-align: left;">App #</th>
+                                <th style="padding: 14px 16px; text-align: left;">Candidate Profile</th>
+                                <th style="padding: 14px 16px; text-align: left;">Opportunity &amp; Company</th>
+                                <th style="padding: 14px 16px; text-align: center;">Applied Date</th>
+                                <th style="padding: 14px 16px; text-align: center;">Interview Status</th>
+                                <th style="padding: 14px 16px; text-align: center;">Schedule</th>
+                                <th style="padding: 14px 16px; text-align: center;">Mode</th>
+                                <th style="padding: 14px 16px; text-align: center;">Actions &amp; Evaluations</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <c:forEach var="application" items="${applications}">
+                                <c:set var="interview" value="${interviewMap[application.id]}" />
+                                <c:set var="stud" value="${studentMap[application.studentId]}" />
+                                <c:set var="usr" value="${userMap[stud.userId]}" />
+                                <c:set var="jb" value="${jobMap[application.jobId]}" />
+                                <c:set var="isRescheduled" value="${not empty rescheduledMap[application.id] && rescheduledMap[application.id]}" />
 
-                <tr>
-                    <td colspan="10" class="empty">
-                        No shortlisted applications found.
-                    </td>
-                </tr>
+                                <tr style="border-bottom: 1px solid var(--border-light);">
+                                    <td style="padding: 14px 16px; text-align: left;">
+                                        <a href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}" style="font-weight: 700; color: var(--primary-navy); text-decoration: none;">
+                                            #${application.id}
+                                        </a>
+                                    </td>
 
+                                    <td style="padding: 14px 16px; text-align: left;">
+                                        <div style="font-weight: 700; color: var(--text-dark);">
+                                            <c:choose>
+                                                <c:when test="${not empty usr.name}"><c:out value="${usr.name}"/></c:when>
+                                                <c:otherwise>Candidate #${application.studentId}</c:otherwise>
+                                            </c:choose>
+                                        </div>
+                                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                            <c:if test="${not empty stud.rollNumber}">Roll: <c:out value="${stud.rollNumber}"/> &bull; </c:if>
+                                            <c:if test="${not empty stud.department}"><c:out value="${stud.department}"/> &bull; </c:if>
+                                            <c:if test="${not empty stud.cgpa}">CGPA: <strong><c:out value="${stud.cgpa}"/></strong></c:if>
+                                        </div>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: left;">
+                                        <div style="font-weight: 700; color: var(--primary-navy);">
+                                            <c:choose>
+                                                <c:when test="${not empty jb.title}"><c:out value="${jb.title}"/></c:when>
+                                                <c:otherwise>Opportunity #${application.jobId}</c:otherwise>
+                                            </c:choose>
+                                        </div>
+                                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                            <c:if test="${not empty jb.company}"><c:out value="${jb.company}"/> &bull; </c:if>
+                                            <c:if test="${not empty jb.jobType}"><c:out value="${jb.jobType}"/></c:if>
+                                        </div>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: center; color: var(--text-muted); font-size: 0.88rem;">${application.applicationDate}</td>
+
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <c:choose>
+                                            <c:when test="${empty interview}">
+                                                <span class="status-badge badge-applied">NOT SCHEDULED</span>
+                                            </c:when>
+                                            <c:when test="${interview.status == 'COMPLETED'}">
+                                                <span class="status-badge badge-completed">COMPLETED</span>
+                                            </c:when>
+                                            <c:when test="${interview.status == 'CANCELLED'}">
+                                                <span class="status-badge badge-cancelled">CANCELLED</span>
+                                            </c:when>
+                                            <c:when test="${interview.status == 'SCHEDULED' && isRescheduled}">
+                                                <span class="status-badge badge-rescheduled">RESCHEDULED</span>
+                                            </c:when>
+                                            <c:when test="${interview.status == 'SCHEDULED'}">
+                                                <span class="status-badge badge-scheduled">SCHEDULED</span>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <span class="status-badge"><c:out value="${interview.status}"/></span>
+                                            </c:otherwise>
+                                        </c:choose>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: center; font-size: 0.88rem;">
+                                        <c:choose>
+                                            <c:when test="${not empty interview && not empty interview.interviewDate}">
+                                                <strong style="color: var(--text-dark);">${interview.interviewDate}</strong>
+                                                <c:if test="${not empty interview.interviewTime}">
+                                                    <div style="color: var(--text-muted); font-size: 0.78rem;">${interview.interviewTime}</div>
+                                                </c:if>
+                                            </c:when>
+                                            <c:otherwise><span style="color: var(--text-muted);">-</span></c:otherwise>
+                                        </c:choose>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: center; font-size: 0.88rem;">
+                                        <c:choose>
+                                            <c:when test="${not empty interview && not empty interview.mode}">
+                                                <span class="badge" style="background: rgba(27, 54, 93, 0.08); color: var(--primary-navy); font-size: 0.75rem;">${interview.mode}</span>
+                                            </c:when>
+                                            <c:otherwise><span style="color: var(--text-muted);">-</span></c:otherwise>
+                                        </c:choose>
+                                    </td>
+
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center;">
+                                            <!-- Dynamic Multi-Round Interview Manager -->
+                                            <a href="${pageContext.request.contextPath}/interview-rounds?applicationId=${application.id}" class="btn btn-primary btn-sm" title="Manage Multi-Round Evaluations" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                <i class="fa-solid fa-bullseye" style="margin-right: 3px;"></i> Rounds
+                                            </a>
+
+                                            <a href="${pageContext.request.contextPath}/applications?action=details&id=${application.id}" class="btn btn-outline btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                <i class="fa-solid fa-eye" style="margin-right: 3px;"></i> Details
+                                            </a>
+
+                                            <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                                                <c:choose>
+                                                    <c:when test="${empty interview}">
+                                                        <a href="${pageContext.request.contextPath}/interviews?applicationId=${application.id}" class="btn btn-accent btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                            <i class="fa-solid fa-calendar-plus" style="margin-right: 3px;"></i> Schedule
+                                                        </a>
+                                                    </c:when>
+                                                    <c:when test="${interview.status == 'SCHEDULED'}">
+                                                        <form action="${pageContext.request.contextPath}/interviews" method="post" style="display:inline; margin:0;">
+                                                            <input type="hidden" name="action" value="complete">
+                                                            <input type="hidden" name="id" value="${interview.id}">
+                                                            <input type="hidden" name="from" value="shortlist">
+                                                            <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>">
+                                                            <button type="submit" class="btn btn-success btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                                <i class="fa-solid fa-check" style="margin-right: 3px;"></i> Complete
+                                                            </button>
+                                                        </form>
+
+                                                        <a href="${pageContext.request.contextPath}/interviews?action=edit&id=${interview.id}" class="btn btn-outline btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                            Reschedule
+                                                        </a>
+
+                                                        <form action="${pageContext.request.contextPath}/interviews" method="post" style="display:inline; margin:0;" data-action-type="cancelRound">
+                                                            <input type="hidden" name="action" value="cancel">
+                                                            <input type="hidden" name="id" value="${interview.id}">
+                                                            <input type="hidden" name="from" value="shortlist">
+                                                            <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>">
+                                                            <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                                Cancel
+                                                            </button>
+                                                        </form>
+                                                    </c:when>
+
+                                                    <c:when test="${interview.status == 'COMPLETED'}">
+                                                        <form action="${pageContext.request.contextPath}/applications" method="post" style="display:inline; margin:0;" data-action-type="select">
+                                                            <input type="hidden" name="action" value="select">
+                                                            <input type="hidden" name="id" value="${application.id}">
+                                                            <input type="hidden" name="from" value="shortlist">
+                                                            <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>">
+                                                            <button type="submit" class="btn btn-success btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                                <i class="fa-solid fa-award" style="margin-right: 3px;"></i> Select Candidate
+                                                            </button>
+                                                        </form>
+
+                                                        <form action="${pageContext.request.contextPath}/applications" method="post" style="display:inline; margin:0;" data-action-type="reject">
+                                                            <input type="hidden" name="action" value="reject">
+                                                            <input type="hidden" name="id" value="${application.id}">
+                                                            <input type="hidden" name="from" value="shortlist">
+                                                            <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>">
+                                                            <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.78rem; padding: 5px 10px;">
+                                                                <i class="fa-solid fa-xmark" style="margin-right: 3px;"></i> Reject
+                                                            </button>
+                                                        </form>
+                                                    </c:when>
+                                                </c:choose>
+                                            </c:if>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </c:forEach>
+                        </tbody>
+                    </table>
+                </div>
             </c:otherwise>
-
         </c:choose>
-
-        </tbody>
-
-    </table>
+    </div>
 
 </div>
 
-</body>
-</html>
+<!-- Common Footer -->
+<jsp:include page="/WEB-INF/jsp/common/footer.jsp" />

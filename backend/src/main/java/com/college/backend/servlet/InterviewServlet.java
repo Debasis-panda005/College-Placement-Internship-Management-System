@@ -2,7 +2,13 @@ package com.college.backend.servlet;
 
 import com.college.backend.dao.ApplicationDAO;
 import com.college.backend.dao.InterviewDAO;
+import com.college.backend.dao.InterviewReportDAO;
+import com.college.backend.dao.JobDAO;
 import com.college.backend.dao.StudentDAO;
+import com.college.backend.dao.UserDAO;
+import com.college.backend.entity.InterviewReport;
+import com.college.backend.entity.Job;
+import com.college.backend.entity.User;
 import com.college.backend.entity.Application;
 import com.college.backend.entity.Interview;
 import com.college.backend.entity.Student;
@@ -33,13 +39,19 @@ public class InterviewServlet extends HttpServlet {
 
     private InterviewDAO interviewDAO;
     private ApplicationDAO applicationDAO;
-    private StudentDAO studentDAO;
+        private StudentDAO studentDAO;
+    private JobDAO jobDAO = new JobDAO();
+    private UserDAO userDAO = new UserDAO();
+    private InterviewReportDAO interviewReportDAO = new InterviewReportDAO();
 
     @Override
     public void init() {
         interviewDAO = new InterviewDAO();
         applicationDAO = new ApplicationDAO();
-        studentDAO = new StudentDAO();
+                studentDAO = new StudentDAO();
+        jobDAO = new JobDAO();
+        userDAO = new UserDAO();
+        interviewReportDAO = new InterviewReportDAO();
     }
 
     // Setters for test dependency injection

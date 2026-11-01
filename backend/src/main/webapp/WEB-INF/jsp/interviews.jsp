@@ -1,656 +1,384 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<c:set var="activeNav" value="interviews" scope="request" />
+<c:set var="pageTitle" value="Interview Management &amp; Scheduling | Centurion University Placement Portal" scope="request" />
 
-<!DOCTYPE html>
-<html>
-<head>
+<jsp:include page="/WEB-INF/jsp/common/header.jsp" />
 
-    <meta charset="UTF-8">
+<c:if test="${not empty sessionScope.userId}">
+    <form action="${pageContext.request.contextPath}/logout" method="post" style="display:none;" aria-hidden="true">
+        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+        <button type="submit">Logout</button>
+    </form>
+</c:if>
 
-    <title>Interview Management</title>
+<main class="page-container" style="max-width: 1240px; margin: 30px auto 60px auto;">
 
-    <style>
-
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            margin: 0;
-            padding: 30px;
-        }
-
-        .container {
-            width: 90%;
-            margin: 40px auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            text-align: center;
-            color: #222;
-            margin-bottom: 30px;
-        }
-
-        .form-section {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-        }
-
-        .form-section h2 {
-            margin-top: 0;
-            margin-bottom: 20px;
-        }
-
-        .form-row {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        input,
-        select {
-            padding: 12px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        input {
-            width: 170px;
-        }
-
-        select {
-            width: 180px;
-        }
-
-        .btn {
-            padding: 12px 18px;
-            border: none;
-            border-radius: 6px;
-            color: white;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 14px;
-            font-family: inherit;
-            vertical-align: middle;
-        }
-
-        .inline-form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .btn-create {
-            background: #333;
-        }
-
-        .btn-edit {
-            background: #0d6efd;
-        }
-
-        .btn-complete {
-            background: #198754;
-        }
-
-        .btn-select {
-            background: #198754;
-        }
-
-        .btn-reject {
-            background: #6c757d;
-        }
-
-        .btn-delete {
-            background: #dc3545;
-        }
-
-        .btn-filter {
-            background: #0d6efd;
-        }
-
-        .btn-reset {
-            background: #6c757d;
-        }
-
-        .btn-cancel {
-            background: #dc3545;
-        }
-
-        .btn:hover {
-            opacity: 0.85;
-        }
-
-        .nav-links {
-            text-align: center;
-            margin-bottom: 25px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-        }
-
-        .nav-links a {
-            margin: 0 12px;
-            text-decoration: none;
-            color: #0066cc;
-            font-weight: 500;
-        }
-
-        .nav-links a.active {
-            color: #333;
-            font-weight: bold;
-        }
-
-        .nav-links form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .nav-links .btn-logout {
-            background: none;
-            border: none;
-            color: #dc3545;
-            font-weight: 500;
-            cursor: pointer;
-            padding: 0;
-            margin: 0 12px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        .nav-links .btn-logout:hover {
-            text-decoration: underline;
-        }
-
-        .alert-error {
-            background-color: #f8d7da;
-            color: #842029;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #f5c2c7;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: center;
-        }
-
-        th {
-            background: #333;
-            color: white;
-        }
-
-        tr:nth-child(even) {
-            background: #f7f7f7;
-        }
-
-        .status {
-            font-weight: bold;
-        }
-
-        .scheduled {
-            color: #0d6efd;
-        }
-
-        .completed {
-            color: #198754;
-        }
-
-        .cancelled {
-            color: #dc3545;
-        }
-
-        .rescheduled {
-            color: #fd7e14;
-        }
-
-        .actions {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .empty {
-            text-align: center;
-            padding: 25px;
-            color: #777;
-        }
-
-        .app-link {
-            color: #0066cc;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .app-link:hover {
-            text-decoration: underline;
-        }
-
-        .alert-success {
-            background-color: #d1e7dd;
-            color: #0f5132;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #badbcc;
-        }
-
-        .stats-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 25px;
-        }
-
-        .stat-card {
-            flex: 1;
-            min-width: 140px;
-            background-color: #f8f9fa;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px 12px;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        .stat-card h3 {
-            margin: 0;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #6c757d;
-        }
-
-        .stat-card .stat-count {
-            font-size: 26px;
-            font-weight: bold;
-            margin-top: 6px;
-        }
-
-    </style>
-
-</head>
-
-<body>
-
-<div class="container">
-
-    <div class="nav-links">
-        <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-            <a href="${pageContext.request.contextPath}/admin/dashboard">Admin Dashboard</a> |
-        </c:if>
-        <a href="${pageContext.request.contextPath}/jobs">Jobs</a> |
-        <a href="${pageContext.request.contextPath}/internships">Internships</a> |
-        <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
-        <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
-        <a class="active" href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
-        <c:if test="${not empty sessionScope.userId}">
-            |
-            <form action="${pageContext.request.contextPath}/logout" method="post" style="display: inline; margin: 0; padding: 0;">
-                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                <button type="submit" class="btn-logout">Logout</button>
-            </form>
-        </c:if>
+    <!-- Page Header Banner -->
+    <div style="background: white; border-radius: var(--radius-lg); padding: 24px 28px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="width: 48px; height: 48px; background: rgba(27, 54, 93, 0.08); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--primary-navy); font-size: 22px;">
+                <i class="fa-solid fa-calendar-check"></i>
+            </div>
+            <div>
+                <span style="font-size: 11px; font-weight: 700; color: var(--accent-gold); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 2px;">
+                    Technical &amp; Corporate Evaluation
+                </span>
+                <h1 class="page-title" style="margin: 0 0 4px 0; font-size: 1.55rem; color: var(--primary-navy); font-weight: 800;">
+                    Interview Management &amp; Scheduling
+                </h1>
+                <p class="page-subtitle" style="margin: 0; color: var(--text-muted); font-size: 0.88rem;">
+                    Track interview timelines, coordinate multi-stage technical assessments, and record evaluation reports.
+                </p>
+            </div>
+        </div>
     </div>
 
-    <h1>Interview Management</h1>
-
     <c:if test="${not empty errorMessage}">
-        <div class="alert-error">
-            <c:out value="${errorMessage}"/>
+        <div class="alert alert-error" style="margin-bottom: 20px;" role="alert">
+            <i class="fa-solid fa-circle-exclamation alert-icon"></i>
+            <div class="alert-content">
+                <strong>Notice:</strong> <c:out value="${errorMessage}"/>
+            </div>
         </div>
     </c:if>
 
     <c:if test="${not empty successMessage}">
-        <div class="alert-success">
-            <c:out value="${successMessage}"/>
+        <div class="alert alert-success" style="margin-bottom: 20px;" role="alert">
+            <i class="fa-solid fa-circle-check alert-icon"></i>
+            <div class="alert-content">
+                <strong>Success:</strong> <c:out value="${successMessage}"/>
+            </div>
         </div>
     </c:if>
 
-    <div class="stats-container">
+    <!-- STATS CARDS -->
+    <div class="kpi-grid" style="margin-bottom: 24px;">
+        <a href="${pageContext.request.contextPath}/interviews" class="kpi-card kpi-blue clickable-card" title="View all interviews">
+            <div class="kpi-value">${not empty interviewStats ? interviewStats['TOTAL'] : 0}</div>
+            <div class="kpi-label"><i class="fa-solid fa-calendar-days" style="margin-right: 4px;"></i> Total Interviews</div>
+        </a>
 
-        <div class="stat-card">
-            <h3>Total Interviews</h3>
-            <div class="stat-count" style="color: #333;">${not empty interviewStats ? interviewStats['TOTAL'] : 0}</div>
-        </div>
+        <a href="${pageContext.request.contextPath}/interviews?filterStatus=SCHEDULED" class="kpi-card clickable-card" title="Filter SCHEDULED sessions">
+            <div class="kpi-value" style="color: var(--secondary-blue);">${not empty interviewStats ? interviewStats['SCHEDULED'] : 0}</div>
+            <div class="kpi-label"><i class="fa-regular fa-clock" style="margin-right: 4px;"></i> Scheduled</div>
+        </a>
 
-        <div class="stat-card">
-            <h3>Scheduled</h3>
-            <div class="stat-count scheduled">${not empty interviewStats ? interviewStats['SCHEDULED'] : 0}</div>
-        </div>
+        <a href="${pageContext.request.contextPath}/interviews?filterStatus=COMPLETED" class="kpi-card kpi-green clickable-card" title="Filter COMPLETED sessions">
+            <div class="kpi-value" style="color: var(--success);">${not empty interviewStats ? interviewStats['COMPLETED'] : 0}</div>
+            <div class="kpi-label"><i class="fa-solid fa-circle-check" style="margin-right: 4px;"></i> Completed</div>
+        </a>
 
-        <div class="stat-card">
-            <h3>Completed</h3>
-            <div class="stat-count completed">${not empty interviewStats ? interviewStats['COMPLETED'] : 0}</div>
-        </div>
+        <a href="${pageContext.request.contextPath}/interviews?filterStatus=CANCELLED" class="kpi-card clickable-card" title="Filter CANCELLED sessions">
+            <div class="kpi-value" style="color: var(--danger);">${not empty interviewStats ? interviewStats['CANCELLED'] : 0}</div>
+            <div class="kpi-label"><i class="fa-solid fa-ban" style="margin-right: 4px;"></i> Cancelled</div>
+        </a>
 
-        <div class="stat-card">
-            <h3>Cancelled</h3>
-            <div class="stat-count cancelled">${not empty interviewStats ? interviewStats['CANCELLED'] : 0}</div>
-        </div>
-
-        <div class="stat-card">
-            <h3>Rescheduled</h3>
-            <div class="stat-count rescheduled">${not empty interviewStats ? interviewStats['RESCHEDULED'] : 0}</div>
-        </div>
-
+        <a href="${pageContext.request.contextPath}/interviews" class="kpi-card kpi-gold clickable-card" title="Rescheduled sessions">
+            <div class="kpi-value" style="color: var(--accent-gold);">${not empty interviewStats ? interviewStats['RESCHEDULED'] : 0}</div>
+            <div class="kpi-label"><i class="fa-solid fa-arrows-rotate" style="margin-right: 4px;"></i> Rescheduled</div>
+        </a>
     </div>
 
     <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-    <!-- CREATE INTERVIEW -->
+        <!-- SCHEDULE NEW INTERVIEW (Staff Only) -->
+        <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--primary-navy); padding: 24px 28px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); background: white;">
+            <h2 style="font-size: 1.05rem; margin: 0 0 16px 0; color: var(--primary-navy); font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-calendar-plus" style="color: var(--primary-navy);"></i> Schedule Primary Interview Session
+            </h2>
+            <form action="${pageContext.request.contextPath}/interviews" method="post" id="scheduleInterviewForm">
+                <input type="hidden" name="action" value="create">
+                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
 
-    <div class="form-section">
+                <div style="display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;">
+                    <div class="form-group" style="flex: 1; min-width: 170px; margin: 0;">
+                        <label class="form-label" for="applicationId" style="font-size: 0.8rem; font-weight: 700;">App Ref ID <span style="color:var(--danger);">*</span></label>
+                        <input type="number" id="applicationId" name="applicationId" class="form-control"
+                               placeholder="e.g. 101" value="${selectedApplicationId}" required min="1" style="height: 42px;">
+                    </div>
 
-        <h2>Schedule New Interview</h2>
+                    <div class="form-group" style="flex: 1; min-width: 170px; margin: 0;">
+                        <label class="form-label" for="interviewDate" style="font-size: 0.8rem; font-weight: 700;">Interview Date <span style="color:var(--danger);">*</span></label>
+                        <input type="date" id="interviewDate" name="interviewDate" class="form-control"
+                               min="${today}" required style="height: 42px;">
+                    </div>
 
-        <form action="${pageContext.request.contextPath}/interviews"
-              method="post">
+                    <div class="form-group" style="flex: 1; min-width: 150px; margin: 0;">
+                        <label class="form-label" for="interviewTime" style="font-size: 0.8rem; font-weight: 700;">Time <span style="color:var(--danger);">*</span></label>
+                        <input type="time" id="interviewTime" name="interviewTime" class="form-control" required style="height: 42px;">
+                    </div>
 
-            <input type="hidden"
-                   name="action"
-                   value="create">
+                    <div class="form-group" style="flex: 1; min-width: 160px; margin: 0;">
+                        <label class="form-label" for="mode" style="font-size: 0.8rem; font-weight: 700;">Evaluation Mode <span style="color:var(--danger);">*</span></label>
+                        <select id="mode" name="mode" class="form-control" required style="height: 42px;">
+                            <option value="">Select Mode</option>
+                            <option value="ONLINE">Online (Virtual)</option>
+                            <option value="OFFLINE">Offline (Campus)</option>
+                        </select>
+                    </div>
 
-            <input type="hidden"
-                   name="csrfToken"
-                   value="${sessionScope.csrfToken}">
-
-            <div class="form-row">
-
-                <input type="number"
-                       name="applicationId"
-                       placeholder="Application ID"
-                       value="${selectedApplicationId}"
-                       required>
-
-                <input type="date"
-                       name="interviewDate"
-                       min="${today}"
-                       required>
-
-                <input type="time"
-                       name="interviewTime"
-                       required>
-
-                <select name="mode" required>
-
-                    <option value="">Select Mode</option>
-
-                    <option value="ONLINE">
-                        Online
-                    </option>
-
-                    <option value="OFFLINE">
-                        Offline
-                    </option>
-
-                </select>
-
-                <button type="submit"
-                        class="btn btn-create">
-                    Schedule Interview
-                </button>
-
-            </div>
-
-        </form>
-
-    </div>
+                    <div style="margin: 0;">
+                        <button type="submit" class="btn btn-primary" style="height: 42px; padding: 0 22px; font-weight: 700; border-radius: var(--radius-sm);">
+                            <i class="fa-solid fa-calendar-check" style="margin-right: 6px;"></i> Schedule Session
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
     </c:if>
 
+    <!-- FILTER & SEARCH INTERVIEWS -->
+    <div class="card" style="margin-bottom: 24px; background: white; border: 1px solid var(--border-light); padding: 20px 24px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+        <h3 style="font-size: 1rem; margin: 0 0 14px 0; color: var(--primary-navy); font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-filter" style="color: var(--accent-gold);"></i> Filter Interview Sessions
+        </h3>
+        <form action="${pageContext.request.contextPath}/interviews" method="get" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;">
+            <div class="form-group" style="flex: 1; min-width: 150px; margin: 0;">
+                <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Application ID</label>
+                <input type="number" name="filterAppId" class="form-control" placeholder="Application ID"
+                       value="${selectedFilterAppId}" style="height: 40px;">
+            </div>
 
-    <!-- FILTER INTERVIEWS -->
+            <div class="form-group" style="flex: 1; min-width: 160px; margin: 0;">
+                <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Filter by Date</label>
+                <input type="date" name="filterDate" class="form-control" value="${selectedFilterDate}" style="height: 40px;">
+            </div>
 
-    <div class="form-section">
-
-        <h2>Filter Interviews</h2>
-
-        <form action="${pageContext.request.contextPath}/interviews"
-              method="get">
-
-            <div class="form-row">
-
-                <input type="number"
-                       name="filterAppId"
-                       placeholder="Application ID"
-                       value="${selectedFilterAppId}">
-
-                <input type="date"
-                       name="filterDate"
-                       value="${selectedFilterDate}">
-
-                <select name="filterMode">
+            <div class="form-group" style="flex: 1; min-width: 140px; margin: 0;">
+                <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Mode</label>
+                <select name="filterMode" class="form-control" style="height: 40px;">
                     <option value="ALL" ${selectedFilterMode == 'ALL' ? 'selected' : ''}>All Modes</option>
                     <option value="ONLINE" ${selectedFilterMode == 'ONLINE' ? 'selected' : ''}>Online</option>
                     <option value="OFFLINE" ${selectedFilterMode == 'OFFLINE' ? 'selected' : ''}>Offline</option>
                 </select>
+            </div>
 
-                <select name="filterStatus">
+            <div class="form-group" style="flex: 1; min-width: 150px; margin: 0;">
+                <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Status</label>
+                <select name="filterStatus" class="form-control" style="height: 40px;">
                     <option value="ALL" ${selectedFilterStatus == 'ALL' ? 'selected' : ''}>All Statuses</option>
                     <option value="SCHEDULED" ${selectedFilterStatus == 'SCHEDULED' ? 'selected' : ''}>SCHEDULED</option>
                     <option value="COMPLETED" ${selectedFilterStatus == 'COMPLETED' ? 'selected' : ''}>COMPLETED</option>
                     <option value="CANCELLED" ${selectedFilterStatus == 'CANCELLED' ? 'selected' : ''}>CANCELLED</option>
                 </select>
-
-                <button type="submit"
-                        class="btn btn-filter">
-                    Filter
-                </button>
-
-                <a class="btn btn-reset"
-                   href="${pageContext.request.contextPath}/interviews">
-                    Reset
-                </a>
-
             </div>
 
+            <div style="display: flex; gap: 8px; margin: 0;">
+                <button type="submit" class="btn btn-primary" style="height: 40px; padding: 0 18px; font-weight: 600; border-radius: var(--radius-sm);">
+                    Filter
+                </button>
+                <a href="${pageContext.request.contextPath}/interviews" class="btn btn-outline" style="height: 40px; padding: 0 14px; display: inline-flex; align-items: center; border-radius: var(--radius-sm);">
+                    Reset
+                </a>
+            </div>
         </form>
-
     </div>
 
+    <!-- INTERVIEW LISTING TABLE -->
+    <div class="card" style="padding: 0; overflow: hidden; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);">
+        <div style="padding: 16px 22px; background: white; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.05rem; color: var(--primary-navy); font-weight: 700;">
+                Scheduled Interview Sessions
+            </div>
+            <span style="font-size: 0.82rem; background: var(--bg-subtle); color: var(--text-muted); padding: 4px 10px; border-radius: 12px; font-weight: 600;">
+                Showing ${not empty interviews ? interviews.size() : 0} session(s)
+            </span>
+        </div>
 
-    <!-- INTERVIEW TABLE -->
-
-    <table>
-
-        <thead>
-
-        <tr>
-
-            <th>ID</th>
-            <th>Application ID</th>
-            <th>Interview Date</th>
-            <th>Interview Time</th>
-            <th>Mode</th>
-            <th>Status</th>
-            <th>Actions</th>
-
-        </tr>
-
-        </thead>
-
-
-        <tbody>
-
-        <c:choose>
-
-            <c:when test="${not empty interviews}">
-
-                <c:forEach var="interview"
-                           items="${interviews}">
-
+        <div style="overflow-x: auto;">
+            <table class="data-table" style="margin: 0; width: 100%; border-collapse: collapse;">
+                <thead>
                     <tr>
-
-                        <td>
-                                ${interview.id}
-                        </td>
-
-                        <td>
-                            <a class="app-link"
-                               href="${pageContext.request.contextPath}/applications?action=details&id=${interview.applicationId}">
-                                #${interview.applicationId}
-                            </a>
-                        </td>
-
-                        <td>
-                                ${interview.interviewDate}
-                        </td>
-
-                        <td>
-                                ${interview.interviewTime}
-                        </td>
-
-                        <td>
-                                ${interview.mode}
-                        </td>
-
-                        <td class="status">
-
-                            <c:choose>
-
-                                <c:when test="${interview.status == 'COMPLETED'}">
-
-                                    <span class="completed">
-                                        COMPLETED
-                                    </span>
-
-                                </c:when>
-
-                                <c:when test="${interview.status == 'CANCELLED'}">
-
-                                    <span class="cancelled">
-                                        CANCELLED
-                                    </span>
-
-                                </c:when>
-
-                                <c:when test="${interview.status == 'SCHEDULED' && not empty rescheduledMap[interview.applicationId] && rescheduledMap[interview.applicationId]}">
-
-                                    <span class="rescheduled">
-                                        RESCHEDULED
-                                    </span>
-
-                                </c:when>
-
-                                <c:otherwise>
-
-                                    <span class="scheduled">
-                                            ${interview.status}
-                                    </span>
-
-                                </c:otherwise>
-
-                            </c:choose>
-
-                        </td>
-
-                        <td>
-
-                            <div class="actions">
-
-                                <c:choose>
-                                    <c:when test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
-                                        <c:if test="${interview.status == 'SCHEDULED'}">
-
-                                            <a class="btn btn-edit"
-                                               href="${pageContext.request.contextPath}/interviews?action=edit&id=${interview.id}">
-                                                Edit / Reschedule
-                                            </a>
-
-                                            <form action="${pageContext.request.contextPath}/interviews" method="post" class="inline-form">
-                                                <input type="hidden" name="action" value="complete">
-                                                <input type="hidden" name="id" value="${interview.id}">
-                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                                <button type="submit" class="btn btn-complete">Complete</button>
-                                            </form>
-
-                                            <form action="${pageContext.request.contextPath}/interviews" method="post" class="inline-form">
-                                                <input type="hidden" name="action" value="cancel">
-                                                <input type="hidden" name="id" value="${interview.id}">
-                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                                <button type="submit" class="btn btn-cancel"
-                                                        onclick="return confirm('Are you sure you want to cancel this interview?');">
-                                                    Cancel Interview
-                                                </button>
-                                            </form>
-
-                                        </c:if>
-
-                                        <c:if test="${interview.status == 'COMPLETED'}">
-
-                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                                <input type="hidden" name="action" value="select">
-                                                <input type="hidden" name="id" value="${interview.applicationId}">
-                                                <input type="hidden" name="from" value="interviews">
-                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                                <button type="submit" class="btn btn-select">Select</button>
-                                            </form>
-
-                                            <form action="${pageContext.request.contextPath}/applications" method="post" class="inline-form">
-                                                <input type="hidden" name="action" value="reject">
-                                                <input type="hidden" name="id" value="${interview.applicationId}">
-                                                <input type="hidden" name="from" value="interviews">
-                                                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                                                <button type="submit" class="btn btn-reject"
-                                                        onclick="return confirm('Are you sure you want to reject this candidate?');">
-                                                    Reject
-                                                </button>
-                                            </form>
-
-                                        </c:if>
-                                    </c:when>
-                                    <c:otherwise>
-                                        <a class="btn btn-filter"
-                                           href="${pageContext.request.contextPath}/applications?action=details&id=${interview.applicationId}"
-                                           style="font-size: 13px; padding: 8px 12px;">
-                                            View Application
-                                        </a>
-                                    </c:otherwise>
-                                </c:choose>
-
-                            </div>
-
-                        </td>
-
+                        <th style="padding: 14px 16px; text-align: left;">Candidate Profile</th>
+                        <th style="padding: 14px 16px; text-align: left;">Opportunity &amp; Company</th>
+                        <th style="padding: 14px 16px; text-align: center;">Date &amp; Time</th>
+                        <th style="padding: 14px 16px; text-align: center;">Mode</th>
+                        <th style="padding: 14px 16px; text-align: center;">Status</th>
+                        <th style="padding: 14px 16px; text-align: center;">Dynamic Rounds</th>
+                        <th style="padding: 14px 16px; text-align: center;">Actions &amp; Reports</th>
                     </tr>
+                </thead>
+                <tbody>
+                    <c:choose>
+                        <c:when test="${not empty interviews}">
+                            <c:forEach var="interview" items="${interviews}">
+                                <c:set var="app" value="${applicationMap[interview.applicationId]}" />
+                                <c:set var="stud" value="${not empty app ? studentMap[app.studentId] : null}" />
+                                <c:set var="user" value="${not empty stud ? userMap[stud.userId] : null}" />
+                                <c:set var="job" value="${not empty app ? jobMap[app.jobId] : null}" />
+                                <c:set var="report" value="${reportMap[interview.applicationId]}" />
 
-                </c:forEach>
+                                <tr style="border-bottom: 1px solid var(--border-light);">
+                                    <!-- Candidate Info -->
+                                    <td style="padding: 14px 16px; text-align: left;">
+                                        <div style="font-weight: 700; color: var(--text-dark);">
+                                            <c:out value="${not empty user ? user.name : (not empty stud ? stud.rollNumber : 'Student')}"/>
+                                        </div>
+                                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                            <c:if test="${not empty stud}">
+                                                Roll: <c:out value="${stud.rollNumber}"/> &bull; <c:out value="${stud.department}"/>
+                                            </c:if>
+                                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 1px;">App Ref: #${interview.applicationId}</span>
+                                        </div>
+                                    </td>
 
-            </c:when>
+                                    <!-- Opportunity Info -->
+                                    <td style="padding: 14px 16px; text-align: left;">
+                                        <div style="font-weight: 700; color: var(--primary-navy);">
+                                            <c:out value="${not empty job ? job.title : 'Job Role'}"/>
+                                        </div>
+                                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                            <c:out value="${not empty job ? job.company : '-'}"/>
+                                            <c:if test="${not empty job && not empty job.jobType}">
+                                                &bull; <span class="badge" style="background: rgba(27, 54, 93, 0.08); color: var(--primary-navy); font-size: 0.72rem; padding: 2px 6px;">${job.jobType}</span>
+                                            </c:if>
+                                        </div>
+                                    </td>
 
+                                    <!-- Date & Time -->
+                                    <td style="padding: 14px 16px; text-align: center; white-space: nowrap;">
+                                        <div style="font-weight: 700; color: var(--text-dark);">
+                                            <c:out value="${interview.interviewDate}"/>
+                                        </div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                                            <i class="fa-regular fa-clock" style="margin-right: 3px;"></i><c:out value="${interview.interviewTime}"/>
+                                        </div>
+                                    </td>
 
-            <c:otherwise>
+                                    <!-- Mode -->
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <c:choose>
+                                            <c:when test="${interview.mode == 'ONLINE'}">
+                                                <span class="badge" style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 0.75rem;">
+                                                    <i class="fa-solid fa-video" style="margin-right: 4px;"></i>ONLINE
+                                                </span>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <span class="badge" style="background: #fef3c7; color: #b45309; font-weight: 700; font-size: 0.75rem;">
+                                                    <i class="fa-solid fa-building-user" style="margin-right: 4px;"></i>OFFLINE
+                                                </span>
+                                            </c:otherwise>
+                                        </c:choose>
+                                    </td>
 
-                <tr>
+                                    <!-- Status -->
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <c:choose>
+                                            <c:when test="${interview.status == 'COMPLETED'}">
+                                                <span class="status-badge badge-completed">COMPLETED</span>
+                                            </c:when>
+                                            <c:when test="${interview.status == 'CANCELLED'}">
+                                                <span class="status-badge badge-cancelled">CANCELLED</span>
+                                            </c:when>
+                                            <c:when test="${interview.status == 'SCHEDULED' && not empty rescheduledMap[interview.applicationId] && rescheduledMap[interview.applicationId]}">
+                                                <span class="status-badge badge-rescheduled">RESCHEDULED</span>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <span class="status-badge badge-scheduled">${interview.status}</span>
+                                            </c:otherwise>
+                                        </c:choose>
+                                    </td>
 
-                    <td colspan="7" class="empty">
-                        No interviews found.
-                    </td>
+                                    <!-- Dynamic Rounds Feature -->
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <a href="${pageContext.request.contextPath}/interview-rounds?applicationId=${interview.applicationId}"
+                                           class="btn btn-primary btn-sm" style="font-size: 0.78rem; padding: 6px 12px; border-radius: var(--radius-sm); white-space: nowrap;">
+                                            <i class="fa-solid fa-bullseye" style="margin-right: 4px;"></i> Manage Rounds
+                                        </a>
+                                    </td>
 
-                </tr>
+                                    <!-- Actions & PDF Reports -->
+                                    <td style="padding: 14px 16px; text-align: center;">
+                                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                                            <!-- PDF Report Link if Available -->
+                                            <c:if test="${not empty report}">
+                                                <a href="${pageContext.request.contextPath}/interview-report?action=download&applicationId=${interview.applicationId}"
+                                                   class="btn btn-outline btn-sm" style="font-size: 0.78rem; padding: 5px 10px; color: var(--success); border-radius: var(--radius-sm);"
+                                                   title="Download Official PDF Report">
+                                                    <i class="fa-solid fa-file-pdf" style="margin-right: 3px;"></i> PDF
+                                                </a>
+                                            </c:if>
 
-            </c:otherwise>
+                                            <c:choose>
+                                                <c:when test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                                                    <c:if test="${interview.status == 'SCHEDULED'}">
+                                                        <a href="${pageContext.request.contextPath}/interviews?action=edit&id=${interview.id}"
+                                                           class="btn btn-outline btn-sm" style="font-size: 0.78rem; padding: 5px 10px; border-radius: var(--radius-sm);" title="Reschedule session">
+                                                            <i class="fa-solid fa-pen-to-square"></i>
+                                                        </a>
 
-        </c:choose>
+                                                        <form action="${pageContext.request.contextPath}/interviews" method="post" style="display: inline; margin: 0;">
+                                                            <input type="hidden" name="action" value="complete">
+                                                            <input type="hidden" name="id" value="${interview.id}">
+                                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                            <button type="submit" class="btn btn-success btn-sm" style="font-size: 0.78rem; padding: 5px 10px; border-radius: var(--radius-sm);">
+                                                                <i class="fa-solid fa-check" style="margin-right: 3px;"></i> Complete
+                                                            </button>
+                                                        </form>
 
-        </tbody>
+                                                        <form action="${pageContext.request.contextPath}/interviews" method="post" style="display: inline; margin: 0;"
+                                                              onsubmit="return (typeof PortalPopups !== 'undefined') ? PortalPopups.confirmAction(event, 'Are you sure you want to cancel this interview session?') : confirm('Are you sure you want to cancel this interview session?');">
+                                                            <input type="hidden" name="action" value="cancel">
+                                                            <input type="hidden" name="id" value="${interview.id}">
+                                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                            <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.78rem; padding: 5px 10px; border-radius: var(--radius-sm);">
+                                                                Cancel
+                                                            </button>
+                                                        </form>
+                                                    </c:if>
 
-    </table>
+                                                    <c:if test="${interview.status == 'COMPLETED'}">
+                                                        <form action="${pageContext.request.contextPath}/applications" method="post" style="display: inline; margin: 0;">
+                                                            <input type="hidden" name="action" value="select">
+                                                            <input type="hidden" name="id" value="${interview.applicationId}">
+                                                            <input type="hidden" name="from" value="interviews">
+                                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                            <button type="submit" class="btn btn-success btn-sm" style="font-size: 0.78rem; padding: 5px 10px; border-radius: var(--radius-sm);">
+                                                                <i class="fa-solid fa-award" style="margin-right: 3px;"></i> Select
+                                                            </button>
+                                                        </form>
 
-</div>
+                                                        <form action="${pageContext.request.contextPath}/applications" method="post" style="display: inline; margin: 0;"
+                                                              onsubmit="return (typeof PortalPopups !== 'undefined') ? PortalPopups.confirmAction(event, 'Are you sure you want to reject this candidate?') : confirm('Are you sure you want to reject this candidate?');">
+                                                            <input type="hidden" name="action" value="reject">
+                                                            <input type="hidden" name="id" value="${interview.applicationId}">
+                                                            <input type="hidden" name="from" value="interviews">
+                                                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                                            <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.78rem; padding: 5px 10px; border-radius: var(--radius-sm);">
+                                                                <i class="fa-solid fa-xmark" style="margin-right: 3px;"></i> Reject
+                                                            </button>
+                                                        </form>
+                                                    </c:if>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <a href="${pageContext.request.contextPath}/applications?action=details&id=${interview.applicationId}"
+                                                       class="btn btn-outline btn-sm" style="font-size: 0.78rem; padding: 5px 10px; border-radius: var(--radius-sm);">
+                                                        <i class="fa-solid fa-eye" style="margin-right: 3px;"></i> Details
+                                                    </a>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </c:forEach>
+                        </c:when>
+                        <c:otherwise>
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+                                    <div style="font-size: 2.2rem; margin-bottom: 10px; color: var(--accent-gold);">
+                                        <i class="fa-solid fa-calendar-xmark"></i>
+                                    </div>
+                                    <div style="font-weight: 700; font-size: 1.15rem; color: var(--primary-navy);">No Interview Records Found</div>
+                                    <div style="font-size: 0.9rem; margin-top: 4px;">There are no interview sessions matching your filter criteria.</div>
+                                </td>
+                            </tr>
+                        </c:otherwise>
+                    </c:choose>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-</body>
-</html>
+</main>
+
+<jsp:include page="/WEB-INF/jsp/common/footer.jsp" />

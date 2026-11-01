@@ -1,294 +1,142 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<c:set var="activeNav" value="${job.isInternship() || isInternshipsEndpoint ? 'internships' : 'jobs'}" scope="request" />
+<c:set var="pageTitle" value="${job.isInternship() ? 'Edit Internship' : 'Edit Job'} | Centurion University Placement Portal" scope="request" />
 
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title><c:out value="${job.isInternship() ? 'Edit Internship' : 'Edit Job / Internship'}"/></title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 30px;
-        }
+<jsp:include page="/WEB-INF/jsp/common/header.jsp" />
 
-        .container {
-            width: 550px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+<c:if test="${not empty sessionScope.userId}">
+    <form action="${pageContext.request.contextPath}/logout" method="post" style="display:none;" aria-hidden="true">
+        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+        <button type="submit">Logout</button>
+    </form>
+</c:if>
 
-        .nav-links {
-            text-align: center;
-            margin-bottom: 25px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-        }
+<main class="page-container" style="max-width: 760px; margin: 36px auto 60px auto;">
 
-        .nav-links a {
-            margin: 0 12px;
-            text-decoration: none;
-            color: #0066cc;
-            font-weight: 500;
-        }
-
-        .nav-links form {
-            display: inline;
-            margin: 0;
-            padding: 0;
-        }
-
-        .nav-links .btn-logout {
-            background: none;
-            border: none;
-            color: #dc3545;
-            font-weight: 500;
-            cursor: pointer;
-            padding: 0;
-            margin: 0 12px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        .nav-links .btn-logout:hover {
-            text-decoration: underline;
-        }
-
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-top: 0;
-            margin-bottom: 25px;
-            font-size: 22px;
-        }
-
-        .alert-error {
-            background-color: #f8d7da;
-            color: #842029;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #f5c2c7;
-        }
-
-        .form-group {
-            margin-bottom: 18px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: bold;
-            color: #495057;
-            font-size: 14px;
-        }
-
-        .form-control {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 10px 12px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-
-        .readonly-control {
-            background-color: #e9ecef;
-            cursor: not-allowed;
-            color: #495057;
-        }
-
-        textarea.form-control {
-            height: 90px;
-            resize: vertical;
-        }
-
-        .button-bar {
-            margin-top: 25px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .btn-submit {
-            padding: 10px 22px;
-            background-color: #1976d2;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-        }
-
-        .btn-submit:hover {
-            background-color: #125aa0;
-        }
-
-        .btn-cancel {
-            color: #6c757d;
-            text-decoration: none;
-            font-size: 14px;
-        }
-
-        .btn-cancel:hover {
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-
-    <div class="nav-links">
-        <a href="${pageContext.request.contextPath}/jobs">Jobs</a> |
-        <a href="${pageContext.request.contextPath}/internships">Internships</a> |
-        <a href="${pageContext.request.contextPath}/applications">All Applications</a> |
-        <a href="${pageContext.request.contextPath}/shortlist">Shortlisted Candidates</a> |
-        <a href="${pageContext.request.contextPath}/interviews">Interview Schedule</a>
-        <c:if test="${not empty sessionScope.userId}">
-            |
-            <form action="${pageContext.request.contextPath}/logout" method="post" style="display: inline; margin: 0; padding: 0;">
-                <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                <button type="submit" class="btn-logout">Logout</button>
-            </form>
-        </c:if>
+    <div style="background: white; border-radius: var(--radius-lg); padding: 24px 28px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
+        <div style="width: 50px; height: 50px; background: rgba(27, 54, 93, 0.08); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--primary-navy); font-size: 24px;">
+            <i class="fa-solid fa-pen-to-square"></i>
+        </div>
+        <div>
+            <h1 class="page-title" style="margin: 0 0 4px 0; font-size: 1.55rem; color: var(--primary-navy); font-weight: 800;">
+                <c:out value="${job.isInternship() ? 'Edit Internship Opening' : 'Edit Placement Opportunity'}"/>
+            </h1>
+            <p class="page-subtitle" style="margin: 0; color: var(--text-muted); font-size: 0.9rem;">
+                Update specifications, eligibility criteria, or status for Opportunity #${job.id}.
+            </p>
+        </div>
     </div>
 
-    <h1><c:out value="${job.isInternship() ? 'Edit Internship' : 'Edit Job / Internship'}"/></h1>
-
     <c:if test="${not empty errorMessage}">
-        <div class="alert-error">
-            <c:out value="${errorMessage}"/>
+        <div class="alert alert-error" style="margin-bottom: 20px;" role="alert">
+            <i class="fa-solid fa-circle-exclamation alert-icon"></i>
+            <div class="alert-content">
+                <strong>Error:</strong> <c:out value="${errorMessage}"/>
+            </div>
         </div>
     </c:if>
 
-    <form action="${pageContext.request.contextPath}/jobs" method="post" onsubmit="return validateJobEditForm()">
+    <div class="card" style="padding: 32px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);">
+        <form action="${pageContext.request.contextPath}/jobs" method="post" id="jobEditForm" onsubmit="return (typeof PortalValidation !== 'undefined' && PortalValidation.validateJob) ? PortalValidation.validateJob(this) : true;">
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="id" value="${job.id}">
+            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+            <c:if test="${isInternshipsEndpoint}">
+                <input type="hidden" name="source" value="internships">
+            </c:if>
 
-        <input type="hidden" name="action" value="update">
-        <input type="hidden" name="id" value="${job.id}">
-        <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-        <c:if test="${job.isInternship() || isInternshipsEndpoint}">
-            <input type="hidden" name="source" value="internships">
-        </c:if>
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label" for="title">Opportunity Role Title <span style="color:var(--danger);">*</span></label>
+                <input type="text" id="title" name="title" class="form-control"
+                       value="<c:out value='${job.title}'/>" required placeholder="e.g. Graduate Software Engineer">
+            </div>
 
-        <div class="form-group">
-            <label>Job ID</label>
-            <input type="text" class="form-control readonly-control" value="<c:out value='${job.id}'/>" readonly>
-        </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 18px;">
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" for="company">Recruiting Organization <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="company" name="company" class="form-control"
+                           value="<c:out value='${job.company}'/>" required placeholder="e.g. Infosys, TCS, Amazon">
+                </div>
 
-        <div class="form-group">
-            <label for="title">Job Title *</label>
-            <input type="text" id="title" name="title" class="form-control"
-                   value="<c:out value='${job.title}'/>" required>
-        </div>
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" for="location">Job Location <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="location" name="location" class="form-control"
+                           value="<c:out value='${job.location}'/>" required placeholder="e.g. Bangalore, Hyderabad, Remote">
+                </div>
+            </div>
 
-        <div class="form-group">
-            <label for="company">Company Name *</label>
-            <input type="text" id="company" name="company" class="form-control"
-                   value="<c:out value='${job.company}'/>" required>
-        </div>
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label" for="description">Role Description, Responsibilities &amp; Prerequisites</label>
+                <textarea id="description" name="description" class="form-control" rows="4"
+                          placeholder="Outline candidate responsibilities and criteria..."><c:out value="${job.description}"/></textarea>
+            </div>
 
-        <div class="form-group">
-            <label for="location">Location *</label>
-            <input type="text" id="location" name="location" class="form-control"
-                   value="<c:out value='${job.location}'/>" required>
-        </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 18px;">
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" for="salary"><c:out value="${job.isInternship() ? 'Monthly Stipend' : 'Annual CTC / Stipend'}"/></label>
+                    <input type="text" id="salary" name="salary" class="form-control"
+                           value="<c:out value='${job.salary}'/>" placeholder="e.g. 8.5 LPA or 45,000 / month">
+                </div>
 
-        <div class="form-group">
-            <label for="description">Job Description</label>
-            <textarea id="description" name="description" class="form-control"><c:out value="${job.description}"/></textarea>
-        </div>
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" for="jobType">Engagement Model <span style="color:var(--danger);">*</span></label>
+                    <select id="jobType" name="jobType" class="form-control" required>
+                        <option value="">Select Engagement Type</option>
+                        <option value="Full Time" ${job.jobType == 'Full Time' ? 'selected' : ''}>Full Time</option>
+                        <option value="Part Time" ${job.jobType == 'Part Time' ? 'selected' : ''}>Part Time</option>
+                        <option value="Internship" ${job.jobType == 'Internship' ? 'selected' : ''}>Internship</option>
+                    </select>
+                </div>
+            </div>
 
-        <div class="form-group">
-            <label for="salary"><c:out value="${job.isInternship() ? 'Stipend' : 'Salary / Stipend'}"/></label>
-            <input type="text" id="salary" name="salary" class="form-control"
-                   value="<c:out value='${job.salary}'/>">
-        </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 18px;">
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" for="duration">Internship Duration (Optional)</label>
+                    <input type="text" id="duration" name="duration" class="form-control"
+                           value="<c:out value='${job.duration}'/>" placeholder="e.g. 6 Months, Summer 2026">
+                </div>
 
-        <div class="form-group" id="durationGroup">
-            <label for="duration">Internship Duration (Optional)</label>
-            <input type="text" id="duration" name="duration" class="form-control"
-                   value="<c:out value='${job.duration}'/>" placeholder="e.g. 6 Months, 3 Months, Summer 2026">
-        </div>
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" for="deadline">Application Deadline</label>
+                    <input type="date" id="deadline" name="deadline" class="form-control"
+                           value="<c:out value='${job.deadline}'/>">
+                </div>
+            </div>
 
-        <div class="form-group">
-            <label for="jobType">Job Type *</label>
-            <select id="jobType" name="jobType" class="form-control" required>
-                <option value="">Select Job Type</option>
-                <option value="Full Time" ${job.jobType == 'Full Time' ? 'selected' : ''}>Full Time</option>
-                <option value="Part Time" ${job.jobType == 'Part Time' ? 'selected' : ''}>Part Time</option>
-                <option value="Internship" ${job.jobType == 'Internship' ? 'selected' : ''}>Internship</option>
-            </select>
-        </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 18px;">
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" for="minCgpa">Minimum CGPA (0.00 – 10.00)</label>
+                    <input type="number" step="0.01" min="0.00" max="10.00" id="minCgpa" name="minCgpa" class="form-control"
+                           value="<c:out value='${job.minCgpa}'/>" placeholder="e.g. 7.50">
+                </div>
 
-        <div class="form-group">
-            <label for="deadline">Application Deadline</label>
-            <input type="date" id="deadline" name="deadline" class="form-control"
-                   value="<c:out value='${job.deadline}'/>">
-        </div>
+                <div class="form-group" style="margin: 0;">
+                    <label class="form-label" for="status">Posting Status <span style="color:var(--danger);">*</span></label>
+                    <select id="status" name="status" class="form-control" required>
+                        <option value="Active" ${job.status == 'Active' ? 'selected' : ''}>Active (Open for applications)</option>
+                        <option value="Closed" ${job.status == 'Closed' ? 'selected' : ''}>Closed (Archived)</option>
+                    </select>
+                </div>
+            </div>
 
-        <div class="form-group">
-            <label for="minCgpa">Minimum CGPA (0.00 – 10.00)</label>
-            <input type="number" step="0.01" min="0.00" max="10.00" id="minCgpa" name="minCgpa" class="form-control"
-                   value="<c:out value='${job.minCgpa}'/>" placeholder="e.g. 7.50 (leave blank for none)">
-        </div>
+            <div class="form-group" style="margin-bottom: 26px;">
+                <label class="form-label" for="eligibleDepartments">Eligible Branches / Departments</label>
+                <input type="text" id="eligibleDepartments" name="eligibleDepartments" class="form-control"
+                       value="<c:out value='${job.eligibleDepartments}'/>" placeholder="e.g. CSE,ECE,IT,MECH (or leave blank for all)">
+            </div>
 
-        <div class="form-group">
-            <label for="eligibleDepartments">Eligible Departments</label>
-            <input type="text" id="eligibleDepartments" name="eligibleDepartments" class="form-control"
-                   value="<c:out value='${job.eligibleDepartments}'/>" placeholder="e.g. CSE,ECE (or blank / ALL for unrestricted)">
-        </div>
+            <div style="display: flex; gap: 14px; align-items: center; justify-content: flex-end;">
+                <a href="${pageContext.request.contextPath}${job.isInternship() || isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn btn-outline" style="padding: 12px 22px; border-radius: var(--radius-md);">
+                    Cancel
+                </a>
+                <button type="submit" class="btn btn-primary" style="padding: 12px 28px; border-radius: var(--radius-md); font-weight: 700;">
+                    <i class="fa-solid fa-floppy-disk" style="margin-right: 6px;"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
 
-        <div class="form-group">
-            <label for="status">Status *</label>
-            <select id="status" name="status" class="form-control" required>
-                <option value="Active" ${job.status == 'Active' ? 'selected' : ''}>Active</option>
-                <option value="Closed" ${job.status == 'Closed' ? 'selected' : ''}>Closed</option>
-            </select>
-        </div>
+</main>
 
-        <div class="button-bar">
-            <button type="submit" class="btn-submit">
-                <c:out value="${job.isInternship() ? 'Update Internship' : 'Update Job'}"/>
-            </button>
-            <a href="${pageContext.request.contextPath}${job.isInternship() || isInternshipsEndpoint ? '/internships' : '/jobs'}" class="btn-cancel">Cancel</a>
-        </div>
-
-    </form>
-
-</div>
-
-<script>
-    function validateJobEditForm() {
-        var title = document.getElementById("title").value.trim();
-        var company = document.getElementById("company").value.trim();
-        var location = document.getElementById("location").value.trim();
-        var jobType = document.getElementById("jobType").value;
-
-        if (!title || !company || !location || !jobType) {
-            alert("Please fill in all required fields (Title, Company, Location, Job Type).");
-            return false;
-        }
-
-        var minCgpaInput = document.getElementById("minCgpa").value.trim();
-        if (minCgpaInput !== "") {
-            var cgpa = parseFloat(minCgpaInput);
-            if (isNaN(cgpa) || cgpa < 0.00 || cgpa > 10.00) {
-                alert("Minimum CGPA must be a number between 0.00 and 10.00.");
-                return false;
-            }
-        }
-
-        return true;
-    }
-</script>
-
-</body>
-</html>
+<jsp:include page="/WEB-INF/jsp/common/footer.jsp" />
