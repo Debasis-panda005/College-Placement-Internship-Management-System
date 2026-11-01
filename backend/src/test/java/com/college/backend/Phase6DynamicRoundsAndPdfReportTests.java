@@ -838,8 +838,7 @@ public class Phase6DynamicRoundsAndPdfReportTests {
         }
         assertTrue(Files.exists(indexJspPath), "index.jsp must exist");
         String jspContent = Files.readString(indexJspPath);
-        assertTrue(jspContent.contains("DEMO DATA"), "Landing page must prominently display DEMO DATA tag");
-        assertTrue(jspContent.contains("Illustrative statistics for demonstration only"), "Landing page must have explicit disclaimer");
+        assertFalse(jspContent.contains("demo-data-banner"), "Landing page must not display demo-data-banner");
     }
 
     // =====================================================

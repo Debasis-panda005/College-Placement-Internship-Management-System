@@ -92,15 +92,6 @@
             </p>
         </div>
 
-        <!-- Strict Data Separation Notice -->
-        <div class="demo-data-banner">
-            <span style="font-size: 20px;">ℹ️</span>
-            <div>
-                <strong>DEMO DATA – Illustrative statistics for demonstration only.</strong>
-                These figures are sample benchmark metrics designed for dashboard preview and are not official college placement records.
-            </div>
-        </div>
-
         <!-- Academic Year Selector -->
         <div class="year-selector-bar">
             <span style="font-size: 13px; font-weight: 700; color: var(--secondary-navy); margin-right: 6px;">Select Academic Year:</span>
@@ -363,53 +354,53 @@
         </div>
 
         <div class="process-timeline">
-            <div class="process-step-card">
+            <a href="${pageContext.request.contextPath}/register" class="process-step-card" title="Navigate to Student Registration">
                 <div class="step-number">1</div>
                 <div class="step-title">Student Registration</div>
                 <p class="step-desc">Students register an authenticated user account with email verification and secure credential hashing.</p>
-            </div>
+            </a>
 
-            <div class="process-step-card">
+            <a href="${pageContext.request.contextPath}/register" class="process-step-card" title="Navigate to Profile Completion">
                 <div class="step-number">2</div>
                 <div class="step-title">Profile Completion</div>
                 <p class="step-desc">Detailed academic profile submission including Roll Number, Department, CGPA, and resume profile links.</p>
-            </div>
+            </a>
 
-            <div class="process-step-card">
+            <a href="${pageContext.request.contextPath}/jobs" class="process-step-card" title="Navigate to Job Eligibility &amp; Opportunities">
                 <div class="step-number">3</div>
                 <div class="step-title">Eligibility Check</div>
                 <p class="step-desc">Automatic server-side validation against job criteria: minimum CGPA cut-off, department, and deadline.</p>
-            </div>
+            </a>
 
-            <div class="process-step-card">
+            <a href="${pageContext.request.contextPath}/applications" class="process-step-card" title="Navigate to Opportunity Application &amp; Tracking">
                 <div class="step-number">4</div>
                 <div class="step-title">Opportunity Application</div>
                 <p class="step-desc">One-click application submission with duplicate prevention and real-time status tracking.</p>
-            </div>
+            </a>
 
-            <div class="process-step-card">
+            <a href="${pageContext.request.contextPath}/shortlist" class="process-step-card" title="Navigate to Candidate Shortlisting">
                 <div class="step-number">5</div>
                 <div class="step-title">Candidate Shortlisting</div>
                 <p class="step-desc">Placement coordinators review eligible applicant pools and approve candidates for interview drives.</p>
-            </div>
+            </a>
 
-            <div class="process-step-card">
+            <a href="${pageContext.request.contextPath}/interviews" class="process-step-card" title="Navigate to Dynamic Interview Rounds Management">
                 <div class="step-number">6</div>
                 <div class="step-title">Interview Rounds</div>
                 <p class="step-desc">Configurable multi-round evaluations: Aptitude, Coding, Technical 1/2, and HR rounds with history logging.</p>
-            </div>
+            </a>
 
-            <div class="process-step-card">
+            <a href="${pageContext.request.contextPath}/applications" class="process-step-card" title="Navigate to Application Management &amp; Final Selection">
                 <div class="step-number">7</div>
                 <div class="step-title">Final Selection</div>
                 <p class="step-desc">Authorized placement officer records final SELECTION or REJECTION determination with feedback remarks.</p>
-            </div>
+            </a>
 
-            <div class="process-step-card">
+            <a href="${pageContext.request.contextPath}/interviews" class="process-step-card" title="Navigate to Interview Evaluation PDF Report">
                 <div class="step-number">8</div>
                 <div class="step-title">Automatic PDF Report</div>
                 <p class="step-desc">Instant generation of official signed evaluation reports ready for viewing and downloadable PDF archival.</p>
-            </div>
+            </a>
         </div>
     </section>
 

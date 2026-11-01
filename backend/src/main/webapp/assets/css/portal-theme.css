@@ -666,17 +666,46 @@ a:hover {
 }
 
 .process-step-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
   background: #ffffff;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   padding: 22px;
   position: relative;
-  transition: transform 0.2s ease;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s ease;
 }
 
 .process-step-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--primary-navy);
+  transform: translateY(-4px);
+  border-color: var(--accent-gold);
+  box-shadow: 0 10px 22px rgba(27, 54, 93, 0.12);
+  text-decoration: none;
+}
+
+.process-step-card:hover .step-number {
+  background: var(--accent-gold);
+  color: #ffffff;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.process-step-card:hover .step-title {
+  color: var(--primary-navy);
+}
+
+.process-step-card:focus {
+  outline: none;
+}
+
+.process-step-card:focus-visible {
+  outline: 3px solid var(--accent-gold);
+  outline-offset: 3px;
+  border-color: var(--accent-gold);
 }
 
 .step-number {
