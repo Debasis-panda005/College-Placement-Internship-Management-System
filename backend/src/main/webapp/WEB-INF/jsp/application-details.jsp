@@ -59,60 +59,153 @@
     </c:if>
 
     <!-- SECTION 1: CANDIDATE INFORMATION -->
-    <div class="card" style="padding: 26px 30px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 22px;">
-        <h2 style="font-size: 1.15rem; margin: 0 0 18px 0; color: var(--primary-navy); font-weight: 700; display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
-            <i class="fa-solid fa-user-graduate" style="color: var(--primary-navy);"></i> Candidate Academic Information
-        </h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
-            <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
-                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Candidate Full Name</span>
-                <span style="font-size: 1.05rem; font-weight: 700; color: var(--text-dark);">
-                    <c:out value="${not empty studentUser ? studentUser.name : 'Registered Student'}"/>
-                </span>
+    <c:choose>
+        <c:when test="${application.external or not empty externalStudent}">
+            <div class="card" style="padding: 26px 30px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 22px;">
+                <h2 style="font-size: 1.15rem; margin: 0 0 18px 0; color: var(--primary-navy); font-weight: 700; display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-user-graduate" style="color: var(--primary-navy);"></i> External Candidate Profile
+                    </span>
+                    <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; background: #e0e7ff; color: #3730a3;">
+                        <i class="fa-solid fa-building-columns" style="margin-right: 4px;"></i> External Applicant
+                    </span>
+                </h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Candidate Full Name</span>
+                        <span style="font-size: 1.05rem; font-weight: 700; color: var(--text-dark);">
+                            <c:choose>
+                                <c:when test="${not empty externalStudent && not empty externalStudent.fullName}"><c:out value="${externalStudent.fullName}"/></c:when>
+                                <c:when test="${not empty externalStudent && not empty externalStudent.applicantName}"><c:out value="${externalStudent.applicantName}"/></c:when>
+                                <c:when test="${not empty studentUser && not empty studentUser.name}"><c:out value="${studentUser.name}"/></c:when>
+                                <c:otherwise>External Candidate</c:otherwise>
+                            </c:choose>
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">College / University</span>
+                        <span style="font-size: 0.95rem; font-weight: 600; color: var(--text-dark);">
+                            <c:out value="${not empty externalStudent ? externalStudent.collegeName : '-'}"/>
+                            <c:if test="${not empty externalStudent && not empty externalStudent.collegeLocation}">
+                                (<c:out value="${externalStudent.collegeLocation}"/>)
+                            </c:if>
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Degree &amp; Department</span>
+                        <span style="font-size: 0.95rem; font-weight: 600; color: var(--text-dark);">
+                            <c:out value="${not empty externalStudent ? externalStudent.degree : '-'}"/>
+                            &bull; <c:out value="${not empty externalStudent ? externalStudent.department : '-'}"/>
+                            <c:if test="${not empty externalStudent && not empty externalStudent.currentSemester}">
+                                (Sem ${externalStudent.currentSemester})
+                            </c:if>
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Cumulative CGPA</span>
+                        <span style="font-size: 1.1rem; font-weight: 800; color: var(--accent-teal);">
+                            <c:out value="${not empty externalStudent ? externalStudent.cgpa : '-'}"/> / 10.00
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Email Address</span>
+                        <span style="font-size: 0.92rem; color: var(--text-dark);">
+                            <c:choose>
+                                <c:when test="${not empty externalStudent && not empty externalStudent.email}"><c:out value="${externalStudent.email}"/></c:when>
+                                <c:when test="${not empty externalStudent && not empty externalStudent.applicantEmail}"><c:out value="${externalStudent.applicantEmail}"/></c:when>
+                                <c:when test="${not empty studentUser && not empty studentUser.email}"><c:out value="${studentUser.email}"/></c:when>
+                                <c:otherwise>-</c:otherwise>
+                            </c:choose>
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Contact Phone &amp; Grad Year</span>
+                        <span style="font-size: 0.92rem; color: var(--text-dark);">
+                            <c:out value="${not empty externalStudent && not empty externalStudent.phone ? externalStudent.phone : '-'}"/>
+                            <c:if test="${not empty externalStudent && not empty externalStudent.graduationYear}">
+                                &bull; Class of ${externalStudent.graduationYear}
+                            </c:if>
+                        </span>
+                    </div>
+                </div>
+                <c:if test="${not empty externalStudent && not empty externalStudent.resumeUrl}">
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">
+                            <i class="fa-solid fa-paperclip" style="margin-right: 6px;"></i> Attached Resume Document
+                        </span>
+                        <a href="${pageContext.request.contextPath}/resume/download?externalStudentId=${externalStudent.id}" target="_blank" class="btn btn-outline" style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i> View Candidate Resume
+                        </a>
+                    </div>
+                </c:if>
             </div>
-            <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
-                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Registration / Roll Number</span>
-                <span style="font-size: 1rem; font-weight: 600; color: var(--text-dark);">
-                    <c:out value="${not empty student ? student.rollNumber : '-'}"/>
-                </span>
+        </c:when>
+        <c:otherwise>
+            <div class="card" style="padding: 26px 30px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 22px;">
+                <h2 style="font-size: 1.15rem; margin: 0 0 18px 0; color: var(--primary-navy); font-weight: 700; display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);">
+                    <i class="fa-solid fa-user-graduate" style="color: var(--primary-navy);"></i> Candidate Academic Information
+                </h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Candidate Full Name</span>
+                        <span style="font-size: 1.05rem; font-weight: 700; color: var(--text-dark);">
+                            <c:choose>
+                                <c:when test="${not empty studentUser && not empty studentUser.name}"><c:out value="${studentUser.name}"/></c:when>
+                                <c:when test="${not empty student && not empty student.name}"><c:out value="${student.name}"/></c:when>
+                                <c:when test="${not empty student && not empty student.fullName}"><c:out value="${student.fullName}"/></c:when>
+                                <c:otherwise>Registered Student</c:otherwise>
+                            </c:choose>
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Registration / Roll Number</span>
+                        <span style="font-size: 1rem; font-weight: 600; color: var(--text-dark);">
+                            <c:out value="${not empty student ? student.rollNumber : '-'}"/>
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Department &amp; Class</span>
+                        <span style="font-size: 0.95rem; font-weight: 600; color: var(--text-dark);">
+                            <c:out value="${not empty student ? student.department : '-'}"/>
+                            <c:if test="${not empty student && not empty student.graduationYear}">
+                                (${student.graduationYear})
+                            </c:if>
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Cumulative CGPA</span>
+                        <span style="font-size: 1.1rem; font-weight: 800; color: var(--accent-teal);">
+                            <c:out value="${not empty student ? student.cgpa : '-'}"/> / 10.00
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Institutional Email</span>
+                        <span style="font-size: 0.92rem; color: var(--text-dark);">
+                            <c:choose>
+                                <c:when test="${not empty studentUser && not empty studentUser.email}"><c:out value="${studentUser.email}"/></c:when>
+                                <c:when test="${not empty student && not empty student.email}"><c:out value="${student.email}"/></c:when>
+                                <c:otherwise>-</c:otherwise>
+                            </c:choose>
+                        </span>
+                    </div>
+                    <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Contact Phone</span>
+                        <span style="font-size: 0.92rem; color: var(--text-dark);">
+                            <c:out value="${not empty student && not empty student.phone ? student.phone : '-'}"/>
+                        </span>
+                    </div>
+                </div>
+                <c:if test="${not empty student && not empty student.skills}">
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase; margin-bottom: 6px;">Technical Competencies &amp; Skills</span>
+                        <span style="font-size: 0.92rem; color: var(--primary-navy); background: rgba(27, 54, 93, 0.05); padding: 6px 12px; border-radius: var(--radius-sm); display: inline-block;">
+                            <i class="fa-solid fa-code" style="margin-right: 6px;"></i><c:out value="${student.skills}"/>
+                        </span>
+                    </div>
+                </c:if>
             </div>
-            <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
-                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Department &amp; Class</span>
-                <span style="font-size: 0.95rem; font-weight: 600; color: var(--text-dark);">
-                    <c:out value="${not empty student ? student.department : '-'}"/>
-                    <c:if test="${not empty student && not empty student.graduationYear}">
-                        (${student.graduationYear})
-                    </c:if>
-                </span>
-            </div>
-            <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
-                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Cumulative CGPA</span>
-                <span style="font-size: 1.1rem; font-weight: 800; color: var(--accent-teal);">
-                    <c:out value="${not empty student ? student.cgpa : '-'}"/> / 10.00
-                </span>
-            </div>
-            <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
-                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Institutional Email</span>
-                <span style="font-size: 0.92rem; color: var(--text-dark);">
-                    <c:out value="${not empty studentUser ? studentUser.email : '-'}"/>
-                </span>
-            </div>
-            <div style="background: var(--bg-subtle); padding: 14px 16px; border-radius: var(--radius-md);">
-                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Contact Phone</span>
-                <span style="font-size: 0.92rem; color: var(--text-dark);">
-                    <c:out value="${not empty student && not empty student.phone ? student.phone : '-'}"/>
-                </span>
-            </div>
-        </div>
-        <c:if test="${not empty student && not empty student.skills}">
-            <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-light);">
-                <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase; margin-bottom: 6px;">Technical Competencies &amp; Skills</span>
-                <span style="font-size: 0.92rem; color: var(--primary-navy); background: rgba(27, 54, 93, 0.05); padding: 6px 12px; border-radius: var(--radius-sm); display: inline-block;">
-                    <i class="fa-solid fa-code" style="margin-right: 6px;"></i><c:out value="${student.skills}"/>
-                </span>
-            </div>
-        </c:if>
-    </div>
+        </c:otherwise>
+    </c:choose>
 
     <!-- SECTION 2: OPPORTUNITY SPECIFICATIONS -->
     <div class="card" style="padding: 26px 30px; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); border: 1px solid var(--border-light); margin-bottom: 22px;">

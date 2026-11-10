@@ -27,11 +27,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.college.backend.dao.ExternalStudentDAO;
+import com.college.backend.entity.ExternalStudent;
+
 @WebServlet({"/interview-report", "/interview-report/view", "/interview-report/download"})
 public class InterviewPdfServlet extends HttpServlet {
 
     private ApplicationDAO applicationDAO = new ApplicationDAO();
     private StudentDAO studentDAO = new StudentDAO();
+    private ExternalStudentDAO externalStudentDAO = new ExternalStudentDAO();
     private UserDAO userDAO = new UserDAO();
     private JobDAO jobDAO = new JobDAO();
     private InterviewRoundDAO roundDAO = new InterviewRoundDAO();
@@ -42,6 +46,7 @@ public class InterviewPdfServlet extends HttpServlet {
     public void init() {
         this.applicationDAO = new ApplicationDAO();
         this.studentDAO = new StudentDAO();
+        this.externalStudentDAO = new ExternalStudentDAO();
         this.userDAO = new UserDAO();
         this.jobDAO = new JobDAO();
         this.roundDAO = new InterviewRoundDAO();
@@ -56,6 +61,10 @@ public class InterviewPdfServlet extends HttpServlet {
 
     public void setStudentDAO(StudentDAO studentDAO) {
         this.studentDAO = studentDAO;
+    }
+
+    public void setExternalStudentDAO(ExternalStudentDAO externalStudentDAO) {
+        this.externalStudentDAO = externalStudentDAO;
     }
 
     public void setUserDAO(UserDAO userDAO) {
@@ -128,9 +137,29 @@ public class InterviewPdfServlet extends HttpServlet {
 
         // 3. Authorization check (IDOR Defense)
         Student currentStudent = null;
+        ExternalStudent currentExternal = null;
         if (!isStaff) {
-            currentStudent = studentDAO.findByUserId(sessionUserId);
-            if (currentStudent == null || !currentStudent.getId().equals(application.getStudentId())) {
+            boolean isExternalSession = "EXTERNAL".equalsIgnoreCase((String) request.getSession().getAttribute("studentType"));
+            if (isExternalSession && externalStudentDAO != null) {
+                currentExternal = externalStudentDAO.findByUserId(sessionUserId);
+            }
+            if (currentExternal == null && studentDAO != null) {
+                currentStudent = studentDAO.findByUserId(sessionUserId);
+            }
+            if (currentStudent == null && currentExternal == null && externalStudentDAO != null) {
+                currentExternal = externalStudentDAO.findByUserId(sessionUserId);
+            }
+
+            boolean isOwner = false;
+            if (currentExternal != null) {
+                Long extId = currentExternal.getId();
+                isOwner = extId.equals(application.getExternalStudentId())
+                        || (extId.equals(application.getStudentId()) && application.isExternal());
+            } else if (currentStudent != null) {
+                isOwner = currentStudent.getId().equals(application.getStudentId()) && !application.isExternal();
+            }
+
+            if (!isOwner) {
                 response.sendError(HttpServletResponse.SC_FORBIDDEN,
                         "Access denied: You are only authorized to access your own interview reports.");
                 return;
@@ -151,10 +180,23 @@ public class InterviewPdfServlet extends HttpServlet {
         }
 
         // 5. Gather related entities
-        Student applicant = studentDAO.findById(application.getStudentId());
-        User applicantUser = applicant != null ? userDAO.findById(applicant.getUserId()) : null;
-        Job job = jobDAO.getJobById(application.getJobId());
-        List<InterviewRound> rounds = roundDAO.getRoundsByApplicationId(application.getId());
+        Student applicant = null;
+        ExternalStudent externalApplicant = null;
+        User applicantUser = null;
+        if (application.isExternal() && externalStudentDAO != null) {
+            Long extId = application.getExternalStudentId() != null ? application.getExternalStudentId() : application.getStudentId();
+            externalApplicant = externalStudentDAO.findById(extId);
+            if (externalApplicant != null && externalApplicant.getUserId() != null && userDAO != null) {
+                applicantUser = userDAO.findById(externalApplicant.getUserId());
+            }
+        } else if (studentDAO != null) {
+            applicant = studentDAO.findById(application.getStudentId());
+            if (applicant != null && applicant.getUserId() != null && userDAO != null) {
+                applicantUser = userDAO.findById(applicant.getUserId());
+            }
+        }
+        Job job = jobDAO != null ? jobDAO.getJobById(application.getJobId()) : null;
+        List<InterviewRound> rounds = roundDAO != null ? roundDAO.getRoundsByApplicationId(application.getId()) : null;
 
         // Ensure report metadata is consistent
         if (report == null) {
@@ -166,7 +208,7 @@ public class InterviewPdfServlet extends HttpServlet {
             report.setGeneratedBy(isStaff ? AuthUtil.getSessionUserName(request) : "Head - Placement Cell");
 
             Map<String, Integer> stats = roundDAO.getRoundStatistics(application.getId());
-            report.setTotalRounds(stats.getOrDefault("TOTAL", rounds.size()));
+            report.setTotalRounds(stats.getOrDefault("TOTAL", rounds != null ? rounds.size() : 0));
             report.setCompletedRounds(stats.getOrDefault("COMPLETED", 0));
             report.setPassedRounds(stats.getOrDefault("PASSED", 0));
             report.setFailedRounds(stats.getOrDefault("FAILED", 0));
@@ -180,7 +222,7 @@ public class InterviewPdfServlet extends HttpServlet {
         // 6. Generate PDF document bytes
         byte[] pdfBytes;
         try {
-            pdfBytes = pdfService.generateInterviewReportPdf(report, application, applicant, applicantUser, job, rounds);
+            pdfBytes = pdfService.generateInterviewReportPdf(report, application, applicant, applicantUser, externalApplicant, job, rounds);
         } catch (Exception e) {
             e.printStackTrace();
             request.getSession().setAttribute("errorMessage", "Error generating PDF report: " + e.getMessage());
@@ -194,8 +236,14 @@ public class InterviewPdfServlet extends HttpServlet {
         boolean isDownload = "download".equalsIgnoreCase(actionParam) ||
                 (servletPath != null && servletPath.contains("download"));
 
-        String safeRoll = applicant != null && applicant.getRollNumber() != null ?
-                applicant.getRollNumber().replaceAll("[^a-zA-Z0-9_-]", "") : "Applicant";
+        String safeRoll;
+        if (externalApplicant != null && externalApplicant.getFullName() != null) {
+            safeRoll = externalApplicant.getFullName().replaceAll("[^a-zA-Z0-9_-]", "");
+        } else if (applicant != null && applicant.getRollNumber() != null) {
+            safeRoll = applicant.getRollNumber().replaceAll("[^a-zA-Z0-9_-]", "");
+        } else {
+            safeRoll = "Applicant";
+        }
         String safeCompany = job != null && job.getCompany() != null ?
                 job.getCompany().replaceAll("[^a-zA-Z0-9_-]", "") : "Company";
         String filename = "Interview_Report_" + safeRoll + "_" + safeCompany + ".pdf";

@@ -49,6 +49,16 @@ public class InterviewPdfService {
                                             User studentUser,
                                             Job job,
                                             List<InterviewRound> rounds) throws IOException {
+        return generateInterviewReportPdf(report, application, student, studentUser, null, job, rounds);
+    }
+
+    public byte[] generateInterviewReportPdf(InterviewReport report,
+                                            Application application,
+                                            Student student,
+                                            User studentUser,
+                                            com.college.backend.entity.ExternalStudent externalStudent,
+                                            Job job,
+                                            List<InterviewRound> rounds) throws IOException {
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Document document = new Document(PageSize.A4, 36, 36, 40, 40);
@@ -89,7 +99,7 @@ public class InterviewPdfService {
             document.add(docTitle);
 
             // Metadata banner
-            String reportIdStr = report != null && report.getReportUuid() != null ? report.getReportUuid() : "REP-" + application.getId();
+            String reportIdStr = report != null && report.getReportUuid() != null ? report.getReportUuid() : "REP-" + (application != null ? application.getId() : "N/A");
             String genDateStr = report != null && report.getGeneratedAt() != null ?
                     report.getGeneratedAt().format(DT_FMT) : java.time.LocalDateTime.now().format(DT_FMT);
 
@@ -126,14 +136,30 @@ public class InterviewPdfService {
             candidateTable.setWidthPercentage(100);
             candidateTable.setWidths(new float[]{3.5f, 6.5f});
 
-            addSectionHeader(candidateTable, "CANDIDATE INFORMATION", sectionHeadingFont, 2);
-            addInfoRow(candidateTable, "Name:", studentUser != null ? studentUser.getName() : "Candidate #" + student.getId(), labelFont, valueFont);
-            addInfoRow(candidateTable, "Roll Number:", student.getRollNumber() != null ? student.getRollNumber() : "N/A", labelFont, valueFont);
-            addInfoRow(candidateTable, "Department:", student.getDepartment() != null ? student.getDepartment() : "N/A", labelFont, valueFont);
-            addInfoRow(candidateTable, "CGPA:", student.getCgpa() != null ? student.getCgpa().toString() + " / 10.0" : "N/A", labelFont, valueFont);
-            addInfoRow(candidateTable, "Graduation:", student.getGraduationYear() != null ? student.getGraduationYear().toString() : "N/A", labelFont, valueFont);
-            addInfoRow(candidateTable, "Email:", studentUser != null ? studentUser.getEmail() : "N/A", labelFont, valueFont);
-            addInfoRow(candidateTable, "Phone:", student.getPhone() != null ? student.getPhone() : "N/A", labelFont, valueFont);
+            if (externalStudent != null || (application != null && application.isExternal())) {
+                addSectionHeader(candidateTable, "EXTERNAL CANDIDATE INFORMATION", sectionHeadingFont, 2);
+                addInfoRow(candidateTable, "Name:", externalStudent != null && externalStudent.getFullName() != null ? externalStudent.getFullName() : (studentUser != null ? studentUser.getName() : "External Candidate"), labelFont, valueFont);
+                addInfoRow(candidateTable, "College:", externalStudent != null && externalStudent.getCollegeName() != null ? externalStudent.getCollegeName() : "N/A", labelFont, valueFont);
+                addInfoRow(candidateTable, "Location:", externalStudent != null && externalStudent.getCollegeLocation() != null ? externalStudent.getCollegeLocation() : "N/A", labelFont, valueFont);
+                addInfoRow(candidateTable, "Degree:", (externalStudent != null && externalStudent.getDegree() != null ? externalStudent.getDegree() : "N/A") + (externalStudent != null && externalStudent.getDepartment() != null ? " (" + externalStudent.getDepartment() + ")" : ""), labelFont, valueFont);
+                addInfoRow(candidateTable, "CGPA:", externalStudent != null && externalStudent.getCgpa() != null ? externalStudent.getCgpa().toString() + " / 10.0" : "N/A", labelFont, valueFont);
+                addInfoRow(candidateTable, "Graduation:", externalStudent != null && externalStudent.getGraduationYear() != null ? externalStudent.getGraduationYear().toString() : "N/A", labelFont, valueFont);
+                addInfoRow(candidateTable, "Email:", externalStudent != null && externalStudent.getEmail() != null ? externalStudent.getEmail() : (studentUser != null ? studentUser.getEmail() : "N/A"), labelFont, valueFont);
+                addInfoRow(candidateTable, "Phone:", externalStudent != null && externalStudent.getPhone() != null ? externalStudent.getPhone() : "N/A", labelFont, valueFont);
+            } else if (student != null) {
+                addSectionHeader(candidateTable, "CANDIDATE INFORMATION", sectionHeadingFont, 2);
+                addInfoRow(candidateTable, "Name:", studentUser != null ? studentUser.getName() : "Candidate #" + student.getId(), labelFont, valueFont);
+                addInfoRow(candidateTable, "Roll Number:", student.getRollNumber() != null ? student.getRollNumber() : "N/A", labelFont, valueFont);
+                addInfoRow(candidateTable, "Department:", student.getDepartment() != null ? student.getDepartment() : "N/A", labelFont, valueFont);
+                addInfoRow(candidateTable, "CGPA:", student.getCgpa() != null ? student.getCgpa().toString() + " / 10.0" : "N/A", labelFont, valueFont);
+                addInfoRow(candidateTable, "Graduation:", student.getGraduationYear() != null ? student.getGraduationYear().toString() : "N/A", labelFont, valueFont);
+                addInfoRow(candidateTable, "Email:", studentUser != null ? studentUser.getEmail() : "N/A", labelFont, valueFont);
+                addInfoRow(candidateTable, "Phone:", student.getPhone() != null ? student.getPhone() : "N/A", labelFont, valueFont);
+            } else {
+                addSectionHeader(candidateTable, "CANDIDATE INFORMATION", sectionHeadingFont, 2);
+                addInfoRow(candidateTable, "Name:", studentUser != null ? studentUser.getName() : (application != null ? "Applicant #" + application.getStudentId() : "N/A"), labelFont, valueFont);
+                addInfoRow(candidateTable, "Email:", studentUser != null ? studentUser.getEmail() : "N/A", labelFont, valueFont);
+            }
 
             PdfPCell candidateWrapper = new PdfPCell(candidateTable);
             candidateWrapper.setBorder(Rectangle.NO_BORDER);

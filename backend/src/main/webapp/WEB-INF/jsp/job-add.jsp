@@ -119,6 +119,18 @@
                 </div>
             </div>
 
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label" for="targetAudience">Target Candidate Audience <span style="color:var(--danger);">*</span></label>
+                <select id="targetAudience" name="targetAudience" class="form-control" required>
+                    <option value="INTERNAL" ${empty job.targetAudience || job.targetAudience == 'INTERNAL' ? 'selected' : ''}>Internal CUTM Students Only</option>
+                    <option value="EXTERNAL" ${job.targetAudience == 'EXTERNAL' ? 'selected' : ''}>External University Students Only</option>
+                    <option value="BOTH" ${job.targetAudience == 'BOTH' ? 'selected' : ''}>Both Internal (CUTM) &amp; External Students</option>
+                </select>
+                <small style="color: var(--text-muted); font-size: 0.8rem; display: block; margin-top: 4px;">
+                    Control which student category can view and apply for this opportunity.
+                </small>
+            </div>
+
             <div class="form-group" style="margin-bottom: 26px;">
                 <label class="form-label" for="eligibleDepartments">Eligible Branches / Departments</label>
                 <input type="text" id="eligibleDepartments" name="eligibleDepartments" class="form-control"

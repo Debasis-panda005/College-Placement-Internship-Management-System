@@ -49,14 +49,27 @@
                     Candidate Evaluation Drive
                 </span>
                 <h2 style="font-size:1.6rem; margin:0 0 6px 0; color: var(--primary-navy); font-weight: 800;">
-                    <c:out value="${applicantUser.name}"/>
-                    <span style="font-size:1rem; font-weight:400; color:var(--text-muted); margin-left: 6px;">
-                        (<c:out value="${applicant.rollNumber}"/> &bull; <c:out value="${applicant.department}"/>)
-                    </span>
+                    <c:choose>
+                        <c:when test="${not empty externalApplicant}">
+                            <c:out value="${externalApplicant.fullName}"/>
+                            <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: #e0e7ff; color: #3730a3; vertical-align: middle; margin-left: 6px;">
+                                <i class="fa-solid fa-building-columns" style="margin-right: 4px;"></i> External Candidate
+                            </span>
+                            <span style="font-size:1rem; font-weight:400; color:var(--text-muted); margin-left: 6px;">
+                                (<c:out value="${externalApplicant.collegeName}"/> &bull; <c:out value="${externalApplicant.degree}"/> - <c:out value="${externalApplicant.department}"/>)
+                            </span>
+                        </c:when>
+                        <c:otherwise>
+                            <c:out value="${applicantUser.name}"/>
+                            <span style="font-size:1rem; font-weight:400; color:var(--text-muted); margin-left: 6px;">
+                                (<c:out value="${applicant.rollNumber}"/> &bull; <c:out value="${applicant.department}"/>)
+                            </span>
+                        </c:otherwise>
+                    </c:choose>
                 </h2>
                 <div style="font-size:0.95rem; color:var(--text-dark);">
                     Applied for: <strong style="color:var(--primary-navy);"><c:out value="${job.title}"/></strong> at <strong><c:out value="${job.company}"/></strong>
-                    &bull; Current CGPA: <strong><c:out value="${applicant.cgpa}"/></strong>
+                    &bull; Current CGPA: <strong><c:out value="${not empty externalApplicant ? externalApplicant.cgpa : applicant.cgpa}"/></strong>
                 </div>
             </div>
 
@@ -64,13 +77,13 @@
                 <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px; font-weight: 600;">Application Lifecycle Status</div>
                 <c:choose>
                     <c:when test="${application.status == 'SELECTED'}">
-                        <span class="status-badge badge-selected" style="font-size:0.9rem; padding:7px 16px; border-radius: 20px;">🎉 SELECTED</span>
+                        <span class="status-badge badge-selected" style="font-size:0.9rem; padding:7px 16px; border-radius: 20px;"><i class="fa-solid fa-circle-check" style="margin-right: 6px;"></i> SELECTED</span>
                     </c:when>
                     <c:when test="${application.status == 'REJECTED'}">
-                        <span class="status-badge badge-rejected" style="font-size:0.9rem; padding:7px 16px; border-radius: 20px;">REJECTED</span>
+                        <span class="status-badge badge-rejected" style="font-size:0.9rem; padding:7px 16px; border-radius: 20px;"><i class="fa-solid fa-circle-xmark" style="margin-right: 6px;"></i> REJECTED</span>
                     </c:when>
                     <c:when test="${application.status == 'SHORTLISTED'}">
-                        <span class="status-badge badge-shortlisted" style="font-size:0.9rem; padding:7px 16px; border-radius: 20px;">SHORTLISTED FOR INTERVIEWS</span>
+                        <span class="status-badge badge-shortlisted" style="font-size:0.9rem; padding:7px 16px; border-radius: 20px;"><i class="fa-solid fa-clock" style="margin-right: 6px;"></i> SHORTLISTED FOR INTERVIEWS</span>
                     </c:when>
                     <c:otherwise>
                         <span class="status-badge badge-applied" style="font-size:0.9rem; padding:7px 16px; border-radius: 20px;"><c:out value="${application.status}"/></span>

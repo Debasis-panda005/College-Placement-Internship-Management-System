@@ -146,6 +146,17 @@
                     </div>
                 </c:if>
 
+                <c:if test="${sessionScope.userRole != 'STUDENT'}">
+                    <div class="form-group" style="flex: 1; min-width: 150px; margin: 0;">
+                        <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Candidate Type</label>
+                        <select name="category" class="form-control" style="height: 40px;">
+                            <option value="ALL" ${selectedCategory == 'ALL' ? 'selected' : ''}>All Candidates</option>
+                            <option value="INTERNAL" ${selectedCategory == 'INTERNAL' ? 'selected' : ''}>Centurion (Internal)</option>
+                            <option value="EXTERNAL" ${selectedCategory == 'EXTERNAL' ? 'selected' : ''}>External Candidates</option>
+                        </select>
+                    </div>
+                </c:if>
+
                 <div class="form-group" style="flex: 1; min-width: 160px; margin: 0;">
                     <label class="form-label" style="font-size: 0.8rem; font-weight: 700;">Opportunity ID</label>
                     <input type="number" name="jobId" class="form-control" placeholder="e.g. 201" value="<c:out value='${selectedJobId}'/>" style="height: 40px;" />
@@ -216,8 +227,10 @@
                         </thead>
                         <tbody>
                             <c:forEach var="app" items="${applications}">
+                                <c:set var="isExt" value="${app.external or not empty externalStudentMap[app.externalStudentId] or not empty externalStudentMap[app.studentId]}" />
+                                <c:set var="extStudent" value="${not empty externalStudentMap[app.externalStudentId] ? externalStudentMap[app.externalStudentId] : externalStudentMap[app.studentId]}" />
                                 <c:set var="stud" value="${studentMap[app.studentId]}" />
-                                <c:set var="usr" value="${userMap[stud.userId]}" />
+                                <c:set var="usr" value="${not empty userMap[stud.userId] ? userMap[stud.userId] : (not empty userMap[app.studentId] ? userMap[app.studentId] : userMap[extStudent.userId])}" />
                                 <c:set var="jb" value="${jobMap[app.jobId]}" />
 
                                 <tr style="border-bottom: 1px solid var(--border-light);">
@@ -228,17 +241,39 @@
                                     </td>
 
                                     <td style="padding: 14px 16px; text-align: left;">
-                                        <div style="font-weight: 700; color: var(--text-dark);">
-                                            <c:choose>
-                                                <c:when test="${not empty usr.name}"><c:out value="${usr.name}"/></c:when>
-                                                <c:otherwise>Student #${app.studentId}</c:otherwise>
-                                            </c:choose>
-                                        </div>
-                                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
-                                            <c:if test="${not empty stud.rollNumber}">Roll: <c:out value="${stud.rollNumber}"/> &bull; </c:if>
-                                            <c:if test="${not empty stud.department}"><c:out value="${stud.department}"/> &bull; </c:if>
-                                            <c:if test="${not empty stud.cgpa}">CGPA: <strong><c:out value="${stud.cgpa}"/></strong></c:if>
-                                        </div>
+                                        <c:choose>
+                                            <c:when test="${isExt and not empty extStudent}">
+                                                <div style="font-weight: 700; color: var(--text-dark); display: flex; align-items: center; gap: 6px;">
+                                                    <c:choose>
+                                                        <c:when test="${not empty extStudent.fullName}"><c:out value="${extStudent.fullName}"/></c:when>
+                                                        <c:when test="${not empty extStudent.applicantName}"><c:out value="${extStudent.applicantName}"/></c:when>
+                                                        <c:when test="${not empty usr.name}"><c:out value="${usr.name}"/></c:when>
+                                                        <c:otherwise>External Candidate</c:otherwise>
+                                                    </c:choose>
+                                                    <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #e0e7ff; color: #3730a3;">External</span>
+                                                </div>
+                                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                                    <c:out value="${extStudent.collegeName}"/> &bull;
+                                                    <c:out value="${extStudent.degree}"/> (<c:out value="${extStudent.department}"/>) &bull;
+                                                    CGPA: <strong><c:out value="${extStudent.cgpa}"/></strong>
+                                                </div>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <div style="font-weight: 700; color: var(--text-dark);">
+                                                    <c:choose>
+                                                        <c:when test="${not empty usr.name}"><c:out value="${usr.name}"/></c:when>
+                                                        <c:when test="${not empty stud.name}"><c:out value="${stud.name}"/></c:when>
+                                                        <c:when test="${not empty stud.fullName}"><c:out value="${stud.fullName}"/></c:when>
+                                                        <c:otherwise>Student #${app.studentId}</c:otherwise>
+                                                    </c:choose>
+                                                </div>
+                                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                                    <c:if test="${not empty stud.rollNumber}">Roll: <c:out value="${stud.rollNumber}"/> &bull; </c:if>
+                                                    <c:if test="${not empty stud.department}"><c:out value="${stud.department}"/> &bull; </c:if>
+                                                    <c:if test="${not empty stud.cgpa}">CGPA: <strong><c:out value="${stud.cgpa}"/></strong></c:if>
+                                                </div>
+                                            </c:otherwise>
+                                        </c:choose>
                                     </td>
 
                                     <td style="padding: 14px 16px; text-align: left;">

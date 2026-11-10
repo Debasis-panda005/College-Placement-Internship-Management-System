@@ -149,7 +149,15 @@
         </form>
 
         <div style="text-align: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-light); font-size: 0.9rem; color: var(--text-muted);">
-            Already have an active applicant account? <a href="${pageContext.request.contextPath}/login" style="color: var(--primary-navy); font-weight: 700; text-decoration: none;">Sign in here &rarr;</a>
+            <div style="margin-bottom: 8px;">
+                Student from another college or university?
+                <a href="${pageContext.request.contextPath}/external/register" style="color: var(--accent-gold); font-weight: 700; text-decoration: none;">
+                    Register as External Student &rarr;
+                </a>
+            </div>
+            <div>
+                Already have an active applicant account? <a href="${pageContext.request.contextPath}/login" style="color: var(--primary-navy); font-weight: 700; text-decoration: none;">Sign in here &rarr;</a>
+            </div>
         </div>
     </div>
 

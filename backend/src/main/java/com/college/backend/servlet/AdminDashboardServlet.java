@@ -1,9 +1,14 @@
 package com.college.backend.servlet;
 
 import com.college.backend.dao.ApplicationDAO;
+import com.college.backend.dao.CoordinatorDAO;
+import com.college.backend.dao.ExternalStudentDAO;
 import com.college.backend.dao.InterviewDAO;
 import com.college.backend.dao.JobDAO;
 import com.college.backend.dao.StudentDAO;
+import com.college.backend.entity.Application;
+import com.college.backend.entity.Coordinator;
+import com.college.backend.entity.ExternalStudent;
 import com.college.backend.exception.DAOException;
 import com.college.backend.util.AuthUtil;
 import com.college.backend.util.CsrfUtil;
@@ -16,7 +21,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,6 +45,8 @@ public class AdminDashboardServlet extends HttpServlet {
     private JobDAO jobDAO;
     private ApplicationDAO applicationDAO;
     private InterviewDAO interviewDAO;
+    private CoordinatorDAO coordinatorDAO;
+    private ExternalStudentDAO externalStudentDAO;
 
     @Override
     public void init() {
@@ -45,6 +54,8 @@ public class AdminDashboardServlet extends HttpServlet {
         this.jobDAO = new JobDAO();
         this.applicationDAO = new ApplicationDAO();
         this.interviewDAO = new InterviewDAO();
+        this.coordinatorDAO = new CoordinatorDAO();
+        this.externalStudentDAO = new ExternalStudentDAO();
     }
 
     // Setters for testing dependency injection
@@ -62,6 +73,14 @@ public class AdminDashboardServlet extends HttpServlet {
 
     public void setInterviewDAO(InterviewDAO interviewDAO) {
         this.interviewDAO = interviewDAO;
+    }
+
+    public void setCoordinatorDAO(CoordinatorDAO coordinatorDAO) {
+        this.coordinatorDAO = coordinatorDAO;
+    }
+
+    public void setExternalStudentDAO(ExternalStudentDAO externalStudentDAO) {
+        this.externalStudentDAO = externalStudentDAO;
     }
 
     @Override
@@ -118,6 +137,38 @@ public class AdminDashboardServlet extends HttpServlet {
 
             int scheduledInterviews = interviewStats != null ? interviewStats.getOrDefault("SCHEDULED", 0) : 0;
 
+            // Retrieve external student portal metrics
+            Map<String, Integer> extMetrics = Collections.emptyMap();
+            if (externalStudentDAO != null) {
+                try {
+                    extMetrics = externalStudentDAO.getDashboardMetrics();
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "Could not load external student metrics: " + e.getMessage());
+                }
+            }
+            int totalExternalStudents = extMetrics.getOrDefault("TOTAL", 0);
+            int pendingApprovals = extMetrics.getOrDefault("PENDING", 0);
+            int approvedExternalStudents = extMetrics.getOrDefault("APPROVED", 0);
+            int rejectedExternalStudents = extMetrics.getOrDefault("REJECTED", 0);
+
+            int totalExternalApplications = 0;
+            int externalSelected = 0;
+            if (applicationDAO != null) {
+                try {
+                    List<Application> allApps = applicationDAO.getAllApplications();
+                    if (allApps != null) {
+                        for (Application app : allApps) {
+                            if (app.isExternal()) {
+                                totalExternalApplications++;
+                                if ("SELECTED".equalsIgnoreCase(app.getStatus())) {
+                                    externalSelected++;
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
             // Consolidated statistics map for JSP EL expressions (e.g. ${stats.totalStudents})
             Map<String, Object> stats = new HashMap<>();
             stats.put("totalStudents", totalStudents);
@@ -129,6 +180,55 @@ public class AdminDashboardServlet extends HttpServlet {
             stats.put("shortlistedApplications", shortlistedApplications);
             stats.put("selectedApplications", selectedApplications);
             stats.put("scheduledInterviews", scheduledInterviews);
+            stats.put("totalExternalStudents", totalExternalStudents);
+            stats.put("pendingApprovals", pendingApprovals);
+            stats.put("approvedStudents", approvedExternalStudents);
+            stats.put("rejectedStudents", rejectedExternalStudents);
+            stats.put("externalApplications", totalExternalApplications);
+            stats.put("externalSelected", externalSelected);
+
+            // Retrieve coordinator registration requests
+            List<Coordinator> coordinatorRequests = Collections.emptyList();
+            int pendingCoordinators = 0;
+            if (coordinatorDAO != null) {
+                try {
+                    coordinatorRequests = coordinatorDAO.getAllRegistrationRequests();
+                    pendingCoordinators = coordinatorDAO.countPendingRequests();
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "Could not load coordinator requests: " + e.getMessage());
+                }
+            }
+            stats.put("pendingCoordinators", pendingCoordinators);
+            request.setAttribute("coordinatorRequests", coordinatorRequests);
+            request.setAttribute("pendingCoordinatorCount", pendingCoordinators);
+
+            // Filter/search external candidate directory
+            String extSearchQuery = request.getParameter("extQuery");
+            String extStatusFilter = request.getParameter("extStatus");
+            String extDegreeFilter = request.getParameter("extDegree");
+            String extCollegeFilter = request.getParameter("extCollege");
+
+            List<ExternalStudent> externalStudentsList = Collections.emptyList();
+            if (externalStudentDAO != null) {
+                try {
+                    if ((extSearchQuery != null && !extSearchQuery.trim().isEmpty()) ||
+                        (extStatusFilter != null && !extStatusFilter.trim().isEmpty() && !"ALL".equalsIgnoreCase(extStatusFilter)) ||
+                        (extDegreeFilter != null && !extDegreeFilter.trim().isEmpty()) ||
+                        (extCollegeFilter != null && !extCollegeFilter.trim().isEmpty())) {
+                        externalStudentsList = externalStudentDAO.searchExternalStudents(
+                            extSearchQuery, extStatusFilter, extDegreeFilter, extCollegeFilter);
+                    } else {
+                        externalStudentsList = externalStudentDAO.findAll();
+                    }
+                } catch (Exception e) {
+                    LOGGER.log(Level.WARNING, "Could not load external students directory: " + e.getMessage());
+                }
+            }
+            request.setAttribute("externalStudents", externalStudentsList);
+            request.setAttribute("selectedExtQuery", extSearchQuery != null ? extSearchQuery.trim() : "");
+            request.setAttribute("selectedExtStatus", extStatusFilter != null ? extStatusFilter.trim() : "ALL");
+            request.setAttribute("selectedExtDegree", extDegreeFilter != null ? extDegreeFilter.trim() : "");
+            request.setAttribute("selectedExtCollege", extCollegeFilter != null ? extCollegeFilter.trim() : "");
 
             request.setAttribute("stats", stats);
 
@@ -142,6 +242,12 @@ public class AdminDashboardServlet extends HttpServlet {
             request.setAttribute("shortlistedApplications", shortlistedApplications);
             request.setAttribute("selectedApplications", selectedApplications);
             request.setAttribute("scheduledInterviews", scheduledInterviews);
+            request.setAttribute("totalExternalStudents", totalExternalStudents);
+            request.setAttribute("pendingApprovals", pendingApprovals);
+            request.setAttribute("approvedStudents", approvedExternalStudents);
+            request.setAttribute("rejectedStudents", rejectedExternalStudents);
+            request.setAttribute("externalApplications", totalExternalApplications);
+            request.setAttribute("externalSelected", externalSelected);
 
         } catch (DAOException e) {
             // Log internally and present user-safe error without exposing database details or credentials
@@ -159,7 +265,18 @@ public class AdminDashboardServlet extends HttpServlet {
             stats.put("shortlistedApplications", 0);
             stats.put("selectedApplications", 0);
             stats.put("scheduledInterviews", 0);
+            stats.put("pendingCoordinators", 0);
+            stats.put("totalExternalStudents", 0);
+            stats.put("pendingApprovals", 0);
+            stats.put("approvedStudents", 0);
+            stats.put("rejectedStudents", 0);
+            stats.put("externalApplications", 0);
+            stats.put("externalSelected", 0);
             request.setAttribute("stats", stats);
+
+            request.setAttribute("coordinatorRequests", Collections.emptyList());
+            request.setAttribute("pendingCoordinatorCount", 0);
+            request.setAttribute("externalStudents", Collections.emptyList());
 
             request.setAttribute("totalStudents", 0);
             request.setAttribute("totalJobs", 0);
@@ -170,6 +287,12 @@ public class AdminDashboardServlet extends HttpServlet {
             request.setAttribute("shortlistedApplications", 0);
             request.setAttribute("selectedApplications", 0);
             request.setAttribute("scheduledInterviews", 0);
+            request.setAttribute("totalExternalStudents", 0);
+            request.setAttribute("pendingApprovals", 0);
+            request.setAttribute("approvedStudents", 0);
+            request.setAttribute("rejectedStudents", 0);
+            request.setAttribute("externalApplications", 0);
+            request.setAttribute("externalSelected", 0);
         }
 
         request.getRequestDispatcher("/WEB-INF/jsp/admin-dashboard.jsp").forward(request, response);

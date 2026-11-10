@@ -62,6 +62,26 @@ public class RoleAuthorizationFilter implements Filter {
             }
         }
 
+        // 1.1 ADMIN ONLY RESTRICTIONS: Coordinator approval operations
+        if (path.equals("/admin/coordinators") || path.startsWith("/admin/coordinators/")) {
+            if (!User.ROLE_ADMIN.equals(role)) {
+                httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "Access Denied: Only administrators can approve or reject coordinator registration requests.");
+                return;
+            }
+        }
+
+        // 1.2 ADMIN ONLY RESTRICTIONS: External Student approval/rejection mutations
+        if (path.equals("/admin/external-students") || path.startsWith("/admin/external-students/")) {
+            if (!"GET".equalsIgnoreCase(method)) {
+                if (!User.ROLE_ADMIN.equals(role)) {
+                    httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN,
+                            "Access Denied: Only administrators can approve or reject external student registration requests.");
+                    return;
+                }
+            }
+        }
+
         // Job Management (creation, editing, deleting, toggling status)
         if (path.equals("/jobs") || path.startsWith("/jobs/") ||
             path.equals("/internships") || path.startsWith("/internships/")) {

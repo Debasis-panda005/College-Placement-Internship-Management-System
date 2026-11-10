@@ -34,52 +34,6 @@ public class JobDAO {
             return false;
         }
 
-        if (job.getDuration() != null && !job.getDuration().trim().isEmpty()) {
-            String sqlWithDuration = "INSERT INTO jobs (title, company, location, description, salary, duration, job_type, status, deadline, min_cgpa, eligible_departments) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            try (Connection connection = getConnection();
-                 PreparedStatement statement = connection.prepareStatement(sqlWithDuration, Statement.RETURN_GENERATED_KEYS)) {
-
-                statement.setString(1, job.getTitle());
-                statement.setString(2, job.getCompany());
-                statement.setString(3, job.getLocation());
-                statement.setString(4, job.getDescription());
-                statement.setString(5, job.getSalary());
-                statement.setString(6, job.getDuration());
-                statement.setString(7, job.getJobType());
-                statement.setString(8, job.getStatus() != null ? job.getStatus() : "Active");
-                if (job.getDeadline() != null) {
-                    statement.setDate(9, Date.valueOf(job.getDeadline()));
-                } else {
-                    statement.setNull(9, Types.DATE);
-                }
-                statement.setBigDecimal(10, job.getMinCgpa());
-                statement.setString(11, job.getEligibleDepartments());
-
-                int affected = statement.executeUpdate();
-                if (affected > 0) {
-                    try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
-                        if (generatedKeys.next()) {
-                            job.setId(generatedKeys.getLong(1));
-                        }
-                    }
-                    return true;
-                }
-                return false;
-            } catch (SQLException e) {
-                // If duration column is not present in schema, fallback to insert without duration
-                if (e.getErrorCode() == 1054 || (e.getMessage() != null && e.getMessage().toLowerCase().contains("duration"))) {
-                    return addJobWithoutDuration(job);
-                }
-                e.printStackTrace();
-                return false;
-            }
-        }
-
-        return addJobWithoutDuration(job);
-    }
-
-    private boolean addJobWithoutDuration(Job job) {
         String sql = "INSERT INTO jobs (title, company, location, description, salary, job_type, status, deadline, min_cgpa, eligible_departments) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -108,15 +62,33 @@ public class JobDAO {
                         job.setId(generatedKeys.getLong(1));
                     }
                 }
+                if (job.getId() != null) {
+                    String aud = job.getTargetAudience() != null ? job.getTargetAudience() : Job.AUDIENCE_INTERNAL;
+                    try (PreparedStatement audStmt = connection.prepareStatement("UPDATE jobs SET target_audience = ? WHERE id = ?")) {
+                        audStmt.setString(1, aud);
+                        audStmt.setLong(2, job.getId());
+                        audStmt.executeUpdate();
+                    } catch (SQLException ignored) {
+                    }
+
+                    if (job.getDuration() != null) {
+                        try (PreparedStatement durStmt = connection.prepareStatement("UPDATE jobs SET duration = ? WHERE id = ?")) {
+                            durStmt.setString(1, job.getDuration());
+                            durStmt.setLong(2, job.getId());
+                            durStmt.executeUpdate();
+                        } catch (SQLException ignored) {
+                        }
+                    }
+                }
                 return true;
             }
             return false;
-
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
         }
     }
+
 
     // =====================================================
     // 2. GET ALL JOBS
@@ -136,6 +108,56 @@ public class JobDAO {
 
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+
+        return jobs;
+    }
+
+    public List<Job> getActiveJobs() {
+        List<Job> jobs = new ArrayList<>();
+        String sql = "SELECT * FROM jobs WHERE status = 'Active' ORDER BY id DESC";
+
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+
+            while (resultSet.next()) {
+                jobs.add(mapResultSetToJob(resultSet));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return jobs;
+    }
+
+    public List<Job> getActiveJobsByAudience(String audience) {
+        if (audience == null || audience.trim().isEmpty() || "ALL".equalsIgnoreCase(audience.trim())) {
+            return getActiveJobs();
+        }
+
+        List<Job> jobs = new ArrayList<>();
+        String sql;
+        if ("INTERNAL".equalsIgnoreCase(audience)) {
+            sql = "SELECT * FROM jobs WHERE status = 'Active' AND (target_audience = 'INTERNAL' OR target_audience = 'BOTH' OR target_audience IS NULL) ORDER BY id DESC";
+        } else if ("EXTERNAL".equalsIgnoreCase(audience)) {
+            sql = "SELECT * FROM jobs WHERE status = 'Active' AND (target_audience = 'EXTERNAL' OR target_audience = 'BOTH') ORDER BY id DESC";
+        } else {
+            sql = "SELECT * FROM jobs WHERE status = 'Active' ORDER BY id DESC";
+        }
+
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+
+            while (resultSet.next()) {
+                jobs.add(mapResultSetToJob(resultSet));
+            }
+
+        } catch (SQLException e) {
+            // Fall back to getActiveJobs() if target_audience column not present yet
+            return getActiveJobs();
         }
 
         return jobs;
@@ -179,44 +201,6 @@ public class JobDAO {
             return false;
         }
 
-        if (job.getDuration() != null && !job.getDuration().trim().isEmpty()) {
-            String sqlWithDuration = "UPDATE jobs SET title = ?, company = ?, location = ?, description = ?, " +
-                    "salary = ?, duration = ?, job_type = ?, status = ?, deadline = ?, min_cgpa = ?, eligible_departments = ? WHERE id = ?";
-            try (Connection connection = getConnection();
-                 PreparedStatement statement = connection.prepareStatement(sqlWithDuration)) {
-
-                statement.setString(1, job.getTitle());
-                statement.setString(2, job.getCompany());
-                statement.setString(3, job.getLocation());
-                statement.setString(4, job.getDescription());
-                statement.setString(5, job.getSalary());
-                statement.setString(6, job.getDuration());
-                statement.setString(7, job.getJobType());
-                statement.setString(8, job.getStatus() != null ? job.getStatus() : "Active");
-                if (job.getDeadline() != null) {
-                    statement.setDate(9, Date.valueOf(job.getDeadline()));
-                } else {
-                    statement.setNull(9, Types.DATE);
-                }
-                statement.setBigDecimal(10, job.getMinCgpa());
-                statement.setString(11, job.getEligibleDepartments());
-                statement.setLong(12, job.getId());
-
-                return statement.executeUpdate() > 0;
-            } catch (SQLException e) {
-                // If duration column is not present in schema, fallback to update without duration
-                if (e.getErrorCode() == 1054 || (e.getMessage() != null && e.getMessage().toLowerCase().contains("duration"))) {
-                    return updateJobWithoutDuration(job);
-                }
-                e.printStackTrace();
-                return false;
-            }
-        }
-
-        return updateJobWithoutDuration(job);
-    }
-
-    private boolean updateJobWithoutDuration(Job job) {
         String sql = "UPDATE jobs SET title = ?, company = ?, location = ?, description = ?, " +
                 "salary = ?, job_type = ?, status = ?, deadline = ?, min_cgpa = ?, eligible_departments = ? WHERE id = ?";
 
@@ -239,8 +223,26 @@ public class JobDAO {
             statement.setString(10, job.getEligibleDepartments());
             statement.setLong(11, job.getId());
 
-            return statement.executeUpdate() > 0;
+            boolean updated = statement.executeUpdate() > 0;
+            if (updated) {
+                String aud = job.getTargetAudience() != null ? job.getTargetAudience() : Job.AUDIENCE_INTERNAL;
+                try (PreparedStatement audStmt = connection.prepareStatement("UPDATE jobs SET target_audience = ? WHERE id = ?")) {
+                    audStmt.setString(1, aud);
+                    audStmt.setLong(2, job.getId());
+                    audStmt.executeUpdate();
+                } catch (SQLException ignored) {
+                }
 
+                if (job.getDuration() != null) {
+                    try (PreparedStatement durStmt = connection.prepareStatement("UPDATE jobs SET duration = ? WHERE id = ?")) {
+                        durStmt.setString(1, job.getDuration());
+                        durStmt.setLong(2, job.getId());
+                        durStmt.executeUpdate();
+                    } catch (SQLException ignored) {
+                    }
+                }
+            }
+            return updated;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -546,6 +548,14 @@ public class JobDAO {
             job.setDuration(resultSet.getString("duration"));
         } catch (SQLException ignored) {
             // column not present in pre-migration schema
+        }
+
+        try {
+            String aud = resultSet.getString("target_audience");
+            job.setTargetAudience(aud != null ? aud : Job.AUDIENCE_INTERNAL);
+        } catch (SQLException ignored) {
+            // column not present in pre-migration schema
+            job.setTargetAudience(Job.AUDIENCE_INTERNAL);
         }
 
         return job;

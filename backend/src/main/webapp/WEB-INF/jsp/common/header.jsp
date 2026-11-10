@@ -46,7 +46,7 @@
             <i class="fa fa-bars"></i>
         </button>
 
-        <nav id="portalNav">
+        <nav id="portalNav" class="portal-nav" aria-label="Main Navigation">
             <ul class="nav-links-list">
                 <li class="nav-link-item ${param.activeNav == 'home' || activeNav == 'home' ? 'active' : ''}">
                     <a href="${pageContext.request.contextPath}/"><i class="fa fa-home"></i> Home</a>
@@ -55,21 +55,42 @@
                 <c:choose>
                     <%-- STUDENT NAVIGATION --%>
                     <c:when test="${sessionScope.userRole == 'STUDENT'}">
-                        <li class="nav-link-item ${param.activeNav == 'jobs' || activeNav == 'jobs' ? 'active' : ''}">
-                            <a href="${pageContext.request.contextPath}/jobs"><i class="fa fa-briefcase"></i> Opportunities</a>
-                        </li>
-                        <li class="nav-link-item ${param.activeNav == 'applications' || activeNav == 'applications' ? 'active' : ''}">
-                            <a href="${pageContext.request.contextPath}/applications"><i class="fa fa-file-alt"></i> My Applications</a>
-                        </li>
-                        <li class="nav-link-item ${param.activeNav == 'shortlist' || activeNav == 'shortlist' ? 'active' : ''}">
-                            <a href="${pageContext.request.contextPath}/shortlist"><i class="fa fa-star"></i> Shortlisted</a>
-                        </li>
-                        <li class="nav-link-item ${param.activeNav == 'interviews' || activeNav == 'interviews' ? 'active' : ''}">
-                            <a href="${pageContext.request.contextPath}/interviews"><i class="fa fa-calendar-check"></i> My Interviews</a>
-                        </li>
-                        <li class="nav-link-item">
-                            <span class="nav-user-badge"><i class="fa fa-user-graduate"></i> <c:out value="${sessionScope.userName}"/></span>
-                        </li>
+                        <c:choose>
+                            <c:when test="${sessionScope.studentType == 'EXTERNAL'}">
+                                <li class="nav-link-item ${param.activeNav == 'dashboard' || activeNav == 'dashboard' ? 'active' : ''}">
+                                    <a href="${pageContext.request.contextPath}/external/dashboard"><i class="fa fa-tachometer-alt"></i> Dashboard</a>
+                                </li>
+                                <li class="nav-link-item ${param.activeNav == 'jobs' || activeNav == 'jobs' ? 'active' : ''}">
+                                    <a href="${pageContext.request.contextPath}/jobs"><i class="fa fa-briefcase"></i> Opportunities</a>
+                                </li>
+                                <li class="nav-link-item ${param.activeNav == 'applications' || activeNav == 'applications' ? 'active' : ''}">
+                                    <a href="${pageContext.request.contextPath}/applications"><i class="fa fa-file-alt"></i> My Applications</a>
+                                </li>
+                                <li class="nav-link-item ${param.activeNav == 'interviews' || activeNav == 'interviews' ? 'active' : ''}">
+                                    <a href="${pageContext.request.contextPath}/interviews"><i class="fa fa-calendar-check"></i> My Interviews</a>
+                                </li>
+                                <li class="nav-link-item nav-item-btn-start">
+                                    <span class="nav-user-badge"><i class="fa fa-external-link-alt"></i> [External] <c:out value="${sessionScope.userName}"/></span>
+                                </li>
+                            </c:when>
+                            <c:otherwise>
+                                <li class="nav-link-item ${param.activeNav == 'jobs' || activeNav == 'jobs' ? 'active' : ''}">
+                                    <a href="${pageContext.request.contextPath}/jobs"><i class="fa fa-briefcase"></i> Opportunities</a>
+                                </li>
+                                <li class="nav-link-item ${param.activeNav == 'applications' || activeNav == 'applications' ? 'active' : ''}">
+                                    <a href="${pageContext.request.contextPath}/applications"><i class="fa fa-file-alt"></i> My Applications</a>
+                                </li>
+                                <li class="nav-link-item ${param.activeNav == 'shortlist' || activeNav == 'shortlist' ? 'active' : ''}">
+                                    <a href="${pageContext.request.contextPath}/shortlist"><i class="fa fa-star"></i> Shortlisted</a>
+                                </li>
+                                <li class="nav-link-item ${param.activeNav == 'interviews' || activeNav == 'interviews' ? 'active' : ''}">
+                                    <a href="${pageContext.request.contextPath}/interviews"><i class="fa fa-calendar-check"></i> My Interviews</a>
+                                </li>
+                                <li class="nav-link-item nav-item-btn-start">
+                                    <span class="nav-user-badge"><i class="fa fa-user-graduate"></i> <c:out value="${sessionScope.userName}"/></span>
+                                </li>
+                            </c:otherwise>
+                        </c:choose>
                         <li class="nav-link-item">
                             <form action="${pageContext.request.contextPath}/logout" method="post" style="display:inline; margin:0; padding:0;">
                                 <input type="hidden" name="csrfToken" value="<c:out value='${sessionScope.csrfToken}'/>" />
@@ -95,7 +116,7 @@
                         <li class="nav-link-item ${param.activeNav == 'interviews' || activeNav == 'interviews' ? 'active' : ''}">
                             <a href="${pageContext.request.contextPath}/interviews"><i class="fa fa-calendar-alt"></i> Interviews</a>
                         </li>
-                        <li class="nav-link-item">
+                        <li class="nav-link-item nav-item-btn-start">
                             <span class="nav-user-badge">
                                 <c:choose>
                                     <c:when test="${sessionScope.userRole == 'ADMIN'}"><i class="fa fa-shield-alt"></i> Admin</c:when>
@@ -132,14 +153,14 @@
                         <li class="nav-link-item">
                             <a href="${pageContext.request.contextPath}/#contact"><i class="fa fa-envelope"></i> Contact</a>
                         </li>
-                        <li class="nav-link-item">
-                            <a href="${pageContext.request.contextPath}/login" class="btn-nav-highlight"><i class="fa fa-lock"></i> Student Sign In</a>
+                        <li class="nav-link-item nav-item-btn-start">
+                            <a href="${pageContext.request.contextPath}/login" class="btn-nav-highlight"><i class="fa-solid fa-right-to-bracket"></i> Student Sign In</a>
                         </li>
                         <li class="nav-link-item">
-                            <a href="${pageContext.request.contextPath}/login?role=coordinator" class="btn-nav-coordinator" title="Coordinator Portal Sign In"><span aria-hidden="true" style="margin-right: 4px;">🔐</span> Coordinator Login</a>
+                            <a href="${pageContext.request.contextPath}/login?role=coordinator" class="btn-nav-coordinator" title="Coordinator Portal Sign In"><i class="fa-solid fa-user-shield"></i> Coordinator Login</a>
                         </li>
                         <li class="nav-link-item">
-                            <a href="${pageContext.request.contextPath}/register" class="btn-nav-gold"><i class="fa fa-user-plus"></i> Register</a>
+                            <a href="${pageContext.request.contextPath}/register" class="btn-nav-gold"><i class="fa-solid fa-user-plus"></i> Register</a>
                         </li>
                     </c:otherwise>
                 </c:choose>

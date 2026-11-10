@@ -70,6 +70,8 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 main.page-container, .portal-container {
@@ -142,51 +144,6 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
   font-size: 1.15rem;
   color: var(--primary-navy);
-}
-
-/* MOBILE NAVIGATION & TOGGLE */
-.mobile-menu-toggle {
-  display: none;
-  background: transparent;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  cursor: pointer;
-  color: var(--primary-navy);
-  font-size: 1.2rem;
-}
-
-@media (max-width: 980px) {
-  .mobile-menu-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .nav-links-list {
-    display: none !important;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: #ffffff;
-    flex-direction: column;
-    align-items: stretch !important;
-    padding: 16px 24px !important;
-    box-shadow: var(--shadow-lg);
-    border-bottom: 2px solid var(--accent-gold);
-    gap: 10px !important;
-    z-index: 1001;
-  }
-  
-  .nav-links-list.mobile-open {
-    display: flex !important;
-  }
-  
-  .nav-link-item a, .nav-link-item button {
-    width: 100%;
-    justify-content: flex-start;
-  }
 }
 
 /* BUTTONS */

@@ -120,6 +120,21 @@
                 </select>
             </div>
 
+            <!-- Audience Filter (Coordinators/Admins) -->
+            <c:if test="${sessionScope.userRole == 'COORDINATOR' || sessionScope.userRole == 'ADMIN'}">
+                <div class="form-group" style="flex: 1; min-width: 140px; margin: 0;">
+                    <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-dark); margin-bottom: 5px;">
+                        Audience
+                    </label>
+                    <select name="audience" class="form-control" style="height: 40px; border-radius: var(--radius-sm);">
+                        <option value="">All Audiences</option>
+                        <option value="INTERNAL" ${selectedAudience == 'INTERNAL' ? 'selected' : ''}>CUTM Only</option>
+                        <option value="EXTERNAL" ${selectedAudience == 'EXTERNAL' ? 'selected' : ''}>External Only</option>
+                        <option value="BOTH" ${selectedAudience == 'BOTH' ? 'selected' : ''}>Both CUTM &amp; External</option>
+                    </select>
+                </div>
+            </c:if>
+
             <div style="display: flex; gap: 8px; margin: 0;">
                 <button type="submit" class="btn btn-primary" style="height: 40px; padding: 0 18px; border-radius: var(--radius-sm); font-weight: 600;">
                     Filter
@@ -189,6 +204,25 @@
                                                 <i class="fa-regular fa-clock" style="font-size: 10px;"></i> <c:out value="${job.duration}"/>
                                             </div>
                                         </c:if>
+                                        <div>
+                                            <c:choose>
+                                                <c:when test="${job.targetAudience == 'EXTERNAL'}">
+                                                    <span class="badge" style="background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; font-size: 0.68rem; margin-top: 4px; display: inline-block;">
+                                                        <i class="fa fa-university"></i> External
+                                                    </span>
+                                                </c:when>
+                                                <c:when test="${job.targetAudience == 'BOTH'}">
+                                                    <span class="badge" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; font-size: 0.68rem; margin-top: 4px; display: inline-block;">
+                                                        <i class="fa fa-users"></i> All Pools
+                                                    </span>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <span class="badge" style="background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; font-size: 0.68rem; margin-top: 4px; display: inline-block;">
+                                                        <i class="fa fa-graduation-cap"></i> CUTM
+                                                    </span>
+                                                </c:otherwise>
+                                            </c:choose>
+                                        </div>
                                     </td>
 
                                     <td style="padding: 14px 16px; text-align: center;">

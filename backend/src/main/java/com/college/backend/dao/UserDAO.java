@@ -22,6 +22,8 @@ import java.time.LocalDateTime;
  */
 public class UserDAO {
 
+    private static final java.util.logging.Logger LOGGER = java.util.logging.Logger.getLogger(UserDAO.class.getName());
+
     /**
      * Finds a user by their primary key ID.
      *
@@ -34,7 +36,7 @@ public class UserDAO {
             return null;
         }
 
-        String sql = "SELECT id, name, email, password_hash, role, created_at FROM users WHERE id = ?";
+        String sql = "SELECT id, name, email, password_hash, role, status, created_at FROM users WHERE id = ?";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -48,6 +50,9 @@ public class UserDAO {
             }
 
         } catch (SQLException e) {
+            if (e.getErrorCode() == 1054) {
+                throw new DAOException("Database error: required column 'status' is missing from 'users' table (MySQL 1054): " + e.getMessage(), e);
+            }
             throw new DAOException("Database error finding user by ID " + id + ": " + e.getMessage(), e);
         }
 
@@ -68,7 +73,7 @@ public class UserDAO {
             return null;
         }
 
-        String sql = "SELECT id, name, email, password_hash, role, created_at FROM users WHERE email = ?";
+        String sql = "SELECT id, name, email, password_hash, role, status, created_at FROM users WHERE email = ?";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -82,6 +87,9 @@ public class UserDAO {
             }
 
         } catch (SQLException e) {
+            if (e.getErrorCode() == 1054) {
+                throw new DAOException("Database error: required column 'status' is missing from 'users' table (MySQL 1054): " + e.getMessage(), e);
+            }
             throw new DAOException("Database error finding user by email '" + normalizedEmail + "': " + e.getMessage(), e);
         }
 
@@ -201,7 +209,7 @@ public class UserDAO {
             throw new DuplicateRecordException("User with email '" + user.getEmail() + "' already exists.");
         }
 
-        String sql = "INSERT INTO users (name, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO users (name, email, password_hash, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?)";
 
         try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -209,9 +217,10 @@ public class UserDAO {
             statement.setString(2, user.getEmail());
             statement.setString(3, user.getPasswordHash());
             statement.setString(4, user.getRole());
+            statement.setString(5, user.getStatus() != null ? user.getStatus() : User.STATUS_APPROVED);
 
             LocalDateTime created = user.getCreatedAt() != null ? user.getCreatedAt() : LocalDateTime.now();
-            statement.setTimestamp(5, Timestamp.valueOf(created));
+            statement.setTimestamp(6, Timestamp.valueOf(created));
 
             int affected = statement.executeUpdate();
             if (affected > 0) {
@@ -227,10 +236,65 @@ public class UserDAO {
             if (e.getErrorCode() == 1062) {
                 throw new DuplicateRecordException("User with email '" + user.getEmail() + "' already exists.", e);
             }
+            if (e.getErrorCode() == 1054) {
+                throw new SQLException("Database error: required column 'status' is missing from 'users' table (MySQL 1054): " + e.getMessage(), e.getSQLState(), 1054, e);
+            }
             throw e;
         }
 
         return false;
+    }
+
+    /**
+     * Updates the status of an existing user account.
+     *
+     * @param userId user account ID
+     * @param status new approval status (e.g. APPROVED, PENDING_APPROVAL, REJECTED)
+     * @return true if status was updated
+     * @throws DAOException on database error
+     */
+    public boolean updateUserStatus(Long userId, String status) {
+        if (userId == null || status == null || status.trim().isEmpty()) {
+            throw new IllegalArgumentException("User ID and status are required.");
+        }
+        String sql = "UPDATE users SET status = ? WHERE id = ?";
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, status.trim().toUpperCase());
+            statement.setLong(2, userId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1054) {
+                throw new DAOException("Database error: required column 'status' is missing from 'users' table (MySQL 1054): " + e.getMessage(), e);
+            }
+            throw new DAOException("Database error updating user status: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Updates user status within an active transaction connection.
+     *
+     * @param connection active database connection
+     * @param userId     user account ID
+     * @param status     new approval status
+     * @return true if updated
+     * @throws SQLException on database error
+     */
+    public boolean updateUserStatus(Connection connection, Long userId, String status) throws SQLException {
+        if (connection == null || userId == null || status == null || status.trim().isEmpty()) {
+            throw new IllegalArgumentException("Connection, User ID and status are required.");
+        }
+        String sql = "UPDATE users SET status = ? WHERE id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, status.trim().toUpperCase());
+            statement.setLong(2, userId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1054) {
+                throw new SQLException("Database error: required column 'status' is missing from 'users' table (MySQL 1054): " + e.getMessage(), e.getSQLState(), 1054, e);
+            }
+            throw e;
+        }
     }
 
     /**
@@ -282,6 +346,8 @@ public class UserDAO {
         user.setEmail(rs.getString("email"));
         user.setPasswordHash(rs.getString("password_hash"));
         user.setRole(rs.getString("role"));
+
+        user.setStatus(rs.getString("status"));
 
         Timestamp ts = rs.getTimestamp("created_at");
         if (ts != null) {

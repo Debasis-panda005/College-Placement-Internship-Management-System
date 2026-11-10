@@ -8,6 +8,10 @@ public class Job implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    public static final String AUDIENCE_INTERNAL = "INTERNAL";
+    public static final String AUDIENCE_EXTERNAL = "EXTERNAL";
+    public static final String AUDIENCE_BOTH = "BOTH";
+
     private Long id;
     private String title;
     private String company;
@@ -20,6 +24,7 @@ public class Job implements Serializable {
     private LocalDate deadline;
     private BigDecimal minCgpa;
     private String eligibleDepartments;
+    private String targetAudience = AUDIENCE_INTERNAL;
 
     public Job() {
     }
@@ -315,6 +320,35 @@ public class Job implements Serializable {
             }
         }
         return false;
+    }
+
+    public String getTargetAudience() {
+        return targetAudience != null ? targetAudience : AUDIENCE_INTERNAL;
+    }
+
+    public void setTargetAudience(String targetAudience) {
+        if (targetAudience == null || targetAudience.trim().isEmpty()) {
+            this.targetAudience = AUDIENCE_INTERNAL;
+        } else {
+            this.targetAudience = targetAudience.trim().toUpperCase();
+        }
+    }
+
+    public boolean isEligibleForInternal() {
+        String aud = getTargetAudience();
+        return AUDIENCE_INTERNAL.equalsIgnoreCase(aud) || AUDIENCE_BOTH.equalsIgnoreCase(aud);
+    }
+
+    public boolean isEligibleForExternal() {
+        String aud = getTargetAudience();
+        return AUDIENCE_EXTERNAL.equalsIgnoreCase(aud) || AUDIENCE_BOTH.equalsIgnoreCase(aud);
+    }
+
+    public boolean isEligibleForAudience(String studentType) {
+        if ("EXTERNAL".equalsIgnoreCase(studentType)) {
+            return isEligibleForExternal();
+        }
+        return isEligibleForInternal();
     }
 
     @Override

@@ -26,6 +26,10 @@ public class Student implements Serializable {
     private String skills;
     private String resumeUrl;
 
+    // Joined display fields
+    private String name;
+    private String email;
+
     public Student() {
     }
 
@@ -157,6 +161,38 @@ public class Student implements Serializable {
 
     public void setResumeUrl(String resumeUrl) {
         this.resumeUrl = resumeUrl != null ? resumeUrl.trim() : null;
+    }
+
+    public String getResumePath() {
+        return resumeUrl;
+    }
+
+    public void setResumePath(String resumePath) {
+        setResumeUrl(resumePath);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getFullName() {
+        return name;
+    }
+
+    public void setFullName(String fullName) {
+        this.name = fullName;
     }
 
     @Override

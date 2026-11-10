@@ -37,11 +37,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.college.backend.dao.ExternalStudentDAO;
+import com.college.backend.entity.ExternalStudent;
+
 @WebServlet({"/interview-rounds", "/interview-rounds/*"})
 public class InterviewRoundServlet extends HttpServlet {
 
     private ApplicationDAO applicationDAO = new ApplicationDAO();
     private StudentDAO studentDAO = new StudentDAO();
+    private ExternalStudentDAO externalStudentDAO = new ExternalStudentDAO();
     private UserDAO userDAO = new UserDAO();
     private JobDAO jobDAO = new JobDAO();
     private InterviewDAO interviewDAO = new InterviewDAO();
@@ -54,6 +58,7 @@ public class InterviewRoundServlet extends HttpServlet {
     public void init() {
         this.applicationDAO = new ApplicationDAO();
         this.studentDAO = new StudentDAO();
+        this.externalStudentDAO = new ExternalStudentDAO();
         this.userDAO = new UserDAO();
         this.jobDAO = new JobDAO();
         this.interviewDAO = new InterviewDAO();
@@ -66,7 +71,9 @@ public class InterviewRoundServlet extends HttpServlet {
     // Setters for test dependency injection
     public void setApplicationDAO(ApplicationDAO applicationDAO) { this.applicationDAO = applicationDAO; }
     public void setStudentDAO(StudentDAO studentDAO) { this.studentDAO = studentDAO; }
+    public void setExternalStudentDAO(ExternalStudentDAO externalStudentDAO) { this.externalStudentDAO = externalStudentDAO; }
     public void setUserDAO(UserDAO userDAO) { this.userDAO = userDAO; }
+
     public void setJobDAO(JobDAO jobDAO) { this.jobDAO = jobDAO; }
     public void setInterviewDAO(InterviewDAO interviewDAO) { this.interviewDAO = interviewDAO; }
     public void setRoundDAO(InterviewRoundDAO roundDAO) { this.roundDAO = roundDAO; }
@@ -116,9 +123,29 @@ public class InterviewRoundServlet extends HttpServlet {
 
         // 2. Authorization check (IDOR Defense)
         Student currentStudent = null;
+        ExternalStudent currentExternal = null;
         if (!isStaff) {
-            currentStudent = studentDAO.findByUserId(sessionUserId);
-            if (currentStudent == null || !currentStudent.getId().equals(application.getStudentId())) {
+            boolean isExternalSession = "EXTERNAL".equalsIgnoreCase((String) request.getSession().getAttribute("studentType"));
+            if (isExternalSession && externalStudentDAO != null) {
+                currentExternal = externalStudentDAO.findByUserId(sessionUserId);
+            }
+            if (currentExternal == null && studentDAO != null) {
+                currentStudent = studentDAO.findByUserId(sessionUserId);
+            }
+            if (currentStudent == null && currentExternal == null && externalStudentDAO != null) {
+                currentExternal = externalStudentDAO.findByUserId(sessionUserId);
+            }
+
+            boolean isOwner = false;
+            if (currentExternal != null) {
+                Long extId = currentExternal.getId();
+                isOwner = extId.equals(application.getExternalStudentId())
+                        || (extId.equals(application.getStudentId()) && application.isExternal());
+            } else if (currentStudent != null) {
+                isOwner = currentStudent.getId().equals(application.getStudentId()) && !application.isExternal();
+            }
+
+            if (!isOwner) {
                 response.sendError(HttpServletResponse.SC_FORBIDDEN,
                         "Access denied: You are not authorized to view this application's interview rounds.");
                 return;
@@ -126,12 +153,25 @@ public class InterviewRoundServlet extends HttpServlet {
         }
 
         // Retrieve related data
-        Student applicant = studentDAO.findById(application.getStudentId());
-        User applicantUser = applicant != null ? userDAO.findById(applicant.getUserId()) : null;
-        Job job = jobDAO.getJobById(application.getJobId());
-        List<InterviewRound> rounds = roundDAO.getRoundsByApplicationId(applicationId);
-        Map<String, Integer> stats = roundDAO.getRoundStatistics(applicationId);
-        InterviewReport report = reportDAO.getReportByApplicationId(applicationId);
+        Student applicant = null;
+        ExternalStudent externalApplicant = null;
+        User applicantUser = null;
+        if (application.isExternal() && externalStudentDAO != null) {
+            Long extId = application.getExternalStudentId() != null ? application.getExternalStudentId() : application.getStudentId();
+            externalApplicant = externalStudentDAO.findById(extId);
+            if (externalApplicant != null && externalApplicant.getUserId() != null && userDAO != null) {
+                applicantUser = userDAO.findById(externalApplicant.getUserId());
+            }
+        } else if (studentDAO != null) {
+            applicant = studentDAO.findById(application.getStudentId());
+            if (applicant != null && applicant.getUserId() != null && userDAO != null) {
+                applicantUser = userDAO.findById(applicant.getUserId());
+            }
+        }
+        Job job = jobDAO != null ? jobDAO.getJobById(application.getJobId()) : null;
+        List<InterviewRound> rounds = roundDAO != null ? roundDAO.getRoundsByApplicationId(applicationId) : null;
+        Map<String, Integer> stats = roundDAO != null ? roundDAO.getRoundStatistics(applicationId) : null;
+        InterviewReport report = reportDAO != null ? reportDAO.getReportByApplicationId(applicationId) : null;
 
         int nextRoundNumber = roundDAO.getNextRoundNumber(applicationId);
         boolean hasActiveRound = roundDAO.hasActiveOrPendingRound(applicationId);
@@ -156,6 +196,7 @@ public class InterviewRoundServlet extends HttpServlet {
         request.setAttribute("application", application);
         request.setAttribute("applicant", applicant);
         request.setAttribute("applicantUser", applicantUser);
+        request.setAttribute("externalApplicant", externalApplicant);
         request.setAttribute("job", job);
         request.setAttribute("rounds", rounds);
         request.setAttribute("stats", stats);

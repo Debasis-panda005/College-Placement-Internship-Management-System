@@ -105,6 +105,23 @@
                     </span>
                 </div>
             </c:if>
+
+            <div style="background: var(--bg-subtle); padding: 16px; border-radius: var(--radius-md); border-left: 3px solid #6366f1;">
+                <span style="font-size: 0.78rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">Candidate Audience</span>
+                <span style="font-size: 0.95rem; font-weight: 700; color: #4338ca;">
+                    <c:choose>
+                        <c:when test="${job.targetAudience == 'EXTERNAL'}">
+                            <i class="fa fa-university"></i> External Students Only
+                        </c:when>
+                        <c:when test="${job.targetAudience == 'BOTH'}">
+                            <i class="fa fa-users"></i> CUTM &amp; External
+                        </c:when>
+                        <c:otherwise>
+                            <i class="fa fa-graduation-cap"></i> CUTM Internal Only
+                        </c:otherwise>
+                    </c:choose>
+                </span>
+            </div>
         </div>
 
         <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-light);">
@@ -133,18 +150,32 @@
             <c:when test="${job.status == 'Active'}">
                 <c:choose>
                     <c:when test="${not empty sessionScope.userId}">
-                        <p style="color: var(--text-muted); font-size: 0.92rem; margin: 0 0 18px 0; line-height: 1.5;">
-                            Applying will submit your verified student profile, roll number, academic CGPA, and resume directly to the recruiting team for initial eligibility screening.
-                        </p>
-                        <form action="${pageContext.request.contextPath}/applications" method="post" style="margin: 0;"
-                              onsubmit="return (typeof PortalPopups !== 'undefined') ? PortalPopups.confirmAction(event, 'Are you sure you want to apply for ${job.title} at ${job.company}?') : confirm('Are you sure you want to apply for this opportunity?');">
-                            <input type="hidden" name="action" value="apply">
-                            <input type="hidden" name="jobId" value="${job.id}">
-                            <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
-                            <button type="submit" class="btn btn-primary" style="padding: 12px 26px; font-weight: 700; font-size: 1rem; border-radius: var(--radius-md);">
-                                <i class="fa-solid fa-check" style="margin-right: 6px;"></i> Submit Application for this Opportunity
-                            </button>
-                        </form>
+                        <c:set var="isAudienceEligible" value="${(empty sessionScope.studentType or sessionScope.studentType == 'INTERNAL') ? job.eligibleForInternal : job.eligibleForExternal}" />
+                        <c:choose>
+                            <c:when test="${sessionScope.userRole == 'STUDENT' and not isAudienceEligible}">
+                                <div class="alert alert-warning" style="margin: 0; background: #fffbeb; color: #b45309; border: 1px solid #fde68a; padding: 14px 18px; border-radius: 8px; display: flex; align-items: center; gap: 10px;">
+                                    <i class="fa fa-exclamation-triangle" style="font-size: 1.2rem;"></i>
+                                    <div>
+                                        <strong>Audience Notice:</strong> This opportunity is specifically designated for
+                                        <strong><c:out value="${job.targetAudience == 'EXTERNAL' ? 'external university students' : 'Centurion University (CUTM) students'}"/></strong>.
+                                    </div>
+                                </div>
+                            </c:when>
+                            <c:otherwise>
+                                <p style="color: var(--text-muted); font-size: 0.92rem; margin: 0 0 18px 0; line-height: 1.5;">
+                                    Applying will submit your verified candidate profile, academic records, and resume directly to the recruiting team for initial screening.
+                                </p>
+                                <form action="${pageContext.request.contextPath}/applications" method="post" style="margin: 0;"
+                                      onsubmit="return (typeof PortalPopups !== 'undefined') ? PortalPopups.confirmAction(event, 'Are you sure you want to apply for ${job.title} at ${job.company}?') : confirm('Are you sure you want to apply for this opportunity?');">
+                                    <input type="hidden" name="action" value="apply">
+                                    <input type="hidden" name="jobId" value="${job.id}">
+                                    <input type="hidden" name="csrfToken" value="${sessionScope.csrfToken}">
+                                    <button type="submit" class="btn btn-primary" style="padding: 12px 26px; font-weight: 700; font-size: 1rem; border-radius: var(--radius-md);">
+                                        <i class="fa-solid fa-check" style="margin-right: 6px;"></i> Submit Application for this Opportunity
+                                    </button>
+                                </form>
+                            </c:otherwise>
+                        </c:choose>
                     </c:when>
                     <c:otherwise>
                         <p style="color: var(--text-muted); font-size: 0.92rem; margin: 0 0 16px 0;">

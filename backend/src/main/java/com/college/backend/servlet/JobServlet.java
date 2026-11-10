@@ -146,6 +146,16 @@ public class JobServlet extends HttpServlet {
                 return;
             }
 
+            HttpSession session = request.getSession(false);
+            String userRole = session != null ? (String) session.getAttribute(LoginServlet.SESSION_USER_ROLE) : null;
+            String studentType = session != null ? (String) session.getAttribute("studentType") : null;
+            if ("STUDENT".equalsIgnoreCase(userRole) && !job.isEligibleForAudience(studentType)) {
+                request.getSession().setAttribute("errorMessage", "This opportunity is exclusive to " +
+                        (Job.AUDIENCE_EXTERNAL.equalsIgnoreCase(job.getTargetAudience()) ? "external university students." : "Centurion University students."));
+                response.sendRedirect(request.getContextPath() + (isInternships ? "/internships" : "/jobs"));
+                return;
+            }
+
             request.setAttribute("job", job);
             request.getRequestDispatcher("/WEB-INF/jsp/job-details.jsp")
                     .forward(request, response);
@@ -205,6 +215,33 @@ public class JobServlet extends HttpServlet {
             }
         }
 
+        // Apply Candidate Audience Filtering
+        HttpSession session = request.getSession(false);
+        String userRole = session != null ? (String) session.getAttribute(LoginServlet.SESSION_USER_ROLE) : null;
+        String studentType = session != null ? (String) session.getAttribute("studentType") : null;
+
+        if ("STUDENT".equalsIgnoreCase(userRole)) {
+            List<Job> audienceFiltered = new ArrayList<>();
+            for (Job j : jobs) {
+                if (j.isEligibleForAudience(studentType)) {
+                    audienceFiltered.add(j);
+                }
+            }
+            jobs = audienceFiltered;
+        } else {
+            String targetAudienceParam = request.getParameter("audience");
+            if (targetAudienceParam != null && !targetAudienceParam.trim().isEmpty() && !"ALL".equalsIgnoreCase(targetAudienceParam)) {
+                List<Job> audienceFiltered = new ArrayList<>();
+                for (Job j : jobs) {
+                    if (targetAudienceParam.equalsIgnoreCase(j.getTargetAudience())) {
+                        audienceFiltered.add(j);
+                    }
+                }
+                jobs = audienceFiltered;
+                request.setAttribute("selectedAudience", targetAudienceParam);
+            }
+        }
+
         request.setAttribute("jobs", jobs);
         request.getRequestDispatcher("/WEB-INF/jsp/jobs.jsp")
                 .forward(request, response);
@@ -254,6 +291,14 @@ public class JobServlet extends HttpServlet {
             String deadlineParam = trimToNull(request.getParameter("deadline"));
             String minCgpaParam = trimToNull(request.getParameter("minCgpa"));
             String eligibleDepartments = trimToNull(request.getParameter("eligibleDepartments"));
+            String targetAudience = trimToNull(request.getParameter("targetAudience"));
+            if (Job.AUDIENCE_EXTERNAL.equalsIgnoreCase(targetAudience)) {
+                targetAudience = Job.AUDIENCE_EXTERNAL;
+            } else if (Job.AUDIENCE_BOTH.equalsIgnoreCase(targetAudience)) {
+                targetAudience = Job.AUDIENCE_BOTH;
+            } else {
+                targetAudience = Job.AUDIENCE_INTERNAL;
+            }
 
             LocalDate deadline = null;
             if (deadlineParam != null) {
@@ -262,6 +307,7 @@ public class JobServlet extends HttpServlet {
                 } catch (DateTimeParseException e) {
                     Job job = new Job(title, company, location, description, salary, duration, jobType,
                             status != null ? status : "Active", null, null, eligibleDepartments);
+                    job.setTargetAudience(targetAudience);
                     request.setAttribute("errorMessage", "Invalid Application Deadline format. Please use YYYY-MM-DD.");
                     request.setAttribute("job", job);
                     request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
@@ -277,6 +323,7 @@ public class JobServlet extends HttpServlet {
                     if (minCgpa.compareTo(BigDecimal.ZERO) < 0 || minCgpa.compareTo(new BigDecimal("10.00")) > 0) {
                         Job job = new Job(title, company, location, description, salary, duration, jobType,
                                 status != null ? status : "Active", deadline, null, eligibleDepartments);
+                        job.setTargetAudience(targetAudience);
                         request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
                         request.setAttribute("job", job);
                         request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
@@ -286,6 +333,7 @@ public class JobServlet extends HttpServlet {
                 } catch (NumberFormatException e) {
                     Job job = new Job(title, company, location, description, salary, duration, jobType,
                             status != null ? status : "Active", deadline, null, eligibleDepartments);
+                    job.setTargetAudience(targetAudience);
                     request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
                     request.setAttribute("job", job);
                     request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
@@ -295,9 +343,11 @@ public class JobServlet extends HttpServlet {
             }
 
             if (title == null || company == null || location == null || jobType == null) {
+                Job job = new Job(title, company, location, description, salary, duration, jobType,
+                        status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
+                job.setTargetAudience(targetAudience);
                 request.setAttribute("errorMessage", "Title, Company, Location, and Job Type are required.");
-                request.setAttribute("job", new Job(title, company, location, description, salary, duration, jobType,
-                        status != null ? status : "Active", deadline, minCgpa, eligibleDepartments));
+                request.setAttribute("job", job);
                 request.getRequestDispatcher("/WEB-INF/jsp/job-add.jsp")
                         .forward(request, response);
                 return;
@@ -305,6 +355,7 @@ public class JobServlet extends HttpServlet {
 
             Job job = new Job(title, company, location, description, salary, duration, jobType,
                     status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
+            job.setTargetAudience(targetAudience);
 
             boolean created = jobDAO.addJob(job);
             if (created) {
@@ -340,6 +391,21 @@ public class JobServlet extends HttpServlet {
             String deadlineParam = trimToNull(request.getParameter("deadline"));
             String minCgpaParam = trimToNull(request.getParameter("minCgpa"));
             String eligibleDepartments = trimToNull(request.getParameter("eligibleDepartments"));
+            String targetAudience = trimToNull(request.getParameter("targetAudience"));
+            if (targetAudience == null) {
+                Job existingJob = jobDAO.getJobById(id);
+                if (existingJob != null && existingJob.getTargetAudience() != null) {
+                    targetAudience = existingJob.getTargetAudience();
+                } else {
+                    targetAudience = Job.AUDIENCE_INTERNAL;
+                }
+            } else if (Job.AUDIENCE_EXTERNAL.equalsIgnoreCase(targetAudience)) {
+                targetAudience = Job.AUDIENCE_EXTERNAL;
+            } else if (Job.AUDIENCE_BOTH.equalsIgnoreCase(targetAudience)) {
+                targetAudience = Job.AUDIENCE_BOTH;
+            } else {
+                targetAudience = Job.AUDIENCE_INTERNAL;
+            }
 
             LocalDate deadline = null;
             if (deadlineParam != null) {
@@ -348,6 +414,7 @@ public class JobServlet extends HttpServlet {
                 } catch (DateTimeParseException e) {
                     Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                             status != null ? status : "Active", null, null, eligibleDepartments);
+                    job.setTargetAudience(targetAudience);
                     request.setAttribute("errorMessage", "Invalid Application Deadline format. Please use YYYY-MM-DD.");
                     request.setAttribute("job", job);
                     request.getRequestDispatcher("/WEB-INF/jsp/job-edit.jsp")
@@ -363,6 +430,7 @@ public class JobServlet extends HttpServlet {
                     if (minCgpa.compareTo(BigDecimal.ZERO) < 0 || minCgpa.compareTo(new BigDecimal("10.00")) > 0) {
                         Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                                 status != null ? status : "Active", deadline, null, eligibleDepartments);
+                        job.setTargetAudience(targetAudience);
                         request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
                         request.setAttribute("job", job);
                         request.getRequestDispatcher("/WEB-INF/jsp/job-edit.jsp")
@@ -372,6 +440,7 @@ public class JobServlet extends HttpServlet {
                 } catch (NumberFormatException e) {
                     Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                             status != null ? status : "Active", deadline, null, eligibleDepartments);
+                    job.setTargetAudience(targetAudience);
                     request.setAttribute("errorMessage", "Minimum CGPA must be a valid number between 0.00 and 10.00.");
                     request.setAttribute("job", job);
                     request.getRequestDispatcher("/WEB-INF/jsp/job-edit.jsp")
@@ -383,6 +452,7 @@ public class JobServlet extends HttpServlet {
             if (title == null || company == null || location == null || jobType == null) {
                 Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                         status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
+                job.setTargetAudience(targetAudience);
                 request.setAttribute("errorMessage", "Title, Company, Location, and Job Type are required.");
                 request.setAttribute("job", job);
                 request.getRequestDispatcher("/WEB-INF/jsp/job-edit.jsp")
@@ -392,6 +462,7 @@ public class JobServlet extends HttpServlet {
 
             Job job = new Job(id, title, company, location, description, salary, duration, jobType,
                     status != null ? status : "Active", deadline, minCgpa, eligibleDepartments);
+            job.setTargetAudience(targetAudience);
 
             boolean updated = jobDAO.updateJob(job);
             if (updated) {

@@ -19,6 +19,11 @@ public class User implements Serializable {
     public static final String ROLE_COORDINATOR = "COORDINATOR";
     public static final String ROLE_ADMIN = "ADMIN";
 
+    public static final String STATUS_APPROVED = "APPROVED";
+    public static final String STATUS_PENDING_APPROVAL = "PENDING_APPROVAL";
+    public static final String STATUS_PENDING = "PENDING";
+    public static final String STATUS_REJECTED = "REJECTED";
+
     private static final Set<String> SUPPORTED_ROLES;
 
     static {
@@ -34,6 +39,7 @@ public class User implements Serializable {
     private String email;
     private String passwordHash;
     private String role;
+    private String status = STATUS_APPROVED;
     private LocalDateTime createdAt;
 
     public User() {
@@ -44,6 +50,16 @@ public class User implements Serializable {
         this.email = normalizeEmail(email);
         this.passwordHash = passwordHash;
         setRole(role);
+        this.status = STATUS_APPROVED;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    public User(String name, String email, String passwordHash, String role, String status) {
+        this.name = name != null ? name.trim() : null;
+        this.email = normalizeEmail(email);
+        this.passwordHash = passwordHash;
+        setRole(role);
+        this.status = status != null ? status.trim().toUpperCase() : null;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -53,6 +69,17 @@ public class User implements Serializable {
         this.email = normalizeEmail(email);
         this.passwordHash = passwordHash;
         setRole(role);
+        this.status = STATUS_APPROVED;
+        this.createdAt = createdAt;
+    }
+
+    public User(Long id, String name, String email, String passwordHash, String role, String status, LocalDateTime createdAt) {
+        this.id = id;
+        this.name = name != null ? name.trim() : null;
+        this.email = normalizeEmail(email);
+        this.passwordHash = passwordHash;
+        setRole(role);
+        this.status = status != null ? status.trim().toUpperCase() : null;
         this.createdAt = createdAt;
     }
 
@@ -126,6 +153,14 @@ public class User implements Serializable {
         this.role = role.trim().toUpperCase();
     }
 
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status != null ? status.trim().toUpperCase() : null;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -144,6 +179,7 @@ public class User implements Serializable {
                 ", name='" + name + '\'' +
                 ", email='" + email + '\'' +
                 ", role='" + role + '\'' +
+                ", status='" + status + '\'' +
                 ", createdAt=" + createdAt +
                 '}';
     }

@@ -21,10 +21,13 @@
                 <c:choose>
                     <c:when test="${empty sessionScope.userId}">
                         <a href="${pageContext.request.contextPath}/login" class="btn-hero-secondary">
-                            🔐 Student Login
+                            <i class="fa-solid fa-right-to-bracket" style="margin-right: 6px;"></i> Student Login
                         </a>
-                        <a href="${pageContext.request.contextPath}/register" class="btn-hero-secondary">
-                            📝 Student Registration
+                        <a href="${pageContext.request.contextPath}/register" class="btn-hero-secondary" title="Centurion University (CUTM) Students">
+                            <i class="fa-solid fa-user-graduate" style="margin-right: 6px;"></i> CUTM Student Registration
+                        </a>
+                        <a href="${pageContext.request.contextPath}/external/register" class="btn-hero-secondary" style="border-color: var(--accent-gold); color: #fff; background: rgba(230, 154, 24, 0.18);" title="Students from Other Universities / Colleges">
+                            <i class="fa-solid fa-university" style="margin-right: 6px; color: var(--accent-gold);"></i> External Student Registration
                         </a>
                     </c:when>
                     <c:otherwise>
@@ -444,9 +447,10 @@
                         Are you a student preparing for campus recruitment? Ensure your profile is up to date with verified CGPA and resume details before upcoming drive deadlines.
                     </p>
                     <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
-                        <a href="${pageContext.request.contextPath}/register" class="btn btn-primary">Student Register</a>
-                        <a href="${pageContext.request.contextPath}/login" class="btn btn-outline">Student Login</a>
-                        <a href="${pageContext.request.contextPath}/jobs" class="btn btn-accent">View Open Drives</a>
+                        <a href="${pageContext.request.contextPath}/register" class="btn btn-primary"><i class="fa-solid fa-user-graduate" style="margin-right: 6px;"></i> CUTM Student Register</a>
+                        <a href="${pageContext.request.contextPath}/external/register" class="btn btn-accent"><i class="fa-solid fa-university" style="margin-right: 6px;"></i> External Student Register</a>
+                        <a href="${pageContext.request.contextPath}/login" class="btn btn-outline"><i class="fa-solid fa-right-to-bracket" style="margin-right: 6px;"></i> Student Login</a>
+                        <a href="${pageContext.request.contextPath}/jobs" class="btn btn-outline"><i class="fa-solid fa-briefcase" style="margin-right: 6px;"></i> View Open Drives</a>
                     </div>
                 </div>
             </div>

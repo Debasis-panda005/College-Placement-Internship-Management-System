@@ -111,7 +111,9 @@ public class AuthenticationFilter implements Filter {
         }
 
         // Authentication & registration endpoints
-        if (path.equals("/login") || path.equals("/register")) {
+        if (path.equals("/login") || path.equals("/register") ||
+            path.equals("/coordinator/register") || path.equals("/coordinator-register") ||
+            path.equals("/external/register") || path.equals("/external-register")) {
             return true;
         }
 

@@ -44,6 +44,7 @@ public class StudentDAO {
 
     /**
      * Finds a student profile by its primary key ID.
+     * Joins with users table to retrieve student full name and email.
      *
      * @param id student profile ID
      * @return Student entity if found, null if not found or id is null
@@ -54,8 +55,9 @@ public class StudentDAO {
             return null;
         }
 
-        String sql = "SELECT id, user_id, roll_number, department, cgpa, graduation_year, phone, skills, resume_url " +
-                "FROM students WHERE id = ?";
+        String sql = "SELECT s.id, s.user_id, s.roll_number, s.department, s.cgpa, s.graduation_year, s.phone, s.skills, s.resume_url, " +
+                "u.name AS student_name, u.email AS student_email " +
+                "FROM students s LEFT JOIN users u ON s.user_id = u.id WHERE s.id = ?";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -69,7 +71,19 @@ public class StudentDAO {
             }
 
         } catch (SQLException e) {
-            throw new DAOException("Database error finding student by ID " + id + ": " + e.getMessage(), e);
+            // Fallback for isolated tables without users join
+            String fallbackSql = "SELECT id, user_id, roll_number, department, cgpa, graduation_year, phone, skills, resume_url FROM students WHERE id = ?";
+            try (Connection connection = DBConnection.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(fallbackSql)) {
+                statement.setLong(1, id);
+                try (ResultSet rs = statement.executeQuery()) {
+                    if (rs.next()) {
+                        return mapResultSetToStudent(rs);
+                    }
+                }
+            } catch (SQLException ex) {
+                throw new DAOException("Database error finding student by ID " + id + ": " + ex.getMessage(), ex);
+            }
         }
 
         return null;
@@ -77,6 +91,7 @@ public class StudentDAO {
 
     /**
      * Finds a student profile associated with a specific user ID.
+     * Joins with users table to retrieve student full name and email.
      *
      * @param userId primary key of the associated user
      * @return Student entity if found, null if not found or userId is null
@@ -87,8 +102,9 @@ public class StudentDAO {
             return null;
         }
 
-        String sql = "SELECT id, user_id, roll_number, department, cgpa, graduation_year, phone, skills, resume_url " +
-                "FROM students WHERE user_id = ?";
+        String sql = "SELECT s.id, s.user_id, s.roll_number, s.department, s.cgpa, s.graduation_year, s.phone, s.skills, s.resume_url, " +
+                "u.name AS student_name, u.email AS student_email " +
+                "FROM students s LEFT JOIN users u ON s.user_id = u.id WHERE s.user_id = ?";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -102,10 +118,39 @@ public class StudentDAO {
             }
 
         } catch (SQLException e) {
-            throw new DAOException("Database error finding student by User ID " + userId + ": " + e.getMessage(), e);
+            String fallbackSql = "SELECT id, user_id, roll_number, department, cgpa, graduation_year, phone, skills, resume_url FROM students WHERE user_id = ?";
+            try (Connection connection = DBConnection.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(fallbackSql)) {
+                statement.setLong(1, userId);
+                try (ResultSet rs = statement.executeQuery()) {
+                    if (rs.next()) {
+                        return mapResultSetToStudent(rs);
+                    }
+                }
+            } catch (SQLException ex) {
+                throw new DAOException("Database error finding student by User ID " + userId + ": " + ex.getMessage(), ex);
+            }
         }
 
         return null;
+    }
+
+    /**
+     * Finds a student profile by either its primary key ID or associated User ID.
+     * Essential for legacy records where application.student_id was populated with user_id.
+     *
+     * @param id student profile ID or User ID
+     * @return Student entity if found, null otherwise
+     */
+    public Student findByIdOrUserId(Long id) {
+        if (id == null) {
+            return null;
+        }
+        Student s = findById(id);
+        if (s != null) {
+            return s;
+        }
+        return findByUserId(id);
     }
 
     /**
@@ -122,8 +167,9 @@ public class StudentDAO {
         }
         String normalizedRollNumber = rollNumber.trim().toUpperCase();
 
-        String sql = "SELECT id, user_id, roll_number, department, cgpa, graduation_year, phone, skills, resume_url " +
-                "FROM students WHERE roll_number = ?";
+        String sql = "SELECT s.id, s.user_id, s.roll_number, s.department, s.cgpa, s.graduation_year, s.phone, s.skills, s.resume_url, " +
+                "u.name AS student_name, u.email AS student_email " +
+                "FROM students s LEFT JOIN users u ON s.user_id = u.id WHERE UPPER(TRIM(s.roll_number)) = ?";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -137,7 +183,18 @@ public class StudentDAO {
             }
 
         } catch (SQLException e) {
-            throw new DAOException("Database error finding student by roll number '" + normalizedRollNumber + "': " + e.getMessage(), e);
+            String fallbackSql = "SELECT id, user_id, roll_number, department, cgpa, graduation_year, phone, skills, resume_url FROM students WHERE roll_number = ?";
+            try (Connection connection = DBConnection.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(fallbackSql)) {
+                statement.setString(1, normalizedRollNumber);
+                try (ResultSet rs = statement.executeQuery()) {
+                    if (rs.next()) {
+                        return mapResultSetToStudent(rs);
+                    }
+                }
+            } catch (SQLException ex) {
+                throw new DAOException("Database error finding student by roll number '" + normalizedRollNumber + "': " + ex.getMessage(), ex);
+            }
         }
 
         return null;
@@ -493,6 +550,16 @@ public class StudentDAO {
         student.setPhone(rs.getString("phone"));
         student.setSkills(rs.getString("skills"));
         student.setResumeUrl(rs.getString("resume_url"));
+
+        try {
+            student.setName(rs.getString("student_name"));
+        } catch (SQLException ignored) {
+        }
+        try {
+            student.setEmail(rs.getString("student_email"));
+        } catch (SQLException ignored) {
+        }
+
         return student;
     }
 

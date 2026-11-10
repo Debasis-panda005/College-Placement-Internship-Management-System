@@ -104,8 +104,10 @@
                         <tbody>
                             <c:forEach var="application" items="${applications}">
                                 <c:set var="interview" value="${interviewMap[application.id]}" />
+                                <c:set var="isExt" value="${application.external or not empty externalStudentMap[application.externalStudentId] or not empty externalStudentMap[application.studentId]}" />
+                                <c:set var="extStudent" value="${not empty externalStudentMap[application.externalStudentId] ? externalStudentMap[application.externalStudentId] : externalStudentMap[application.studentId]}" />
                                 <c:set var="stud" value="${studentMap[application.studentId]}" />
-                                <c:set var="usr" value="${userMap[stud.userId]}" />
+                                <c:set var="usr" value="${not empty userMap[stud.userId] ? userMap[stud.userId] : (not empty userMap[application.studentId] ? userMap[application.studentId] : userMap[extStudent.userId])}" />
                                 <c:set var="jb" value="${jobMap[application.jobId]}" />
                                 <c:set var="isRescheduled" value="${not empty rescheduledMap[application.id] && rescheduledMap[application.id]}" />
 
@@ -117,17 +119,39 @@
                                     </td>
 
                                     <td style="padding: 14px 16px; text-align: left;">
-                                        <div style="font-weight: 700; color: var(--text-dark);">
-                                            <c:choose>
-                                                <c:when test="${not empty usr.name}"><c:out value="${usr.name}"/></c:when>
-                                                <c:otherwise>Candidate #${application.studentId}</c:otherwise>
-                                            </c:choose>
-                                        </div>
-                                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
-                                            <c:if test="${not empty stud.rollNumber}">Roll: <c:out value="${stud.rollNumber}"/> &bull; </c:if>
-                                            <c:if test="${not empty stud.department}"><c:out value="${stud.department}"/> &bull; </c:if>
-                                            <c:if test="${not empty stud.cgpa}">CGPA: <strong><c:out value="${stud.cgpa}"/></strong></c:if>
-                                        </div>
+                                        <c:choose>
+                                            <c:when test="${isExt and not empty extStudent}">
+                                                <div style="font-weight: 700; color: var(--text-dark); display: flex; align-items: center; gap: 6px;">
+                                                    <c:choose>
+                                                        <c:when test="${not empty extStudent.fullName}"><c:out value="${extStudent.fullName}"/></c:when>
+                                                        <c:when test="${not empty extStudent.applicantName}"><c:out value="${extStudent.applicantName}"/></c:when>
+                                                        <c:when test="${not empty usr.name}"><c:out value="${usr.name}"/></c:when>
+                                                        <c:otherwise>External Candidate</c:otherwise>
+                                                    </c:choose>
+                                                    <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #e0e7ff; color: #3730a3;">External</span>
+                                                </div>
+                                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                                    <c:out value="${extStudent.collegeName}"/> &bull;
+                                                    <c:out value="${extStudent.degree}"/> (<c:out value="${extStudent.department}"/>) &bull;
+                                                    CGPA: <strong><c:out value="${extStudent.cgpa}"/></strong>
+                                                </div>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <div style="font-weight: 700; color: var(--text-dark);">
+                                                    <c:choose>
+                                                        <c:when test="${not empty usr.name}"><c:out value="${usr.name}"/></c:when>
+                                                        <c:when test="${not empty stud.name}"><c:out value="${stud.name}"/></c:when>
+                                                        <c:when test="${not empty stud.fullName}"><c:out value="${stud.fullName}"/></c:when>
+                                                        <c:otherwise>Candidate #${application.studentId}</c:otherwise>
+                                                    </c:choose>
+                                                </div>
+                                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                                    <c:if test="${not empty stud.rollNumber}">Roll: <c:out value="${stud.rollNumber}"/> &bull; </c:if>
+                                                    <c:if test="${not empty stud.department}"><c:out value="${stud.department}"/> &bull; </c:if>
+                                                    <c:if test="${not empty stud.cgpa}">CGPA: <strong><c:out value="${stud.cgpa}"/></strong></c:if>
+                                                </div>
+                                            </c:otherwise>
+                                        </c:choose>
                                     </td>
 
                                     <td style="padding: 14px 16px; text-align: left;">

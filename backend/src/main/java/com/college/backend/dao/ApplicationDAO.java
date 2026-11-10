@@ -38,10 +38,6 @@ public class ApplicationDAO {
             throw new IllegalArgumentException("Application cannot be null.");
         }
 
-        String sql = "INSERT INTO applications " +
-                "(student_id, job_id, application_date, status) " +
-                "VALUES (?, ?, ?, ?)";
-
         Connection connection = null;
 
         try {
@@ -50,36 +46,70 @@ public class ApplicationDAO {
 
             Long generatedId = null;
 
-            try (PreparedStatement statement =
-                         connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            // Try insert with applicant_type and external_student_id
+            String sqlWithExternal = "INSERT INTO applications " +
+                    "(student_id, job_id, application_date, status, applicant_type, external_student_id) " +
+                    "VALUES (?, ?, ?, ?, ?, ?)";
 
-                statement.setLong(1, application.getStudentId());
+            boolean insertSuccess = false;
+            try (PreparedStatement statement =
+                         connection.prepareStatement(sqlWithExternal, Statement.RETURN_GENERATED_KEYS)) {
+
+                Long studentId = application.getStudentId() != null
+                        ? application.getStudentId()
+                        : application.getExternalStudentId();
+                statement.setLong(1, studentId != null ? studentId : 0L);
                 statement.setLong(2, application.getJobId());
-                statement.setDate(
-                        3,
-                        Date.valueOf(application.getApplicationDate())
-                );
+                statement.setDate(3, Date.valueOf(application.getApplicationDate()));
                 statement.setString(4, application.getStatus());
+                statement.setString(5, application.getApplicantType());
+                if (application.getExternalStudentId() != null) {
+                    statement.setLong(6, application.getExternalStudentId());
+                } else {
+                    statement.setNull(6, java.sql.Types.BIGINT);
+                }
 
                 int affected = statement.executeUpdate();
-                if (affected <= 0) {
-                    connection.rollback();
-                    return false;
-                }
-
-                try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        generatedId = generatedKeys.getLong(1);
-                        application.setId(generatedId);
+                if (affected > 0) {
+                    insertSuccess = true;
+                    try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
+                        if (generatedKeys.next()) {
+                            generatedId = generatedKeys.getLong(1);
+                            application.setId(generatedId);
+                        }
                     }
                 }
+            } catch (SQLException e) {
+                // If applicant_type or external_student_id column doesn't exist, fallback to classic insert
+                if (e.getErrorCode() == 1054 || (e.getMessage() != null &&
+                        (e.getMessage().toLowerCase().contains("applicant_type") || e.getMessage().toLowerCase().contains("external_student_id")))) {
+                    String fallbackSql = "INSERT INTO applications (student_id, job_id, application_date, status) VALUES (?, ?, ?, ?)";
+                    try (PreparedStatement fbStmt = connection.prepareStatement(fallbackSql, Statement.RETURN_GENERATED_KEYS)) {
+                        Long studentId = application.getStudentId() != null
+                                ? application.getStudentId()
+                                : application.getExternalStudentId();
+                        fbStmt.setLong(1, studentId != null ? studentId : 0L);
+                        fbStmt.setLong(2, application.getJobId());
+                        fbStmt.setDate(3, Date.valueOf(application.getApplicationDate()));
+                        fbStmt.setString(4, application.getStatus());
+
+                        int affected = fbStmt.executeUpdate();
+                        if (affected > 0) {
+                            insertSuccess = true;
+                            try (ResultSet generatedKeys = fbStmt.getGeneratedKeys()) {
+                                if (generatedKeys.next()) {
+                                    generatedId = generatedKeys.getLong(1);
+                                    application.setId(generatedId);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    throw e;
+                }
             }
 
-            if (generatedId == null) {
-                generatedId = application.getId();
-            }
-
-            if (generatedId == null) {
+            if (!insertSuccess || generatedId == null) {
                 connection.rollback();
                 return false;
             }
@@ -107,8 +137,7 @@ public class ApplicationDAO {
                 }
             }
             if (e.getErrorCode() == 1062) {
-                throw new DuplicateRecordException("Application already exists for student ID "
-                        + application.getStudentId() + " and job ID " + application.getJobId() + ".", e);
+                throw new DuplicateRecordException("Application already exists for candidate and job ID " + application.getJobId() + ".", e);
             }
             throw new DAOException("Database error occurred while creating application.", e);
         } finally {
@@ -139,35 +168,7 @@ public class ApplicationDAO {
              ResultSet resultSet = statement.executeQuery()) {
 
             while (resultSet.next()) {
-
-                Application application = new Application();
-
-                application.setId(
-                        resultSet.getLong("id")
-                );
-
-                application.setStudentId(
-                        resultSet.getLong("student_id")
-                );
-
-                application.setJobId(
-                        resultSet.getLong("job_id")
-                );
-
-                Date date =
-                        resultSet.getDate("application_date");
-
-                if (date != null) {
-                    application.setApplicationDate(
-                            date.toLocalDate()
-                    );
-                }
-
-                application.setStatus(
-                        resultSet.getString("status")
-                );
-
-                applications.add(application);
+                applications.add(mapResultSetToApplication(resultSet));
             }
 
         } catch (SQLException e) {
@@ -183,6 +184,9 @@ public class ApplicationDAO {
     // =====================================================
 
     public Application getApplicationById(Long id) {
+        if (id == null) {
+            return null;
+        }
 
         String sql =
                 "SELECT * FROM applications WHERE id = ?";
@@ -197,36 +201,7 @@ public class ApplicationDAO {
                          statement.executeQuery()) {
 
                 if (resultSet.next()) {
-
-                    Application application =
-                            new Application();
-
-                    application.setId(
-                            resultSet.getLong("id")
-                    );
-
-                    application.setStudentId(
-                            resultSet.getLong("student_id")
-                    );
-
-                    application.setJobId(
-                            resultSet.getLong("job_id")
-                    );
-
-                    Date date =
-                            resultSet.getDate("application_date");
-
-                    if (date != null) {
-                        application.setApplicationDate(
-                                date.toLocalDate()
-                        );
-                    }
-
-                    application.setStatus(
-                            resultSet.getString("status")
-                    );
-
-                    return application;
+                    return mapResultSetToApplication(resultSet);
                 }
             }
 
@@ -243,51 +218,64 @@ public class ApplicationDAO {
     // =====================================================
 
     public boolean updateApplication(Application application) {
+        if (application == null || application.getId() == null) {
+            return false;
+        }
 
         String sql =
                 "UPDATE applications SET " +
                         "student_id = ?, " +
                         "job_id = ?, " +
                         "application_date = ?, " +
-                        "status = ? " +
+                        "status = ?, " +
+                        "applicant_type = ?, " +
+                        "external_student_id = ? " +
                         "WHERE id = ?";
 
         try (Connection connection = DBConnection.getConnection();
              PreparedStatement statement =
                      connection.prepareStatement(sql)) {
 
-            statement.setLong(
-                    1,
-                    application.getStudentId()
-            );
-
-            statement.setLong(
-                    2,
-                    application.getJobId()
-            );
-
-            statement.setDate(
-                    3,
-                    Date.valueOf(
-                            application.getApplicationDate()
-                    )
-            );
-
-            statement.setString(
-                    4,
-                    application.getStatus()
-            );
-
-            statement.setLong(
-                    5,
-                    application.getId()
-            );
+            Long sId = application.getStudentId() != null ? application.getStudentId() : application.getExternalStudentId();
+            if (sId != null) {
+                statement.setLong(1, sId);
+            } else {
+                statement.setNull(1, java.sql.Types.BIGINT);
+            }
+            statement.setLong(2, application.getJobId());
+            statement.setDate(3, Date.valueOf(application.getApplicationDate()));
+            statement.setString(4, application.getStatus());
+            statement.setString(5, application.getApplicantType());
+            if (application.getExternalStudentId() != null) {
+                statement.setLong(6, application.getExternalStudentId());
+            } else {
+                statement.setNull(6, java.sql.Types.BIGINT);
+            }
+            statement.setLong(7, application.getId());
 
             return statement.executeUpdate() > 0;
 
         } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
+            // Fallback for pre-migration schema
+            String fallbackSql =
+                    "UPDATE applications SET " +
+                            "student_id = ?, " +
+                            "job_id = ?, " +
+                            "application_date = ?, " +
+                            "status = ? " +
+                            "WHERE id = ?";
+            try (Connection connection = DBConnection.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(fallbackSql)) {
+                statement.setLong(1, application.getStudentId() != null ? application.getStudentId() : 0L);
+                statement.setLong(2, application.getJobId());
+                statement.setDate(3, Date.valueOf(application.getApplicationDate()));
+                statement.setString(4, application.getStatus());
+                statement.setLong(5, application.getId());
+                return statement.executeUpdate() > 0;
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+                return false;
+            }
         }
     }
 
@@ -529,35 +517,7 @@ public class ApplicationDAO {
              ResultSet resultSet = statement.executeQuery()) {
 
             while (resultSet.next()) {
-
-                Application application = new Application();
-
-                application.setId(
-                        resultSet.getLong("id")
-                );
-
-                application.setStudentId(
-                        resultSet.getLong("student_id")
-                );
-
-                application.setJobId(
-                        resultSet.getLong("job_id")
-                );
-
-                Date date =
-                        resultSet.getDate("application_date");
-
-                if (date != null) {
-                    application.setApplicationDate(
-                            date.toLocalDate()
-                    );
-                }
-
-                application.setStatus(
-                        resultSet.getString("status")
-                );
-
-                applications.add(application);
+                applications.add(mapResultSetToApplication(resultSet));
             }
 
         } catch (SQLException e) {
@@ -577,13 +537,14 @@ public class ApplicationDAO {
             return false;
         }
 
-        String sql = "SELECT COUNT(*) FROM applications WHERE student_id = ? AND job_id = ?";
+        String sql = "SELECT COUNT(*) FROM applications WHERE (student_id = ? OR external_student_id = ?) AND job_id = ?";
 
         try (Connection connection = getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setLong(1, studentId);
-            statement.setLong(2, jobId);
+            statement.setLong(2, studentId);
+            statement.setLong(3, jobId);
 
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (resultSet.next()) {
@@ -592,7 +553,20 @@ public class ApplicationDAO {
             }
 
         } catch (SQLException e) {
-            throw new DAOException("Database error checking existing application: " + e.getMessage(), e);
+            // Fallback for pre-migration schema
+            String fallbackSql = "SELECT COUNT(*) FROM applications WHERE student_id = ? AND job_id = ?";
+            try (Connection connection = getConnection();
+                 PreparedStatement statement = connection.prepareStatement(fallbackSql)) {
+                statement.setLong(1, studentId);
+                statement.setLong(2, jobId);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (resultSet.next()) {
+                        return resultSet.getInt(1) > 0;
+                    }
+                }
+            } catch (SQLException ex) {
+                throw new DAOException("Database error checking existing application: " + ex.getMessage(), ex);
+            }
         }
 
         return false;
@@ -610,7 +584,7 @@ public class ApplicationDAO {
         StringBuilder sql = new StringBuilder("SELECT * FROM applications WHERE 1=1");
 
         if (studentId != null) {
-            sql.append(" AND student_id = ?");
+            sql.append(" AND (student_id = ? OR external_student_id = ?)");
         }
 
         if (jobId != null) {
@@ -630,6 +604,7 @@ public class ApplicationDAO {
 
             if (studentId != null) {
                 statement.setLong(index++, studentId);
+                statement.setLong(index++, studentId);
             }
 
             if (jobId != null) {
@@ -642,25 +617,53 @@ public class ApplicationDAO {
 
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
-                    Application application = new Application();
-                    application.setId(resultSet.getLong("id"));
-                    application.setStudentId(resultSet.getLong("student_id"));
-                    application.setJobId(resultSet.getLong("job_id"));
-
-                    Date date = resultSet.getDate("application_date");
-                    if (date != null) {
-                        application.setApplicationDate(date.toLocalDate());
-                    }
-
-                    application.setStatus(resultSet.getString("status"));
-                    applications.add(application);
+                    applications.add(mapResultSetToApplication(resultSet));
                 }
             }
 
         } catch (SQLException e) {
+            if (studentId != null && (e.getErrorCode() == 1054 || (e.getMessage() != null && e.getMessage().contains("external_student_id")))) {
+                return searchApplicationsLegacy(studentId, jobId, status);
+            }
             e.printStackTrace();
         }
 
+        return applications;
+    }
+
+    private List<Application> searchApplicationsLegacy(Long studentId, Long jobId, String status) {
+        List<Application> applications = new ArrayList<>();
+        StringBuilder sql = new StringBuilder("SELECT * FROM applications WHERE 1=1");
+        if (studentId != null) {
+            sql.append(" AND student_id = ?");
+        }
+        if (jobId != null) {
+            sql.append(" AND job_id = ?");
+        }
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+            sql.append(" AND status = ?");
+        }
+        sql.append(" ORDER BY id");
+        try (Connection connection = DBConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+            int index = 1;
+            if (studentId != null) {
+                statement.setLong(index++, studentId);
+            }
+            if (jobId != null) {
+                statement.setLong(index++, jobId);
+            }
+            if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+                statement.setString(index++, status.trim());
+            }
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    applications.add(mapResultSetToApplication(resultSet));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
         return applications;
     }
 
@@ -704,5 +707,125 @@ public class ApplicationDAO {
         }
 
         return stats;
+    }
+
+    // =====================================================
+    // 13. EXTERNAL STUDENT APPLICATION HELPERS
+    // =====================================================
+
+    public List<Application> getApplicationsByExternalStudent(Long externalStudentId) {
+        if (externalStudentId == null) {
+            return new ArrayList<>();
+        }
+        List<Application> applications = new ArrayList<>();
+        String sql = "SELECT * FROM applications WHERE external_student_id = ? OR (student_id = ? AND applicant_type = 'EXTERNAL') ORDER BY id DESC";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, externalStudentId);
+            stmt.setLong(2, externalStudentId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    applications.add(mapResultSetToApplication(rs));
+                }
+            }
+        } catch (SQLException e) {
+            // Fallback for pre-migration schema
+            String fallbackSql = "SELECT * FROM applications WHERE student_id = ? ORDER BY id DESC";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(fallbackSql)) {
+                stmt.setLong(1, externalStudentId);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        applications.add(mapResultSetToApplication(rs));
+                    }
+                }
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+        }
+        return applications;
+    }
+
+    public boolean hasAlreadyAppliedExternal(Long externalStudentId, Long jobId) {
+        if (externalStudentId == null || jobId == null) {
+            return false;
+        }
+        String sql = "SELECT COUNT(*) FROM applications WHERE (external_student_id = ? OR (student_id = ? AND applicant_type = 'EXTERNAL')) AND job_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, externalStudentId);
+            stmt.setLong(2, externalStudentId);
+            stmt.setLong(3, jobId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            // Fallback for pre-migration schema
+            String fallbackSql = "SELECT COUNT(*) FROM applications WHERE student_id = ? AND job_id = ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(fallbackSql)) {
+                stmt.setLong(1, externalStudentId);
+                stmt.setLong(2, jobId);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1) > 0;
+                    }
+                }
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+        }
+        return false;
+    }
+
+    public Application mapResultSetToApplication(ResultSet rs) throws SQLException {
+        Application app = new Application();
+        app.setId(rs.getLong("id"));
+
+        long studentId = rs.getLong("student_id");
+        if (!rs.wasNull()) {
+            app.setStudentId(studentId);
+        }
+
+        app.setJobId(rs.getLong("job_id"));
+        Date date = rs.getDate("application_date");
+        if (date != null) {
+            app.setApplicationDate(date.toLocalDate());
+        }
+        app.setStatus(rs.getString("status"));
+
+        String appType = null;
+        try {
+            appType = rs.getString("applicant_type");
+        } catch (SQLException ignored) {
+        }
+
+        Long extId = null;
+        try {
+            long val = rs.getLong("external_student_id");
+            if (!rs.wasNull()) {
+                extId = val;
+                app.setExternalStudentId(extId);
+            }
+        } catch (SQLException ignored) {
+        }
+
+        if (extId != null) {
+            app.setApplicantType(Application.APPLICANT_EXTERNAL);
+            if (app.getStudentId() == null) {
+                app.setStudentId(extId);
+            }
+        } else if (appType != null && !appType.trim().isEmpty()) {
+            app.setApplicantType(appType.trim().toUpperCase());
+            if (Application.APPLICANT_EXTERNAL.equalsIgnoreCase(appType) && app.getStudentId() != null) {
+                app.setExternalStudentId(app.getStudentId());
+            }
+        } else {
+            app.setApplicantType(Application.APPLICANT_INTERNAL);
+        }
+
+        return app;
     }
 }

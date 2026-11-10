@@ -47,10 +47,22 @@
             <div>
                 <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Candidate Profile</span>
                 <span style="font-size: 1.05rem; font-weight: 700; color: var(--text-dark);">
-                    <c:out value="${not empty studentUser ? studentUser.name : (not empty student ? student.rollNumber : 'Candidate')}"/>
+                    <c:choose>
+                        <c:when test="${not empty studentUser && not empty studentUser.name}"><c:out value="${studentUser.name}"/></c:when>
+                        <c:when test="${not empty externalStudent && not empty externalStudent.fullName}"><c:out value="${externalStudent.fullName}"/></c:when>
+                        <c:when test="${not empty externalStudent && not empty externalStudent.applicantName}"><c:out value="${externalStudent.applicantName}"/></c:when>
+                        <c:when test="${not empty student && not empty student.name}"><c:out value="${student.name}"/></c:when>
+                        <c:when test="${not empty student && not empty student.fullName}"><c:out value="${student.fullName}"/></c:when>
+                        <c:when test="${not empty student && not empty student.rollNumber}"><c:out value="${student.rollNumber}"/></c:when>
+                        <c:otherwise>Candidate</c:otherwise>
+                    </c:choose>
                 </span>
                 <span style="font-size: 0.82rem; color: var(--text-muted); display: block; margin-top: 2px;">
-                    Roll: <c:out value="${not empty student ? student.rollNumber : '-'}"/>
+                    <c:choose>
+                        <c:when test="${not empty student && not empty student.rollNumber}">Roll: <c:out value="${student.rollNumber}"/></c:when>
+                        <c:when test="${not empty externalStudent && not empty externalStudent.collegeName}"><c:out value="${externalStudent.collegeName}"/></c:when>
+                        <c:otherwise>-</c:otherwise>
+                    </c:choose>
                 </span>
             </div>
             <div>
